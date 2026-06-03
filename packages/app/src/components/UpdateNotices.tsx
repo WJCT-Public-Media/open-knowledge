@@ -126,6 +126,7 @@ export function UpdateNotices(): ReactNode {
       <NoticeCard
         notice={active}
         onDismiss={() => {
+          active.onDismiss?.();
           dismissNotice(active.id);
         }}
       />

@@ -815,7 +815,7 @@ describe('versionAtLeast (MMP compare)', () => {
   });
 });
 
-describe('multi-window delivery: relaunch banner everywhere, "updated to" notice on the primary only', () => {
+describe('multi-window delivery: relaunch banner and "updated to" notice both reach every window', () => {
   test('ok:update:downloaded (relaunch banner) reaches every open window', () => {
     const { rig } = makeRig({ extraWindowCount: 2 });
     expect(rig.windows).toHaveLength(3);
@@ -836,19 +836,18 @@ describe('multi-window delivery: relaunch banner everywhere, "updated to" notice
     expect(rig.windows[0]?.filter((c) => c.channel === 'ok:update:downloaded')).toHaveLength(1);
   });
 
-  test('ok:update:whats-new ("Updated to Version X") goes to the primary window only', () => {
+  test('ok:update:whats-new ("Updated to Version X") reaches every open window', () => {
     const { rig } = makeRig({
       lastSeenVersion: '0.3.0',
       appVersion: '0.3.1',
       extraWindowCount: 2,
     });
     expect(rig.windows).toHaveLength(3);
-    const primaryWhatsNew =
-      rig.windows[0]?.filter((c) => c.channel === 'ok:update:whats-new') ?? [];
-    expect(primaryWhatsNew).toHaveLength(1);
-    expect(primaryWhatsNew[0]?.payload).toMatchObject({ version: '0.3.1' });
-    expect(rig.windows[1]?.filter((c) => c.channel === 'ok:update:whats-new')).toHaveLength(0);
-    expect(rig.windows[2]?.filter((c) => c.channel === 'ok:update:whats-new')).toHaveLength(0);
+    for (const win of rig.windows) {
+      const whatsNew = win.filter((c) => c.channel === 'ok:update:whats-new');
+      expect(whatsNew).toHaveLength(1);
+      expect(whatsNew[0]?.payload).toMatchObject({ version: '0.3.1' });
+    }
     expect(rig.dispatches.filter((d) => d === 'whats-new-toast-b')).toHaveLength(1);
   });
 
@@ -860,6 +859,49 @@ describe('multi-window delivery: relaunch banner everywhere, "updated to" notice
       expect(win.filter((c) => c.channel === 'ok:update:downloaded')).toHaveLength(1);
     }
     expect(rig.dispatches).toContain('update-downloaded-deduped' as DispatchKind);
+  });
+});
+
+describe('release-notes cross-window dismiss + late-window delivery', () => {
+  test('registers the whats-new-dismiss IPC handler', () => {
+    const { rig } = makeRig();
+    expect(rig.ipc.handlers.has('ok:update:whats-new-dismiss')).toBe(true);
+  });
+
+  test('whats-new-dismiss re-broadcasts ok:update:whats-new-dismissed to every window', () => {
+    const { rig } = makeRig({ extraWindowCount: 2 });
+    rig.ipc.invoke('ok:update:whats-new-dismiss', { version: '0.3.1' });
+    for (const win of rig.windows) {
+      const dismissed = win.filter((c) => c.channel === 'ok:update:whats-new-dismissed');
+      expect(dismissed).toHaveLength(1);
+      expect(dismissed[0]?.payload).toEqual({ version: '0.3.1' });
+    }
+    expect(rig.dispatches).toContain('whats-new-dismiss-broadcast' as DispatchKind);
+  });
+
+  test('getActiveWhatsNew returns the live notice within its window', () => {
+    const { handle } = makeRig({ lastSeenVersion: '0.3.0', appVersion: '0.3.1' });
+    expect(handle.getActiveWhatsNew()).toMatchObject({ version: '0.3.1' });
+  });
+
+  test('getActiveWhatsNew returns null once the live window elapses', () => {
+    const { rig, handle } = makeRig({ lastSeenVersion: '0.3.0', appVersion: '0.3.1' });
+    expect(handle.getActiveWhatsNew()).not.toBeNull();
+    rig.now = new Date(rig.now.getTime() + 60_001);
+    expect(handle.getActiveWhatsNew()).toBeNull();
+  });
+
+  test('getActiveWhatsNew returns null after the notice is dismissed', () => {
+    const { rig, handle } = makeRig({ lastSeenVersion: '0.3.0', appVersion: '0.3.1' });
+    expect(handle.getActiveWhatsNew()).not.toBeNull();
+    rig.ipc.invoke('ok:update:whats-new-dismiss', { version: '0.3.1' });
+    expect(handle.getActiveWhatsNew()).toBeNull();
+  });
+
+  test('a stale dismiss for an older version leaves a newer live notice intact', () => {
+    const { rig, handle } = makeRig({ lastSeenVersion: '0.3.0', appVersion: '0.3.1' });
+    rig.ipc.invoke('ok:update:whats-new-dismiss', { version: '0.3.0' });
+    expect(handle.getActiveWhatsNew()).toMatchObject({ version: '0.3.1' });
   });
 });
 

@@ -182,6 +182,7 @@ async function installDelayedDesktopSessionBridge(
         onMenuAction: () => unsubscribe,
         onUpdateDownloaded: () => unsubscribe,
         onWhatsNew: () => unsubscribe,
+        onWhatsNewDismissed: () => unsubscribe,
         onUpdateStuckHint: () => unsubscribe,
         onDeepLink: () => unsubscribe,
         onShareReceived: () => unsubscribe,
@@ -240,6 +241,7 @@ async function installDelayedDesktopSessionBridge(
         update: {
           relaunchNow: async () => {},
           checkNow: async () => {},
+          dismissWhatsNew: async () => {},
         },
         state: {
           query: async () => ({ channel: 'latest', schemaIncompatibility: null }),

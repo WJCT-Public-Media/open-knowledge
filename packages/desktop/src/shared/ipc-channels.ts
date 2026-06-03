@@ -387,6 +387,7 @@ export interface RequestChannels {
   'ok:navigator:open': { args: []; result: undefined };
   'ok:update:relaunch-now': { args: []; result: undefined };
   'ok:update:check-now': { args: []; result: undefined };
+  'ok:update:whats-new-dismiss': { args: [{ version: string }]; result: undefined };
   'ok:state:query': {
     args: [];
     result: {

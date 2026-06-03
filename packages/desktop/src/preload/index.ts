@@ -190,6 +190,13 @@ const bridge: OkDesktopBridge = {
     return () => ipcRenderer.removeListener('ok:update:whats-new', listener);
   },
 
+  onWhatsNewDismissed(cb: (info: { version: string }) => void) {
+    const listener = (_event: IpcRendererEvent, info: { version: string }) => cb(info);
+    // biome-ignore lint/plugin/no-loosely-typed-webcontents-ipc: preload-side subscription wrapper (precedent #14)
+    ipcRenderer.on('ok:update:whats-new-dismissed', listener);
+    return () => ipcRenderer.removeListener('ok:update:whats-new-dismissed', listener);
+  },
+
   onUpdateStuckHint(cb: (info: OkUpdateStuckHintInfo) => void) {
     const listener = (_event: IpcRendererEvent, info: OkUpdateStuckHintInfo) => cb(info);
     // biome-ignore lint/plugin/no-loosely-typed-webcontents-ipc: preload-side subscription wrapper (precedent #14)
@@ -344,6 +351,7 @@ const bridge: OkDesktopBridge = {
   update: {
     relaunchNow: () => invoke('ok:update:relaunch-now'),
     checkNow: () => invoke('ok:update:check-now'),
+    dismissWhatsNew: (version: string) => invoke('ok:update:whats-new-dismiss', { version }),
   },
 
   state: {

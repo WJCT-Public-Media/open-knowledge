@@ -73,10 +73,11 @@ describe('M3 update-listener subscribe/unsubscribe pattern', () => {
     expect(ipc.removeListener).toHaveBeenCalledWith('ok:update:downloaded', registeredWrapper);
   });
 
-  test('all three M3 listeners follow the same pattern (channel-name parametric)', () => {
+  test('all update listeners follow the same pattern (channel-name parametric)', () => {
     const channels = [
       'ok:update:downloaded',
       'ok:update:whats-new',
+      'ok:update:whats-new-dismissed',
       'ok:update:stuck-hint',
     ] as const;
     for (const channel of channels) {

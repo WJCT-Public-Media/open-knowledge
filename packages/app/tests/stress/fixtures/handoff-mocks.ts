@@ -215,6 +215,7 @@ export async function installHandoffMocks(page: Page, cfg: HandoffMockConfig): P
         onMenuAction: () => () => {},
         onUpdateDownloaded: () => () => {},
         onWhatsNew: () => () => {},
+        onWhatsNewDismissed: () => () => {},
         onUpdateStuckHint: () => () => {},
         onDeepLink: () => () => {},
         onShareReceived: () => () => {},
@@ -292,6 +293,7 @@ export async function installHandoffMocks(page: Page, cfg: HandoffMockConfig): P
         update: {
           relaunchNow: async () => {},
           checkNow: async () => {},
+          dismissWhatsNew: async () => {},
         },
         state: {
           query: async () => ({

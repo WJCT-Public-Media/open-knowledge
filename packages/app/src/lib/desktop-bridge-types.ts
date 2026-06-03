@@ -420,6 +420,7 @@ export interface OkDesktopBridge {
   onMenuAction(cb: (action: OkMenuAction) => void): OkUnsubscribe;
   onUpdateDownloaded(cb: (info: OkUpdateDownloadedInfo) => void): OkUnsubscribe;
   onWhatsNew(cb: (info: OkWhatsNewInfo) => void): OkUnsubscribe;
+  onWhatsNewDismissed(cb: (info: { readonly version: string }) => void): OkUnsubscribe;
   onUpdateStuckHint(cb: (info: OkUpdateStuckHintInfo) => void): OkUnsubscribe;
   onDeepLink(
     cb: (evt: {
@@ -580,6 +581,7 @@ export interface OkDesktopBridge {
   update: {
     relaunchNow(): Promise<void>;
     checkNow(): Promise<void>;
+    dismissWhatsNew(version: string): Promise<void>;
   };
   state: {
     query(): Promise<OkStateSnapshot>;

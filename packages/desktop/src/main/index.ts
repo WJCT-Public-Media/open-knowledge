@@ -2212,8 +2212,13 @@ function bootPrimaryInstance(): void {
       app.on('browser-window-created', (_event, win) => {
         win.webContents.once('did-finish-load', () => {
           const pending = appState.versionPendingInstall;
-          if (!pending) return;
-          sendToRenderer(win.webContents, 'ok:update:downloaded', { version: pending });
+          if (pending) {
+            sendToRenderer(win.webContents, 'ok:update:downloaded', { version: pending });
+          }
+          const whatsNew = autoUpdaterHandle?.getActiveWhatsNew();
+          if (whatsNew) {
+            sendToRenderer(win.webContents, 'ok:update:whats-new', whatsNew);
+          }
         });
       });
 
@@ -2285,6 +2290,7 @@ function bootPrimaryInstance(): void {
           const all = BrowserWindow.getAllWindows();
           return all[0] ?? null;
         },
+        getAllWindows: () => BrowserWindow.getAllWindows(),
         getAppVersion: () => app.getVersion(),
         isPackaged: app.isPackaged,
         forceDevBypass: process.env.OK_UPDATER_FORCE_DEV === '1',

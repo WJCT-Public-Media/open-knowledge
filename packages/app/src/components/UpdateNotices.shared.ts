@@ -34,6 +34,7 @@ export interface UpdateNotice {
   body: string;
   action?: { label: string; onClick: () => void };
   secondaryAction?: { label: string; onClick: () => void };
+  onDismiss?: () => void;
   variant?: 'info' | 'error';
   priority: number;
 }
@@ -112,12 +113,22 @@ export function attachUpdateSubscribers(
             void bridge.shell.openExternal(releaseUrl);
           },
         },
+        onDismiss: () => {
+          void bridge.update.dismissWhatsNew(version);
+        },
       });
       const timer = setTimeout(() => {
         autoDismissTimers.delete(timer);
         dismissNotice(noticeId);
+        void bridge.update.dismissWhatsNew(version);
       }, autoDismissMs);
       autoDismissTimers.add(timer);
+    }),
+  );
+
+  unsubscribers.push(
+    bridge.onWhatsNewDismissed(({ version }) => {
+      dismissNotice(`whats-new-${version}`);
     }),
   );
 

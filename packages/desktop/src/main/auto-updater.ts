@@ -39,6 +39,7 @@ export type DispatchKind =
   | 'update-downloaded-deduped'
   | 'update-downloaded-empty-version'
   | 'whats-new-toast-b'
+  | 'whats-new-dismiss-broadcast'
   | 'stuck-hint-toast-c'
   | 'check-success'
   | 'error-classified'
@@ -77,6 +78,7 @@ type CheckNowResult =
 export interface StartAutoUpdaterHandle {
   destroy(): void;
   checkForUpdatesNow(): Promise<unknown>;
+  getActiveWhatsNew(): { version: string; releaseUrl: string } | null;
 }
 
 interface Logger {
@@ -107,6 +109,8 @@ export const UPDATE_CHECK_JITTER_MS = 30 * 1000;
 export const STUCK_HINT_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const STUCK_HINT_DOWNLOAD_URL = 'https://inkeep.com/open-knowledge/download';
+
+const WHATS_NEW_LIVE_WINDOW_MS = 60_000;
 
 export function releaseUrlFor(version: string): string {
   return `https://github.com/inkeep/open-knowledge/releases/tag/v${encodeURIComponent(version)}`;
@@ -283,6 +287,8 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
   };
 
   let menuCheckPending = false;
+
+  let activeWhatsNew: { version: string; releaseUrl: string; firedAt: number } | null = null;
 
   const runMenuDrivenCheck = (): Promise<unknown> => {
     menuCheckPending = true;
@@ -471,6 +477,19 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
     return undefined;
   });
 
+  register(
+    'ok:update:whats-new-dismiss',
+    (_event: IpcMainInvokeEvent, payload: { version: string }): undefined => {
+      const version = typeof payload?.version === 'string' ? payload.version : '';
+      if (activeWhatsNew && activeWhatsNew.version === version) {
+        activeWhatsNew = null;
+      }
+      broadcastToAllWindows('ok:update:whats-new-dismissed', { version });
+      onDispatch?.('whats-new-dismiss-broadcast');
+      return undefined;
+    },
+  );
+
   const currentVersion = getAppVersion();
   let state = readState();
 
@@ -497,11 +516,13 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
     );
     if (advanced && shouldShowVersionNotice) {
       const fireToastB = (): void => {
-        broadcast('ok:update:whats-new', {
+        const releaseUrl = releaseUrlFor(currentVersion);
+        activeWhatsNew = { version: currentVersion, releaseUrl, firedAt: now().getTime() };
+        broadcastToAllWindows('ok:update:whats-new', {
           version: currentVersion,
-          releaseUrl: releaseUrlFor(currentVersion),
+          releaseUrl,
         });
-        logger.info('whats-new dispatched Toast B', {
+        logger.info('whats-new dispatched Toast B (all windows)', {
           from: state.lastSeenVersion,
           to: currentVersion,
         });
@@ -560,6 +581,13 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
       logger.info('check-now invoked from menu');
       return runMenuDrivenCheck();
     },
+    getActiveWhatsNew(): { version: string; releaseUrl: string } | null {
+      if (!activeWhatsNew) return null;
+      if (now().getTime() - activeWhatsNew.firedAt >= WHATS_NEW_LIVE_WINDOW_MS) {
+        return null;
+      }
+      return { version: activeWhatsNew.version, releaseUrl: activeWhatsNew.releaseUrl };
+    },
     destroy(): void {
       if (timerHandle) {
         clock.clearTimeout(timerHandle);
@@ -594,6 +622,7 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
       };
       removeHandlerSafely('ok:update:relaunch-now');
       removeHandlerSafely('ok:update:check-now');
+      removeHandlerSafely('ok:update:whats-new-dismiss');
       logger.info('destroyed');
     },
   };

@@ -22,14 +22,17 @@ import {
 
 type UpdateDownloadedCb = (info: { version: string }) => void;
 type WhatsNewCb = (info: { version: string; releaseUrl: string }) => void;
+type WhatsNewDismissedCb = (info: { version: string }) => void;
 type StuckHintCb = (info: { downloadUrl: string }) => void;
 
 interface FakeBridge {
   onUpdateDownloaded: ReturnType<typeof mock>;
   onWhatsNew: ReturnType<typeof mock>;
+  onWhatsNewDismissed: ReturnType<typeof mock>;
   onUpdateStuckHint: ReturnType<typeof mock>;
   update: {
     relaunchNow: ReturnType<typeof mock>;
+    dismissWhatsNew: ReturnType<typeof mock>;
   };
   state: {
     query: ReturnType<typeof mock>;
@@ -38,9 +41,11 @@ interface FakeBridge {
   shell: { openExternal: ReturnType<typeof mock> };
   _downloaded?: UpdateDownloadedCb;
   _whatsNew?: WhatsNewCb;
+  _whatsNewDismissed?: WhatsNewDismissedCb;
   _stuckHint?: StuckHintCb;
   _downloadedUnsub: ReturnType<typeof mock>;
   _whatsNewUnsub: ReturnType<typeof mock>;
+  _whatsNewDismissedUnsub: ReturnType<typeof mock>;
   _stuckHintUnsub: ReturnType<typeof mock>;
 }
 
@@ -48,12 +53,15 @@ function makeFakeBridge(): FakeBridge {
   const b: FakeBridge = {
     _downloadedUnsub: mock(() => {}),
     _whatsNewUnsub: mock(() => {}),
+    _whatsNewDismissedUnsub: mock(() => {}),
     _stuckHintUnsub: mock(() => {}),
     onUpdateDownloaded: mock(() => {}),
     onWhatsNew: mock(() => {}),
+    onWhatsNewDismissed: mock(() => {}),
     onUpdateStuckHint: mock(() => {}),
     update: {
       relaunchNow: mock(() => Promise.resolve(undefined)),
+      dismissWhatsNew: mock(() => Promise.resolve(undefined)),
     },
     state: {
       query: mock(() => Promise.resolve({ channel: 'latest', schemaIncompatibility: null })),
@@ -68,6 +76,10 @@ function makeFakeBridge(): FakeBridge {
   b.onWhatsNew = mock((cb: WhatsNewCb) => {
     b._whatsNew = cb;
     return b._whatsNewUnsub;
+  });
+  b.onWhatsNewDismissed = mock((cb: WhatsNewDismissedCb) => {
+    b._whatsNewDismissed = cb;
+    return b._whatsNewDismissedUnsub;
   });
   b.onUpdateStuckHint = mock((cb: StuckHintCb) => {
     b._stuckHint = cb;
@@ -143,22 +155,24 @@ describe('appendErrorDetail', () => {
 });
 
 describe('attachUpdateSubscribers — registration', () => {
-  test('subscribes to all three update channels on the bridge', () => {
+  test('subscribes to all four update channels on the bridge', () => {
     const bridge = makeFakeBridge();
     const addNotice = mock<(notice: UpdateNotice) => void>(() => {});
     attachUpdateSubscribers(castBridge(bridge), addNotice);
     expect(bridge.onUpdateDownloaded).toHaveBeenCalledTimes(1);
     expect(bridge.onWhatsNew).toHaveBeenCalledTimes(1);
+    expect(bridge.onWhatsNewDismissed).toHaveBeenCalledTimes(1);
     expect(bridge.onUpdateStuckHint).toHaveBeenCalledTimes(1);
   });
 
-  test('returns a single unsubscribe closure that detaches ALL three listeners', () => {
+  test('returns a single unsubscribe closure that detaches ALL four listeners', () => {
     const bridge = makeFakeBridge();
     const addNotice = mock<(notice: UpdateNotice) => void>(() => {});
     const unsubscribe = attachUpdateSubscribers(castBridge(bridge), addNotice);
     unsubscribe();
     expect(bridge._downloadedUnsub).toHaveBeenCalledTimes(1);
     expect(bridge._whatsNewUnsub).toHaveBeenCalledTimes(1);
+    expect(bridge._whatsNewDismissedUnsub).toHaveBeenCalledTimes(1);
     expect(bridge._stuckHintUnsub).toHaveBeenCalledTimes(1);
   });
 });
@@ -376,6 +390,36 @@ describe('Notice B — ok:update:whats-new', () => {
     expect(dismissNotice).toHaveBeenCalledWith('whats-new-0.3.1');
     expect(dismissNotice).toHaveBeenCalledTimes(2);
   });
+
+  test('dismissing the notice (X) notifies main so every window can clear', () => {
+    const bridge = makeFakeBridge();
+    const addNotice = mock<(notice: UpdateNotice) => void>(() => {});
+    attachUpdateSubscribers(castBridge(bridge), addNotice);
+    bridge._whatsNew?.({ version: '0.3.1', releaseUrl: 'https://example.com/r' });
+    const notice = addNotice.mock.calls[0]?.[0] as UpdateNotice;
+    notice.onDismiss?.();
+    expect(bridge.update.dismissWhatsNew).toHaveBeenCalledWith('0.3.1');
+  });
+
+  test('auto-dismiss also notifies main so the other windows clear in lockstep', async () => {
+    const bridge = makeFakeBridge();
+    const addNotice = mock<(notice: UpdateNotice) => void>(() => {});
+    const dismissNotice = mock<(id: string) => void>(() => {});
+    attachUpdateSubscribers(castBridge(bridge), addNotice, dismissNotice, 15);
+    bridge._whatsNew?.({ version: '0.3.1', releaseUrl: 'https://example.com/r' });
+    await new Promise((resolve) => setTimeout(resolve, 45));
+    expect(bridge.update.dismissWhatsNew).toHaveBeenCalledWith('0.3.1');
+  });
+
+  test('onWhatsNewDismissed echo clears the card by id without re-notifying main (no loop)', () => {
+    const bridge = makeFakeBridge();
+    const addNotice = mock<(notice: UpdateNotice) => void>(() => {});
+    const dismissNotice = mock<(id: string) => void>(() => {});
+    attachUpdateSubscribers(castBridge(bridge), addNotice, dismissNotice);
+    bridge._whatsNewDismissed?.({ version: '0.3.1' });
+    expect(dismissNotice).toHaveBeenCalledWith('whats-new-0.3.1');
+    expect(bridge.update.dismissWhatsNew).not.toHaveBeenCalled();
+  });
 });
 
 describe('Notice C — ok:update:stuck-hint', () => {
@@ -519,13 +563,14 @@ describe('pickActiveNotice', () => {
 });
 
 describe('unsubscribe semantics', () => {
-  test('after unsubscribe, all three per-channel unsub closures fire', () => {
+  test('after unsubscribe, all four per-channel unsub closures fire', () => {
     const bridge = makeFakeBridge();
     const addNotice = mock<(notice: UpdateNotice) => void>(() => {});
     const unsubscribe = attachUpdateSubscribers(castBridge(bridge), addNotice);
     unsubscribe();
     expect(bridge._downloadedUnsub).toHaveBeenCalledTimes(1);
     expect(bridge._whatsNewUnsub).toHaveBeenCalledTimes(1);
+    expect(bridge._whatsNewDismissedUnsub).toHaveBeenCalledTimes(1);
     expect(bridge._stuckHintUnsub).toHaveBeenCalledTimes(1);
   });
 });
