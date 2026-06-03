@@ -272,6 +272,7 @@ export function NavigatorApp({ bridge }: { bridge: OkDesktopBridge }) {
           }
         }}
         transport={ipcAuthTransport(bridge)}
+        queryTransport={ipcAuthQueryTransport(bridge)}
         identityPrompt={authInitialStep === 'identity'}
         onSuccess={(result) => {
           setAuthModalOpen(false);

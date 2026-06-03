@@ -1,8 +1,12 @@
 import { Trans, useLingui } from '@lingui/react/macro';
 import { ArrowUpRight, Check, Copy } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { dispatchExternalLinkClick } from '@/lib/external-link';
+import {
+  type AuthQueryTransport,
+  httpAuthQueryTransport,
+} from '@/lib/transports/auth-query-transport';
 import { type AuthTransport, httpAuthTransport } from '@/lib/transports/auth-transport';
 import { Button } from './ui/button';
 import {
@@ -35,6 +39,7 @@ interface AuthModalProps {
   identityPrompt?: boolean;
   reauth?: boolean;
   transport?: AuthTransport;
+  queryTransport?: AuthQueryTransport;
 }
 
 interface DeviceFlowPanelProps {
@@ -232,7 +237,9 @@ function IdentityBody({ login, name, onNameChange, email, onEmailChange }: Ident
   );
 }
 
-type AuthStep = 'auth' | 'identity' | 'done';
+type AuthStep = 'checking' | 'auth' | 'identity' | 'done';
+
+const IDENTITY_PROBE_TIMEOUT_MS = 10_000;
 
 export function AuthModal({
   open,
@@ -241,27 +248,66 @@ export function AuthModal({
   identityPrompt,
   reauth,
   transport,
+  queryTransport,
 }: AuthModalProps) {
   const { t } = useLingui();
   const resolvedTransport = transport ?? httpAuthTransport();
+  const resolvedQueryTransport = queryTransport ?? httpAuthQueryTransport();
   const [step, setStep] = useState<AuthStep>('auth');
   const [authResult, setAuthResult] = useState<AuthSuccessResult | null>(null);
 
   const [idName, setIdName] = useState('');
   const [idEmail, setIdEmail] = useState('');
 
+  useLayoutEffect(() => {
+    if (!open) return;
+    setAuthResult(null);
+    setIdName('');
+    setIdEmail('');
+    setStep(identityPrompt ? 'checking' : 'auth');
+  }, [open, identityPrompt]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: probe runs on open / identityPrompt change; resolvedQueryTransport is a fresh object each render and excluded intentionally
   useEffect(() => {
-    if (open) {
-      setStep('auth');
-      setAuthResult(null);
-      setIdName('');
-      setIdEmail('');
-    }
-  }, [open]);
+    if (!open || !identityPrompt) return;
+    let settled = false;
+    const settle = (next: AuthStep) => {
+      if (settled) return;
+      settled = true;
+      setStep(next);
+    };
+    const timer = setTimeout(() => settle('auth'), IDENTITY_PROBE_TIMEOUT_MS);
+    void resolvedQueryTransport
+      .status()
+      .then((status) => {
+        if (settled) return;
+        if (status.authenticated) {
+          setAuthResult({
+            login: status.login,
+            name: status.name,
+            email: status.email,
+          });
+          setIdName(status.name ?? '');
+          setIdEmail(status.email ?? '');
+          settle('identity');
+        } else {
+          settle('auth');
+        }
+      })
+      .catch(() => {
+        settle('auth');
+      });
+    return () => {
+      settled = true;
+      clearTimeout(timer);
+    };
+  }, [open, identityPrompt]);
 
   function handleAuthSuccess(result: AuthSuccessResult) {
     setAuthResult(result);
-    if (identityPrompt && (!result.name || !result.email)) {
+    if (identityPrompt) {
+      setIdName(result.name ?? '');
+      setIdEmail(result.email ?? '');
       setStep('identity');
     } else {
       setStep('done');
@@ -305,9 +351,23 @@ export function AuthModal({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {reauth ? <Trans>Re-authenticate with GitHub</Trans> : <Trans>Connect GitHub</Trans>}
+            {reauth ? (
+              <Trans>Re-authenticate with GitHub</Trans>
+            ) : identityPrompt && step !== 'auth' ? (
+              <Trans>Set git identity</Trans>
+            ) : (
+              <Trans>Connect GitHub</Trans>
+            )}
           </DialogTitle>
         </DialogHeader>
+
+        {step === 'checking' && (
+          <DialogBody>
+            <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
+              <Trans>Checking sign-in status</Trans>
+            </div>
+          </DialogBody>
+        )}
 
         {step === 'auth' && (
           <>

@@ -888,6 +888,10 @@ msgstr "Checking GitHub connection..."
 msgid "Checking out files"
 msgstr "Checking out files"
 
+#: src/components/AuthModal.tsx
+msgid "Checking sign-in status"
+msgstr "Checking sign-in status"
+
 #: src/components/settings/AccountSection.tsx
 msgid "Checking your GitHub connection"
 msgstr "Checking your GitHub connection"
@@ -4828,6 +4832,10 @@ msgstr "Session ended — undo unavailable"
 #: src/components/FolderDefaultsCard.tsx
 #~ msgid "Set a shared value"
 #~ msgstr "Set a shared value"
+
+#: src/components/AuthModal.tsx
+msgid "Set git identity"
+msgstr "Set git identity"
 
 #: src/components/SyncStatusBadge.tsx
 msgid "Set identity"

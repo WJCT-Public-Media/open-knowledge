@@ -95,6 +95,7 @@
     "27ANM6": ["With AI"],
     "27XW26": ["Clone happens in the Project Navigator. Reclick the share link there."],
     "29VNqC": ["Unknown error"],
+    "29XZXN": ["Set git identity"],
     "2BBAbc": ["List"],
     "2FYpfJ": ["More"],
     "2GT3Hf": ["Global"],
@@ -1274,6 +1275,7 @@
       "> failed to render (likely a bad prop). Copy the source to see what went wrong, or delete the block."
     ],
     "g6d81C": ["Conflict: "],
+    "gBbxn_": ["Checking sign-in status"],
     "gGVP4q": ["Click <0>+</0> <1/> <2>Create skill</2> <3/> <4>Upload skill</4>."],
     "gITz7o": [
       "Move the cursor or extend selection through CodeMirror's standard source-editor navigation keymap."
