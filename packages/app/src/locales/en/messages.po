@@ -3338,6 +3338,7 @@ msgstr "New from template"
 msgid "New ignore pattern"
 msgstr "New ignore pattern"
 
+#: src/components/CommandPalette.tsx
 #: src/components/ProjectSwitcher.tsx
 msgid "New project"
 msgstr "New project"

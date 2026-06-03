@@ -13,6 +13,7 @@ import {
   LayoutGrid,
   Network,
   Package,
+  Plus,
   Settings,
 } from 'lucide-react';
 import {
@@ -23,6 +24,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { CreateProjectDialog } from '@/components/CreateProjectDialog';
 import {
   filterOmnibarRecents,
   loadOmnibarRecents,
@@ -188,6 +190,7 @@ export function CommandPalette({ bridge = null, open, onOpenChange }: CommandPal
   const [recentNavigation, setRecentNavigation] = useState<OmnibarRecentEntry[]>([]);
   const [createDialogKind, setCreateDialogKind] = useState<'file' | 'folder' | null>(null);
   const [seedDialogOpen, setSeedDialogOpen] = useState(false);
+  const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const [tagsList, setTagsList] = useState<TagSummaryEntry[]>([]);
   const [tagsListStatus, setTagsListStatus] = useState<'idle' | 'loading' | 'success' | 'error'>(
     'idle',
@@ -401,6 +404,10 @@ export function CommandPalette({ bridge = null, open, onOpenChange }: CommandPal
       'pack',
       'starter',
     ]);
+  const showCreateProject =
+    !isTagMode &&
+    bridge !== null &&
+    matchesCommandQuery(t`New project`, deferredQuery, ['create new project scaffold']);
   const showProjectOpenFolder =
     !isTagMode &&
     bridge !== null &&
@@ -455,6 +462,7 @@ export function CommandPalette({ bridge = null, open, onOpenChange }: CommandPal
     showCreateFolder ||
     showGraphCommand ||
     showInitializeStarterPack ||
+    showCreateProject ||
     showProjectOpenFolder ||
     showProjectSwitch ||
     showSettings ||
@@ -744,11 +752,27 @@ export function CommandPalette({ bridge = null, open, onOpenChange }: CommandPal
             </CommandGroup>
           ) : null}
 
-          {showProjectOpenFolder ||
+          {showCreateProject ||
+          showProjectOpenFolder ||
           showProjectSwitch ||
           showSettings ||
           showInstallClaudeDesktop ? (
             <CommandGroup heading={t`Project`}>
+              {showCreateProject && bridge ? (
+                <CommandItem
+                  value="new project create scaffold"
+                  onSelect={() => {
+                    onOpenChange(false);
+                    setCreateProjectOpen(true);
+                  }}
+                  data-testid="command-palette-new-project"
+                >
+                  <Plus />
+                  <span>
+                    <Trans>New project</Trans>
+                  </span>
+                </CommandItem>
+              ) : null}
               {showProjectOpenFolder && bridge ? (
                 <CommandItem
                   value="open folder on disk project"
@@ -901,6 +925,15 @@ export function CommandPalette({ bridge = null, open, onOpenChange }: CommandPal
         initialDir={initialCreateDir}
       />
       <SeedDialog open={seedDialogOpen} onOpenChange={setSeedDialogOpen} />
+      {/* Desktop-only — `showCreateProject` gates the launching command on
+          `bridge !== null`, so the dialog only mounts when the bridge exists. */}
+      {bridge ? (
+        <CreateProjectDialog
+          open={createProjectOpen}
+          onOpenChange={setCreateProjectOpen}
+          bridge={bridge}
+        />
+      ) : null}
     </>
   );
 }
