@@ -224,6 +224,63 @@ describe('Initialize starter pack entry (source-level guards)', () => {
   });
 });
 
+describe('New project entry (source-level guards)', () => {
+  const SRC_PATH = join(__dirname, 'CommandPalette.tsx');
+  const src = readFileSync(SRC_PATH, 'utf-8');
+
+  const newProjectBlock = (() => {
+    const chunks = src.split(/(?=<CommandItem\b)/);
+    const ours = chunks.find((c) => c.includes('data-testid="command-palette-new-project"'));
+    if (!ours) return '';
+    return ours.split('</CommandItem>')[0] ?? '';
+  })();
+
+  const showCreateProjectDecision =
+    src.match(/const showCreateProject =[\s\S]*?;\n {2}const showProjectOpenFolder/)?.[0] ?? '';
+
+  test('CommandItem carries the Plus icon and "New project" label', () => {
+    expect(newProjectBlock, 'CommandItem with command-palette-new-project not found').toBeTruthy();
+    expect(newProjectBlock).toContain('<Plus');
+    expect(newProjectBlock).toContain('<Trans>New project</Trans>');
+  });
+
+  test('onSelect closes the palette and opens CreateProjectDialog', () => {
+    expect(newProjectBlock).toContain('onOpenChange(false)');
+    expect(newProjectBlock).toContain('setCreateProjectOpen(true)');
+  });
+
+  test('is desktop-only — the visibility gate requires bridge !== null', () => {
+    expect(showCreateProjectDecision).toContain('bridge !== null');
+  });
+
+  test('search-token value covers new / project / create / scaffold substrings', () => {
+    const valueLine = newProjectBlock.match(/value="new project[^"]*"/)?.[0] ?? '';
+    expect(valueLine).toContain('new');
+    expect(valueLine).toContain('project');
+    expect(valueLine).toContain('create');
+    expect(valueLine).toContain('scaffold');
+  });
+
+  test('CreateProjectDialog is mounted behind a bridge guard', () => {
+    expect(src).toMatch(/bridge \? \(\s*<CreateProjectDialog/);
+    expect(src).toMatch(
+      /import \{ CreateProjectDialog \} from '@\/components\/CreateProjectDialog'/,
+    );
+  });
+
+  test('showCreateProject participates in hasAnyResults', () => {
+    const aggregate = src.match(/const hasAnyResults =[\s\S]*?;/)?.[0] ?? '';
+    expect(aggregate).toContain('showCreateProject');
+  });
+
+  test('New project sits inside the "Project" CommandGroup', () => {
+    const newProjectIdx = src.indexOf('command-palette-new-project');
+    const projectGroupIdx = src.indexOf('heading={t`Project`}');
+    expect(projectGroupIdx).toBeGreaterThanOrEqual(0);
+    expect(projectGroupIdx).toBeLessThan(newProjectIdx);
+  });
+});
+
 describe('CommandPalette entry-point propagation (source-level guards)', () => {
   const SRC_PATH = join(__dirname, 'CommandPalette.tsx');
   const src = readFileSync(SRC_PATH, 'utf-8');
