@@ -550,6 +550,7 @@ function ensureWindowManager() {
     appVersion: app.getVersion(),
     selfProtocolVersion: PROTOCOL_VERSION,
     selfRuntimeVersion: RUNTIME_VERSION,
+    reclaimForeignServerInDev: !app.isPackaged,
     setTimeout: (cb, ms) => setTimeout(cb, ms),
     killProbe: (pid, signal) => {
       process.kill(pid, signal as NodeJS.Signals | 0);

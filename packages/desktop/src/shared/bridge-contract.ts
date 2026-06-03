@@ -378,6 +378,10 @@ export interface OkServerRestartedInfo {
   readonly appRuntime: string;
 }
 
+export interface OkServerReclaimedInfo {
+  readonly appRuntime: string;
+}
+
 export type OkServerRestartOutcome =
   | { readonly ok: true }
   | { readonly ok: false; readonly reason: 'eperm' | 'other' };
@@ -397,6 +401,7 @@ export interface OkDesktopBridge {
 
   onServerVersionDrift(cb: (info: OkServerVersionDriftInfo) => void): OkUnsubscribe;
   onServerRestarted(cb: (info: OkServerRestartedInfo) => void): OkUnsubscribe;
+  onServerReclaimed(cb: (info: OkServerReclaimedInfo) => void): OkUnsubscribe;
   restartServer(projectPath: string): Promise<OkServerRestartOutcome>;
 
   setThemeSource(source: OkThemeSource): Promise<{ ok: true }>;

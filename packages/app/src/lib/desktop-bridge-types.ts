@@ -419,6 +419,7 @@ export interface OkDesktopBridge {
   onShareReceived(cb: (payload: OkShareReceivedPayload) => void): OkUnsubscribe;
   onServerVersionDrift(cb: (info: OkServerVersionDriftInfo) => void): OkUnsubscribe;
   onServerRestarted(cb: (info: { readonly appRuntime: string }) => void): OkUnsubscribe;
+  onServerReclaimed(cb: (info: { readonly appRuntime: string }) => void): OkUnsubscribe;
   restartServer(projectPath: string): Promise<OkServerRestartOutcome>;
   setThemeSource(source: OkThemeSource): Promise<{ ok: true }>;
   signalThemeApplied(opts?: { reducedTransparency?: boolean }): void;

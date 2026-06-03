@@ -753,6 +753,108 @@ describe('WindowManager', () => {
       expect(env.windows.length).toBe(1);
     });
 
+    test('reclaimForeignServerInDev terminates a foreign server and spawns fresh via utility-fork, firing ok:server-reclaimed on did-finish-load', async () => {
+      env.deps.reclaimForeignServerInDev = true;
+      let killed = false;
+      const killProbe = mock((_pid: number, signal: string) => {
+        if (signal === 'SIGTERM') killed = true;
+      });
+      env.deps.killProbe = killProbe;
+      enableAttachProbe({ readServerLock: () => (killed ? null : liveLock) });
+
+      const wm = new WindowManager(env.deps);
+      const promise = wm.createProjectWindow({ projectPath: '/tmp/dragon' });
+      for (let i = 0; i < 50 && env.utilities.length === 0; i++) await wait(0);
+      expect(killProbe).toHaveBeenCalledWith(65792, 'SIGTERM');
+      expect(env.utilities.length).toBe(1);
+      env.utilities[0]?.fire({ type: 'ready', port: 52777, apiOrigin: 'http://localhost:52777' });
+      const ctx = await promise;
+
+      expect(ctx.ownsServer).toBe(true);
+      expect(ctx.port).toBe(52777);
+
+      const w = env.windows[0];
+      if (!w) throw new Error('no window created');
+      const reclaimSends = () =>
+        (w.webContents.send as ReturnType<typeof mock>).mock.calls.filter(
+          (c: unknown[]) => c[0] === 'ok:server-reclaimed',
+        );
+      expect(reclaimSends().length).toBe(0);
+      w.fireDomReady();
+      expect(reclaimSends().length).toBe(0);
+      w.fireDidFinishLoad();
+      expect(reclaimSends().length).toBe(1);
+      expect((reclaimSends()[0] as unknown[])[1]).toEqual({ appRuntime: '9.9.9-test' });
+    });
+
+    test('without reclaimForeignServerInDev (production default), a foreign server is attached — no termination, no reclaim notice', async () => {
+      const killProbe = mock(() => {});
+      env.deps.killProbe = killProbe;
+      enableAttachProbe();
+      const wm = new WindowManager(env.deps);
+      const ctx = await wm.createProjectWindow({ projectPath: '/tmp/dragon' });
+      expect(ctx.ownsServer).toBe(false);
+      expect(ctx.port).toBe(59534);
+      expect(env.utilities.length).toBe(0);
+      expect(killProbe).not.toHaveBeenCalled();
+      const w = env.windows[0];
+      if (!w) throw new Error('no window created');
+      w.fireDidFinishLoad();
+      const reclaimSends = (w.webContents.send as ReturnType<typeof mock>).mock.calls.filter(
+        (c: unknown[]) => c[0] === 'ok:server-reclaimed',
+      );
+      expect(reclaimSends.length).toBe(0);
+    });
+
+    test('reclaim does NOT terminate a server THIS session spawned (own-pid guard)', async () => {
+      env.deps.reclaimForeignServerInDev = true;
+      const killProbe = mock(() => {});
+      env.deps.killProbe = killProbe;
+      const ownLock = { ...liveLock, pid: 6666, port: 60000 };
+      let spawned = false;
+      env.deps.spawnDetachedServer = async () => {
+        spawned = true;
+        return { pid: 6666 };
+      };
+      env.deps.spawnLockPollDeadlineMs = 1000;
+      enableAttachProbe({ readServerLock: () => (spawned ? ownLock : null) });
+
+      const wm = new WindowManager(env.deps);
+      const ctx1 = await wm.createProjectWindow({ projectPath: '/tmp/dragon' });
+      expect(ctx1.port).toBe(60000);
+      expect(env.windows.length).toBe(1);
+
+      env.windows[0]?.fireClose();
+
+      const ctx2 = await wm.createProjectWindow({ projectPath: '/tmp/dragon' });
+      expect(killProbe).not.toHaveBeenCalled();
+      expect(ctx2.ownsServer).toBe(false); // attached to our own server
+      expect(ctx2.port).toBe(60000);
+      expect(env.utilities.length).toBe(0); // attached, did not reclaim-and-respawn
+    });
+
+    test('reclaim falls back to attaching when terminating the foreign server fails (eperm)', async () => {
+      env.deps.reclaimForeignServerInDev = true;
+      env.deps.killProbe = mock(() => {
+        const err = new Error('operation not permitted') as NodeJS.ErrnoException;
+        err.code = 'EPERM';
+        throw err;
+      });
+      enableAttachProbe();
+      const wm = new WindowManager(env.deps);
+      const ctx = await wm.createProjectWindow({ projectPath: '/tmp/dragon' });
+      expect(ctx.ownsServer).toBe(false);
+      expect(ctx.port).toBe(59534);
+      expect(env.utilities.length).toBe(0);
+      const w = env.windows[0];
+      if (!w) throw new Error('no window created');
+      w.fireDidFinishLoad();
+      const reclaimSends = (w.webContents.send as ReturnType<typeof mock>).mock.calls.filter(
+        (c: unknown[]) => c[0] === 'ok:server-reclaimed',
+      );
+      expect(reclaimSends.length).toBe(0);
+    });
+
     test('stale lock (pid dead) falls through to spawn mode', async () => {
       enableAttachProbe({ isProcessAlive: () => false });
       const runClean = mock(() => Promise.resolve());

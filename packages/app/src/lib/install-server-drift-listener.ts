@@ -26,6 +26,10 @@ export function restartSuccessMessage(appRuntime: string): string {
   return `Restarted — now running v${appRuntime}.`;
 }
 
+export function reclaimNoticeMessage(appRuntime: string): string {
+  return `Started a fresh Open Knowledge server (v${appRuntime}) for this dev session — the server already running for this project was terminated. Connected agents (Claude Code, Codex, Cursor) just lost their Open Knowledge MCP connection; restart the agent, or toggle its Open Knowledge MCP server off and on, to reconnect.`;
+}
+
 export function restartFailureMessage(reason: 'eperm' | 'other'): string {
   return reason === 'eperm'
     ? "Couldn't restart the server — it's running under a different account. Restart your computer to clear it, then reopen this project."
@@ -78,8 +82,13 @@ export function installServerDriftListener(opts: {
     toast.success(restartSuccessMessage(info.appRuntime));
   });
 
+  const unsubscribeReclaimed = bridge.onServerReclaimed((info) => {
+    toast.warning(reclaimNoticeMessage(info.appRuntime), { duration: 15_000 });
+  });
+
   return () => {
     unsubscribeDrift();
     unsubscribeRestarted();
+    unsubscribeReclaimed();
   };
 }

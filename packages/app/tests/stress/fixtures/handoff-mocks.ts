@@ -220,6 +220,7 @@ export async function installHandoffMocks(page: Page, cfg: HandoffMockConfig): P
         onShareReceived: () => () => {},
         onServerVersionDrift: () => () => {},
         onServerRestarted: () => () => {},
+        onServerReclaimed: () => () => {},
         restartServer: async () => ({ ok: true as const }),
         setThemeSource: async (): Promise<{ ok: true }> => ({ ok: true }),
         signalThemeApplied: (): void => {},

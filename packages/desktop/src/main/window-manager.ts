@@ -119,6 +119,7 @@ export interface WindowManagerDeps {
   appVersion: string;
   selfProtocolVersion?: number;
   selfRuntimeVersion?: string;
+  reclaimForeignServerInDev?: boolean;
   setTimeout(cb: () => void, ms: number): unknown;
   killProbe(pid: number, signal: number | NodeJS.Signals): void;
   showGate: ShowGateRegistry;
@@ -394,18 +395,50 @@ export class WindowManager {
     const candidate = this.tryAttachExistingServer(lockDir);
     const attached =
       candidate !== null && (await this.probeAttachableLock(candidate)) ? candidate : null;
+    let pendingServerReclaimedToast = false;
     if (attached) {
-      return this.attachToExistingServer({
-        projectPath,
-        canonicalKey,
-        projectName,
-        lock: attached,
-        pendingDeepLinkDoc: opts.pendingDeepLinkDoc,
-        pendingBranch: opts.pendingBranch,
-        pendingMultiCandidate: opts.pendingMultiCandidate,
-        pendingShareBranchSwitch: opts.pendingShareBranchSwitch,
-        pendingServerRestartedToast: opts.pendingServerRestartedToast,
-      });
+      const isForeign = this.spawnedDetachedPids.get(canonicalKey) !== attached.pid;
+      let reclaimed = false;
+      if (this.deps.reclaimForeignServerInDev === true && isForeign) {
+        const term = await this.terminateServerByPid(lockDir, attached.pid);
+        if (term.ok) {
+          this.deps.log?.info(
+            {
+              event: 'desktop-dev-reclaim',
+              outcome: 'terminated',
+              escalated: term.escalated,
+              pid: attached.pid,
+              projectPath,
+            },
+            '[window-manager] dev-mode reclaimed foreign server; spawning fresh own-build server',
+          );
+          reclaimed = true;
+        } else {
+          this.deps.log?.warn(
+            {
+              event: 'desktop-dev-reclaim',
+              outcome: term.reason,
+              pid: attached.pid,
+              projectPath,
+            },
+            '[window-manager] dev-mode reclaim could not terminate the foreign server; attaching to it instead',
+          );
+        }
+      }
+      if (!reclaimed) {
+        return this.attachToExistingServer({
+          projectPath,
+          canonicalKey,
+          projectName,
+          lock: attached,
+          pendingDeepLinkDoc: opts.pendingDeepLinkDoc,
+          pendingBranch: opts.pendingBranch,
+          pendingMultiCandidate: opts.pendingMultiCandidate,
+          pendingShareBranchSwitch: opts.pendingShareBranchSwitch,
+          pendingServerRestartedToast: opts.pendingServerRestartedToast,
+        });
+      }
+      pendingServerReclaimedToast = true;
     }
 
     if (this.deps.runClean) {
@@ -606,6 +639,15 @@ export class WindowManager {
         projectPath: branchSwitch.projectPath,
         currentBranch: branchSwitch.currentBranch,
       });
+    }
+
+    if (pendingServerReclaimedToast) {
+      registerPendingDelivery(
+        window.webContents,
+        'ok:server-reclaimed',
+        { appRuntime: this.deps.appVersion },
+        { event: 'did-finish-load' },
+      );
     }
 
     const disposeShowGate = this.deps.showGate.register(window, { kind: 'editor' });
