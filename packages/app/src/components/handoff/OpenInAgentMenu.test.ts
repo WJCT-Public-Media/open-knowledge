@@ -48,4 +48,10 @@ describe('OpenInAgentMenu source-level guards', () => {
     expect(SRC).not.toContain('<TooltipContent>');
     expect(SRC).toContain('<Trans>Open with AI</Trans>');
   });
+
+  test('opens from click on the Electron host (macOS drag region swallows pointerdown)', () => {
+    expect(SRC).toMatch(/onClick=\{\s*isElectronHost/);
+    expect(SRC).toMatch(/onPointerDown=\{\s*isElectronHost/);
+    expect(SRC).toContain('sawPointerDownRef');
+  });
 });

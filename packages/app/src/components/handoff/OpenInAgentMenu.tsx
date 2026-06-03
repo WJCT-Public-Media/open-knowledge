@@ -2,7 +2,7 @@ import { composeFilePrompt, type TargetData } from '@inkeep/open-knowledge-core'
 import { Trans, useLingui } from '@lingui/react/macro';
 import { ExternalLink, Sparkles } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -38,6 +38,7 @@ export function OpenInAgentMenu({ input, open, onOpenChange }: OpenInAgentMenuPr
   const { merged } = useConfigContext();
   const autoOpen = merged?.appearance?.preview?.autoOpen ?? true;
   const [internalOpen, setInternalOpen] = useState(false);
+  const sawPointerDownRef = useRef(false);
   const isEmbedded = useIsEmbedded();
   if (isEmbedded) return null;
 
@@ -83,6 +84,24 @@ export function OpenInAgentMenu({ input, open, onOpenChange }: OpenInAgentMenuPr
           disabled={triggerDisabled}
           className="gap-1.5 text-muted-foreground px-1.5"
           data-testid="open-in-agent-trigger"
+          onPointerDown={
+            isElectronHost
+              ? () => {
+                  sawPointerDownRef.current = true;
+                }
+              : undefined
+          }
+          onClick={
+            isElectronHost
+              ? () => {
+                  if (sawPointerDownRef.current) {
+                    sawPointerDownRef.current = false;
+                    return;
+                  }
+                  handleOpenChange(true);
+                }
+              : undefined
+          }
         >
           <Sparkles className="size-3.5" aria-hidden="true" />
           <Trans>Open with AI</Trans>
