@@ -619,7 +619,26 @@ export function formatLinkUrl(url: string): string {
 }
 
 function escapeEntityAmpersands(s: string): string {
-  return s.replace(/(?<!\\)&(?=[A-Za-z][A-Za-z0-9]*;|#[0-9]+;|#[xX][0-9A-Fa-f]+;)/g, '\\&');
+  return s.replace(
+    /(?<!\\)&(?=(#[0-9]+|#[xX][0-9A-Fa-f]+|[A-Za-z][A-Za-z0-9]*);)/g,
+    (match, body: string) => (isWhitespaceNumericCharRef(body) ? match : `\\${match}`),
+  );
+}
+
+function isWhitespaceNumericCharRef(body: string): boolean {
+  if (body.charCodeAt(0) !== 0x23 /* '#' */) return false;
+  const code =
+    body[1] === 'x' || body[1] === 'X'
+      ? Number.parseInt(body.slice(2), 16)
+      : Number.parseInt(body.slice(1), 10);
+  return (
+    code === 0x09 ||
+    code === 0x0a ||
+    code === 0x0b ||
+    code === 0x0c ||
+    code === 0x0d ||
+    code === 0x20
+  );
 }
 
 function safeText(state: State, value: string, info: Info): string {
