@@ -76,7 +76,7 @@ export function OpenInAgentMenu({ input, open, onOpenChange }: OpenInAgentMenuPr
   };
 
   return (
-    <DropdownMenu open={menuOpen} onOpenChange={handleOpenChange}>
+    <DropdownMenu open={menuOpen} onOpenChange={handleOpenChange} modal={false}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
