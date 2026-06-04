@@ -25,10 +25,18 @@ mock.module('react-medium-image-zoom', () => ({
 }));
 
 const { ImageInlineZoomView } = await import('./ImageInlineZoomView');
+const { setEditorDocName } = await import('./doc-context.ts');
 
-function makeNode(attrs: { src?: string; alt?: string; title?: string }) {
+function makeNode(attrs: { src?: string; alt?: string; title?: string }, editor?: object) {
   // biome-ignore lint/suspicious/noExplicitAny: test stub
-  return { node: { attrs } } as any;
+  return { node: { attrs }, editor } as any;
+}
+
+function makeEditorWithDocName(docName: string): object {
+  const editor = {};
+  // biome-ignore lint/suspicious/noExplicitAny: WeakMap key only — the view never calls editor methods
+  setEditorDocName(editor as any, docName);
+  return editor;
 }
 
 describe('ImageInlineZoomView — inline-image lightbox wrap', () => {
@@ -80,5 +88,34 @@ describe('ImageInlineZoomView — inline-image lightbox wrap', () => {
     render(<ImageInlineZoomView {...makeNode({ src: '/assets/pic.png', alt: '' })} />);
     const img = document.querySelector('img');
     expect(img?.getAttribute('src')).toContain('/assets/pic.png');
+  });
+
+  test('resolves a `./`-relative inline src against the document folder, not the SPA root', () => {
+    const editor = makeEditorWithDocName('fishing-log/2026-05-16-wind-river-springer');
+    render(
+      <ImageInlineZoomView {...makeNode({ src: './assets/cat.jpg', alt: 'A cat' }, editor)} />,
+    );
+    const img = document.querySelector('img');
+    expect(img?.getAttribute('src')).toBe('/fishing-log/assets/cat.jpg');
+  });
+
+  test('resolves a `../`-relative inline src against the document folder', () => {
+    const editor = makeEditorWithDocName('fishing-log/2026/spring/log');
+    render(<ImageInlineZoomView {...makeNode({ src: '../../assets/cat.jpg' }, editor)} />);
+    const img = document.querySelector('img');
+    expect(img?.getAttribute('src')).toBe('/fishing-log/assets/cat.jpg');
+  });
+
+  test('leaves a server-absolute src untouched even with a docName (idempotent)', () => {
+    const editor = makeEditorWithDocName('fishing-log/2026-05-16-wind-river-springer');
+    render(<ImageInlineZoomView {...makeNode({ src: '/fishing-log/assets/cat.jpg' }, editor)} />);
+    const img = document.querySelector('img');
+    expect(img?.getAttribute('src')).toBe('/fishing-log/assets/cat.jpg');
+  });
+
+  test('falls back to the raw src when no docName is registered (no base to resolve against)', () => {
+    render(<ImageInlineZoomView {...makeNode({ src: './assets/cat.jpg' })} />);
+    const img = document.querySelector('img');
+    expect(img?.getAttribute('src')).toBe('./assets/cat.jpg');
   });
 });
