@@ -507,7 +507,8 @@ export function createServer(options: ServerOptions): ServerInstance {
                 loaded: loadedPrincipal.id,
               }),
             );
-          } else {
+          }
+          else {
             ctx.principalId = parsed.principalId;
           }
         }
@@ -1044,6 +1045,7 @@ export function createServer(options: ServerOptions): ServerInstance {
     }
   }
 
+
   const eventBuffer: DiskEvent[] = [];
 
   async function onDiskEvent(event: DiskEvent): Promise<void> {
@@ -1060,6 +1062,7 @@ export function createServer(options: ServerOptions): ServerInstance {
       await handleDiskEvent(event);
     }
   }
+
 
   let watcher: WatcherHandle | null = null;
   let headWatcher: HeadWatcherHandle | null = null;
@@ -1329,7 +1332,8 @@ export function createServer(options: ServerOptions): ServerInstance {
                   'utf-8',
                 );
               }
-            } catch {}
+            } catch {
+            }
 
             try {
               destroyShadowRepo(shadowRef.current);
@@ -1467,13 +1471,15 @@ export function createServer(options: ServerOptions): ServerInstance {
         let lastKnownHead: string | null = null;
         try {
           lastKnownHead = readFileSync(lastKnownHeadPath, 'utf-8').trim() || null;
-        } catch {}
+        } catch {
+        }
 
         let currentHead: string | null = null;
         try {
           const projectGit = simpleGit({ baseDir: projectDir, timeout: { block: 10_000 } });
           currentHead = (await projectGit.revparse('HEAD')).trim() || null;
-        } catch {}
+        } catch {
+        }
 
         if (currentHead !== null) {
           if (currentHead !== lastKnownHead) {
@@ -1482,7 +1488,8 @@ export function createServer(options: ServerOptions): ServerInstance {
               const projectGit = simpleGit({ baseDir: projectDir, timeout: { block: 10_000 } });
               const b = (await projectGit.raw('rev-parse', '--abbrev-ref', 'HEAD')).trim();
               if (b && b !== 'HEAD') branch = b;
-            } catch {}
+            } catch {
+            }
 
             log.info(
               { lastKnownHead, currentHead, branch },
@@ -1652,7 +1659,8 @@ export function createServer(options: ServerOptions): ServerInstance {
           const candidate = join(commonDir, 'info', 'exclude');
           if (existsSync(dirname(candidate))) gitInfoExcludePath = candidate;
         }
-      } catch {}
+      } catch {
+      }
       const ignorePaths = gitInfoExcludePath
         ? [okignorePath, gitignorePath, gitInfoExcludePath]
         : [okignorePath, gitignorePath];

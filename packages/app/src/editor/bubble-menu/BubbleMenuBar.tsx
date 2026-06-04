@@ -74,7 +74,8 @@ export function BubbleMenuBar({
             popup.style.top = `${y}px`;
           }
         })
-        .catch(() => {});
+        .catch(() => {
+        });
     });
   };
 

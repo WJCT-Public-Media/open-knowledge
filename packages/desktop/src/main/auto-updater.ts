@@ -1,8 +1,10 @@
+
 import type { IpcMain, IpcMainInvokeEvent } from 'electron';
 import type { EventChannels } from '../shared/ipc-events.ts';
 import { createHandler } from '../shared/ipc-handler.ts';
 import { type SendableWebContents, sendToRenderer } from '../shared/ipc-send.ts';
 import type { AppState, UpdateChannel } from './state-store.ts';
+
 
 export interface UpdaterLike {
   autoDownload: boolean;
@@ -170,6 +172,7 @@ export function versionAtLeast(running: string, pending: string): boolean {
   return r[2] >= p[2];
 }
 
+
 export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHandle {
   const {
     updater,
@@ -203,6 +206,7 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
       feedUrl,
     });
   }
+
 
   const broadcast = <K extends keyof EventChannels>(
     channel: K,
@@ -281,6 +285,7 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
       return;
     onDispatch?.('check-success');
   };
+
 
   const onCheckingForUpdate = (): void => {
     logger.info('checking-for-update');
@@ -447,6 +452,7 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
   updater.on('update-downloaded', onUpdateDownloaded);
   updater.on('error', onError);
 
+
   const register = createHandler(ipcMain as IpcMain);
   register('ok:update:relaunch-now', async (_event: IpcMainInvokeEvent): Promise<undefined> => {
     const snapshot = readState();
@@ -489,6 +495,7 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
       return undefined;
     },
   );
+
 
   const currentVersion = getAppVersion();
   let state = readState();
@@ -533,6 +540,7 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
     }
   }
 
+
   let timerHandle: ReturnType<typeof setTimeout> | null = null;
 
   const nextCheckDelayMs = (): number =>
@@ -575,6 +583,7 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
     );
     onDispatch?.('skipped-dev-mode');
   }
+
 
   return {
     checkForUpdatesNow(): Promise<unknown> {

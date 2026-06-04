@@ -308,6 +308,7 @@ describe('block-separator-collapse — `\\n[marker]` ≡ `\\n\\n[marker]`', () =
 });
 
 describe('commonmark-escape collapse', () => {
+
   test('escaped underscore equivalent to plain underscore', () => {
     expect(normalizeBridge('init_spike')).toBe(normalizeBridge('init\\_spike'));
   });
@@ -343,6 +344,7 @@ describe('commonmark-escape collapse', () => {
 });
 
 describe('table-align-row-spacing collapse', () => {
+
   test('unpadded equivalent to padded alignment row', () => {
     expect(normalizeBridge('|---|---|')).toBe(normalizeBridge('| --- | --- |'));
   });
@@ -383,6 +385,7 @@ describe('table-align-row-spacing collapse', () => {
 });
 
 describe('emphasis-around-code flatten', () => {
+
   test('strong wrapper around inline code equivalent to bare inline code', () => {
     expect(normalizeBridge('**`text-indent`**')).toBe(normalizeBridge('`text-indent`'));
   });
@@ -402,6 +405,7 @@ describe('emphasis-around-code flatten', () => {
 });
 
 describe('list-indent canonical collapse', () => {
+
   test('6-space-indented list item equivalent to 3-space-indented', () => {
     expect(normalizeBridge('      - nested item')).toBe(normalizeBridge('   - nested item'));
   });

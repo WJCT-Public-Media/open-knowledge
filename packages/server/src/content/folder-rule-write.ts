@@ -1,3 +1,4 @@
+
 import {
   existsSync,
   mkdirSync,
@@ -228,7 +229,8 @@ function autoCleanOkDir(okAbsDir: string): void {
   if (entries.length === 0) {
     try {
       rmdirSync(okAbsDir);
-    } catch {}
+    } catch {
+    }
   }
 }
 

@@ -1,3 +1,4 @@
+
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { z } from 'zod';
 
@@ -33,6 +34,7 @@ export const ApiConfigSuccessSchema = z
   })
   .loose() satisfies StandardSchemaV1;
 export type ApiConfigSuccess = z.infer<typeof ApiConfigSuccessSchema>;
+
 
 export const ProblemTypeSchema = z.enum([
   'urn:ok:error:malformed-upload',
@@ -112,6 +114,7 @@ export const ProblemDetailsSchema = z
   })
   .loose() satisfies StandardSchemaV1;
 export type ProblemDetails = z.infer<typeof ProblemDetailsSchema>;
+
 
 export const UploadRequestSchema = z
   .object({

@@ -1,3 +1,4 @@
+
 import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -92,10 +93,12 @@ async function checkCollabSync(port: number, timeoutMs = 10_000): Promise<void> 
   } finally {
     try {
       provider.destroy();
-    } catch {}
+    } catch {
+    }
     try {
       doc.destroy();
-    } catch {}
+    } catch {
+    }
   }
 }
 

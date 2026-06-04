@@ -370,6 +370,7 @@ describe('spawnOkUi', () => {
   });
 });
 
+
 function makeTestConfig(): Config {
   return ConfigSchema.parse({});
 }
@@ -572,7 +573,8 @@ describe('bootStartServer (integration)', () => {
     if (booted) {
       try {
         await booted.destroy();
-      } catch {}
+      } catch {
+      }
       booted = null;
     }
     if (originalHome === undefined) {
@@ -989,6 +991,7 @@ describe('bootStartServer (integration)', () => {
     for (const c of captured) expect(c.reclaimDisableEnv).toBeNull();
   });
 
+
   test('serveContentAssets: false (default) — content paths return the SPA-pointer 404', async () => {
     writeFileSync(join(tmpDir, 'fixture-asset.png'), 'fake-png-bytes', 'utf-8');
 
@@ -1123,7 +1126,8 @@ describe('bootStartServer — no auto git-init from ok start (US-004)', () => {
     if (booted) {
       try {
         await booted.destroy();
-      } catch {}
+      } catch {
+      }
       booted = null;
     }
     if (originalHome === undefined) {
@@ -1163,6 +1167,7 @@ describe('bootStartServer — no auto git-init from ok start (US-004)', () => {
     }
   });
 });
+
 
 describe('bootStartServer — rejects with init-required when .ok/config.yml is absent', () => {
   let tmpDir: string;
@@ -1258,6 +1263,7 @@ describe('bootStartServer — rejects with init-required when .ok/config.yml is 
   });
 });
 
+
 describe('awaitUiSiblingPort', () => {
   test('returns the bound port immediately when ui.lock has port > 0 on first read', async () => {
     const port = await awaitUiSiblingPort({
@@ -1324,6 +1330,7 @@ describe('awaitUiSiblingPort', () => {
   });
 });
 
+
 describe('bootStartServer — resolvedUiPort tracks the port ok ui actually binds', () => {
   let tmpDir: string;
   let booted: BootedStartServer | null = null;
@@ -1346,7 +1353,8 @@ describe('bootStartServer — resolvedUiPort tracks the port ok ui actually bind
     if (booted) {
       try {
         await booted.destroy();
-      } catch {}
+      } catch {
+      }
       booted = null;
     }
     if (uiHandle) {

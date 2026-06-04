@@ -41,7 +41,8 @@ const wordmarkDataUrl = (() => {
     try {
       const bytes = readFileSync(candidate);
       return `data:image/svg+xml;base64,${bytes.toString('base64')}`;
-    } catch {}
+    } catch {
+    }
   }
   return FALLBACK_LOGO;
 })();

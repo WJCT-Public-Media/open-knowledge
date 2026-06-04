@@ -45,6 +45,7 @@ describeCiSkippable('ingest — previewUrl emission', () => {
 });
 
 describe('ingest — binary preservation plan body (SPEC 2026-05-19)', () => {
+
   test('plan mentions binary-handling tokens (external-sources/, ![[, sha256, --max-filesize)', async () => {
     const { server, call } = captureTool();
     register(server, { config: BASE_CONFIG, resolveCwd: async () => process.cwd() });

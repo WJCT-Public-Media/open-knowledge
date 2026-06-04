@@ -318,7 +318,8 @@ describe('bootServer git-preflight OTEL emission', () => {
             throw new GitNotAvailableError('linux', makeGuidance());
           },
         });
-      } catch {}
+      } catch {
+      }
     } finally {
       process.stderr.write = originalStderrWrite;
     }
@@ -354,7 +355,8 @@ describe('bootServer git-preflight OTEL emission', () => {
             throw new GitTooOldError('linux', '2.20.0', '2.31.0', '/usr/bin/git', makeGuidance());
           },
         });
-      } catch {}
+      } catch {
+      }
     } finally {
       process.stderr.write = originalStderrWrite;
     }
@@ -394,7 +396,8 @@ describe('bootServer git-preflight OTEL emission', () => {
           log: logger,
           gitPreflight: () => ok,
         });
-      } catch {}
+      } catch {
+      }
     } finally {
       process.stderr.write = originalStderrWrite;
     }

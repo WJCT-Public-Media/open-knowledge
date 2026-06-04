@@ -1,3 +1,4 @@
+
 import {
   type BridgeInvariantSite,
   type BridgeInvariantViolation,
@@ -13,6 +14,7 @@ import {
   incrementBridgeToleranceApplied,
   incrementObserverAPathBFiresSuppressed,
 } from './metrics.ts';
+
 
 const DEFAULT_DEBOUNCE_S = 60;
 
@@ -161,11 +163,13 @@ export function __getViolationRateTupleCountForTests(): number {
   return lastEmitMs.size;
 }
 
+
 export function shouldThrowOnBridgeInvariantViolation(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   return env.NODE_ENV === 'test' || env.OK_BRIDGE_THROW_ON_VIOLATION === '1';
 }
+
 
 interface AssertBridgeInvariantOpts {
   site: BridgeInvariantSite;

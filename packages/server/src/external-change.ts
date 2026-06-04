@@ -1,3 +1,4 @@
+
 import type { Hocuspocus } from '@hocuspocus/server';
 import {
   BridgeInvariantViolationError,

@@ -66,6 +66,7 @@ mock.module('@napi-rs/keyring', () => ({ Entry: MockKeyringEntry }));
 
 import { FileBackend } from './token-store.ts';
 
+
 describe('FileBackend', () => {
   let tmpDir: string;
   let authFile: string;
@@ -175,6 +176,7 @@ describe('FileBackend', () => {
   });
 });
 
+
 describe('createTokenStore', () => {
   beforeEach(resetKeyringMockState);
 
@@ -189,6 +191,7 @@ describe('createTokenStore', () => {
     expect(typeof store.clear).toBe('function');
   });
 });
+
 
 describe('KeyringBackend upsert semantics', () => {
   let tmpDir: string;
@@ -256,6 +259,7 @@ describe('KeyringBackend upsert semantics', () => {
   });
 });
 
+
 describe('createTokenStore fallback to FileBackend', () => {
   let tmpDir: string;
   let authFile: string;
@@ -312,6 +316,7 @@ describe('createTokenStore fallback to FileBackend', () => {
     expect(await store.get('github.com')).toBeNull();
   });
 });
+
 
 describe('clearTokenFromAllBackends', () => {
   let tmpDir: string;
@@ -423,6 +428,7 @@ describe('clearTokenFromAllBackends', () => {
     expect((await file.get('gitlab.com'))?.token).toBe('glpat_gl');
   });
 });
+
 
 describe('createTokenStore cross-backend read fallback', () => {
   let tmpDir: string;

@@ -52,12 +52,9 @@ export function register(server: ServerInstance, deps: EditFrontmatterDeps): voi
         patch: z
           .record(z.string(), PatchValueSchema)
           .describe('JSON Merge Patch — `{key: value}` sets, `{key: null}` deletes'),
-        types: z
-          .record(z.string(), z.enum(FRONTMATTER_TYPES))
-          .optional()
-          .describe(
-            'Currently ignored (shape-validated for forward-compat but not persisted). Type is inferred from value shape on read. Will become a real per-key widget-type override (text|number|boolean|date|list) once persistence lands.',
-          ),
+        types: z.record(z.string(), z.enum(FRONTMATTER_TYPES)).optional().describe(
+          'Currently ignored (shape-validated for forward-compat but not persisted). Type is inferred from value shape on read. Will become a real per-key widget-type override (text|number|boolean|date|list) once persistence lands.',
+        ),
         summary: summaryArgSchema,
         cwd: z.string().optional().describe(ROUTED_CWD_DESCRIPTION),
       },

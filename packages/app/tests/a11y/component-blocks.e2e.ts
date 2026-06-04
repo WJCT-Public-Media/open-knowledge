@@ -1,3 +1,4 @@
+
 import { randomUUID } from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
@@ -19,6 +20,7 @@ async function setupDoc(page: Page, api: ApiHelpers, content: string): Promise<s
   await page.waitForSelector('.ProseMirror');
   return docName;
 }
+
 
 test('A11Y01: Tab key cycles through PropPanel controls in visual DOM order', async ({
   page,
@@ -51,6 +53,7 @@ test('A11Y01: Tab key cycles through PropPanel controls in visual DOM order', as
   }
 });
 
+
 test('A11Y02: NodeSelection announces component via aria-live region', async ({ page, api }) => {
   await setupDoc(page, api, '<Callout type="warning">\n\nTest content\n\n</Callout>');
   await page.waitForFunction(() => Boolean(window.__activeEditor?.state.doc.childCount), null, {
@@ -77,6 +80,7 @@ test('A11Y02: NodeSelection announces component via aria-live region', async ({ 
   await expect(liveRegion).toBeAttached({ timeout: 2_000 });
   await expect(liveRegion).toContainText('Selected: Callout', { timeout: 2_000 });
 });
+
 
 test('A11Y03: PropPanel Esc key closes and returns focus to block', async ({ page, api }) => {
   await setupDoc(page, api, '<Callout type="warning">\n\nTest content\n\n</Callout>');
@@ -106,6 +110,7 @@ test('A11Y03: PropPanel Esc key closes and returns focus to block', async ({ pag
   expect(activeElement).toBeTruthy();
 });
 
+
 test('A11Y05: rawMdxFallback nested CodeMirror has accessible label', async ({ page, api }) => {
   await setupDoc(page, api, '<Foo>broken</Bar>\n');
   await page.waitForFunction(() => Boolean(window.__activeEditor?.state.doc.childCount), null, {
@@ -127,6 +132,7 @@ test('A11Y05: rawMdxFallback nested CodeMirror has accessible label', async ({ p
   const role = await wrapper.getAttribute('role');
   expect(role, 'rawMdxFallback wrapper must have role="group"').toBe('group');
 });
+
 
 test('A11Y07: Empty Tabs placeholder activatable via keyboard inserts a Tab', async ({
   page,
@@ -183,6 +189,7 @@ test('A11Y07: Empty Tabs placeholder activatable via keyboard inserts a Tab', as
 
   expect(docName).toContain('a11y-');
 });
+
 
 test('A11Y09: Wildcard block chrome has accessible name', async ({ page, api }) => {
   await setupDoc(page, api, '<UnknownComponent prop="val">\n\nSome content\n\n</UnknownComponent>');
@@ -260,6 +267,7 @@ test('A11Y10: Zero axe-core violations on 5-pack fixture (excluding color-contra
     .analyze();
   expect(axeResults.violations).toEqual([]);
 });
+
 
 test('A11Y11: javascript:/data: URL props render inert in the DOM', async ({ page, api }) => {
   const malicious = [
