@@ -1319,6 +1319,10 @@ msgstr "Content directory"
 msgid "Content directory must be inside the project"
 msgstr "Content directory must be inside the project"
 
+#: src/editor/bubble-menu/FootnoteBubbleButton.tsx
+msgid "Convert selection to footnote"
+msgstr "Convert selection to footnote"
+
 #: src/lib/keyboard-shortcuts.ts
 msgid "Convert the current block to a paragraph."
 msgstr "Convert the current block to a paragraph."

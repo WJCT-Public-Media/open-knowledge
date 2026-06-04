@@ -8,6 +8,52 @@ declare module '@tiptap/core' {
   }
 }
 
+export function nextFootnoteIdentifier(existingIdentifiers: readonly string[]): string {
+  let maxId = 0;
+  for (const id of existingIdentifiers) {
+    const n = Number.parseInt(id, 10);
+    if (!Number.isNaN(n) && n > maxId) maxId = n;
+  }
+  return String(maxId + 1);
+}
+
+export interface FootnoteWalkableDoc {
+  forEach(
+    f: (node: { type: { name: string }; nodeSize: number }, offset: number, index: number) => void,
+  ): void;
+  content: { size: number };
+}
+
+export interface FootnoteDescendableDoc {
+  descendants(
+    f: (
+      node: { type: { name: string }; attrs: { identifier?: unknown } },
+      pos: number,
+    ) => boolean | undefined,
+  ): void;
+}
+
+export function collectFootnoteIdentifiers(doc: FootnoteDescendableDoc): string[] {
+  const ids: string[] = [];
+  doc.descendants((node) => {
+    if (node.type.name === 'footnoteDefinition') {
+      ids.push(String(node.attrs.identifier ?? ''));
+    }
+    return true;
+  });
+  return ids;
+}
+
+export function findFootnoteDefinitionInsertPos(doc: FootnoteWalkableDoc): number {
+  let pos: number | null = null;
+  doc.forEach((node, offset) => {
+    if (node.type.name === 'footnoteDefinition') {
+      pos = offset + node.nodeSize;
+    }
+  });
+  return pos ?? doc.content.size;
+}
+
 export const FootnoteReference = Node.create({
   name: 'footnoteReference',
   group: 'inline',

@@ -1704,6 +1704,7 @@
       ". You can still create a blank note."
     ],
     "sER-bs": ["Files"],
+    "sIGbBZ": ["Convert selection to footnote"],
     "sIxSSP": ["Resolve conflict in your terminal"],
     "sJK6pq": ["Permission denied"],
     "sJWhgo": ["Unknown component: ", ["unregisteredComponentName"]],

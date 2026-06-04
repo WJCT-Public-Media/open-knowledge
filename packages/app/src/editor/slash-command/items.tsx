@@ -1,3 +1,8 @@
+import {
+  collectFootnoteIdentifiers,
+  findFootnoteDefinitionInsertPos,
+  nextFootnoteIdentifier,
+} from '@inkeep/open-knowledge-core';
 import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import type { Editor } from '@tiptap/react';
@@ -254,22 +259,13 @@ export function getSlashCommandItems(): SlashCommandItem[] {
       icon: Superscript,
       category: 'insert',
       command: (editor) => {
-        let maxId = 0;
-        editor.state.doc.descendants((node) => {
-          if (node.type.name === 'footnoteDefinition') {
-            const id = String(node.attrs.identifier ?? '');
-            const n = Number.parseInt(id, 10);
-            if (!Number.isNaN(n) && n > maxId) maxId = n;
-          }
-          return true;
-        });
-        const next = String(maxId + 1);
-        const docEnd = editor.state.doc.content.size;
+        const next = nextFootnoteIdentifier(collectFootnoteIdentifiers(editor.state.doc));
+        const insertAt = findFootnoteDefinitionInsertPos(editor.state.doc) + 1;
         editor
           .chain()
           .focus()
           .insertFootnoteReference(next)
-          .insertContentAt(docEnd + 1, {
+          .insertContentAt(insertAt, {
             type: 'footnoteDefinition',
             attrs: { identifier: next, label: next },
             content: [{ type: 'paragraph' }],

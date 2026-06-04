@@ -9,6 +9,7 @@ import { getFindReplaceState } from '../find-replace/tiptap-find-replace-extensi
 import { BlockTypeSelector } from './BlockTypeSelector';
 import { EditWithAiBubbleButton } from './EditWithAiBubbleButton';
 import { FileBubbleButtons, isFileNodeSelected } from './FileBubbleButtons';
+import { FootnoteBubbleButton } from './FootnoteBubbleButton';
 import { ImageAlignButtons, isImageNodeSelected } from './ImageAlignButtons';
 import { InlineFormatButtons } from './InlineFormatButtons';
 import { LinkEditPopover } from './LinkEditPopover';
@@ -106,6 +107,7 @@ export function BubbleMenuBar({
           <InlineFormatButtons key={tooltipKey} editor={editor} />
           <Separator orientation="vertical" className="mx-0.5 h-5 data-vertical:self-center" />
           <LinkEditPopover key={`${tooltipKey}-link`} editor={editor} />
+          <FootnoteBubbleButton key={`${tooltipKey}-footnote`} editor={editor} />
           <EditWithAiBubbleButton
             key={`${tooltipKey}-edit-ai`}
             editor={editor}

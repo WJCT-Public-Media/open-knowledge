@@ -3029,16 +3029,28 @@ html.electron-mode [data-slot="sidebar-inner"] {
 }
 
 /* Visual divider above the first footnote in the document — separates
- * the footnote list from the prose body. The selector targets any
- * `.footnote-def` that is NOT preceded by another `.footnote-def` (i.e.
- * the first footnote-def regardless of intervening siblings). Class-
- * keyed rather than `:first-of-type` because `commentBlock` also renders
- * as `<aside>` (see `core/src/extensions/comment-block.ts`) — a comment
- * block before the first footnote would otherwise hide the divider. */
-.footnote-def:not(.footnote-def + .footnote-def) {
+ * the footnote list from the prose body. CSS has no native "first-of-
+ * class" selector, so we apply the divider to ALL `.footnote-def` and
+ * then UN-apply it on any `.footnote-def` that has a prior
+ * `.footnote-def` SIBLING anywhere earlier in the parent. The general-
+ * sibling combinator (`~`) matches across intervening non-footnote
+ * elements — PM inserts `<p class="ok-chunk-wrapper">` chunks between
+ * every block-level node, so the adjacent-sibling combinator (`+`)
+ * would never see a `.footnote-def + .footnote-def` match in practice.
+ *
+ * Class-keyed rather than `:first-of-type` because `commentBlock` also
+ * renders as `<aside>` (see `core/src/extensions/comment-block.ts`) —
+ * a comment block before the first footnote would otherwise hide the
+ * divider. */
+.footnote-def {
   margin-top: 1.5rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border);
+}
+.footnote-def ~ .footnote-def {
+  margin-top: 0.25rem;
+  padding-top: 0;
+  border-top: none;
 }
 
 .footnote-def .footnote-body {
