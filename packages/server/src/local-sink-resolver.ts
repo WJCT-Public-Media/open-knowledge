@@ -9,17 +9,16 @@ import { parse as parseYaml } from 'yaml';
 
 export interface ResolveLocalSinkArgs {
   projectDir: string;
-  contentDir: string;
 }
 
 export interface ResolvedLocalSink {
   telemetry: {
-    contentDir: string;
+    projectDir: string;
     spansMaxBytes: number;
     attributeDenylist: readonly string[];
   };
   logs: {
-    contentDir: string;
+    projectDir: string;
     maxBytes: number;
   };
 }
@@ -102,12 +101,12 @@ export function resolveLocalSinkConfig(args: ResolveLocalSinkArgs): ResolvedLoca
 
   return {
     telemetry: {
-      contentDir: args.contentDir,
+      projectDir: args.projectDir,
       spansMaxBytes,
       attributeDenylist,
     },
     logs: {
-      contentDir: args.contentDir,
+      projectDir: args.projectDir,
       maxBytes: logsMaxBytes,
     },
   };

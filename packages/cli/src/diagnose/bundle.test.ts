@@ -84,6 +84,49 @@ describe('collectBundle — file inventory', () => {
     collected.cleanup();
   });
 
+  test('harvests sink + lock from projectDir, not the content sub-folder', async () => {
+    const projectDir = makeTmpDir();
+    const contentDir = join(projectDir, 'docs');
+    mkdirSync(contentDir, { recursive: true });
+
+    const realSpans = '{"resourceSpans":[]}\n';
+    writeAt(projectDir, '.ok/local/telemetry/spans-current.jsonl', realSpans);
+    writeAt(projectDir, '.ok/local/logs/server-current.jsonl', '{"level":30,"msg":"x"}\n');
+    writeAt(projectDir, '.ok/local/server.lock', JSON.stringify({ port: 6111 }));
+    writeAt(contentDir, '.ok/local/telemetry/spans-current.jsonl', '{"resourceSpans":["DECOY"]}\n');
+
+    const collected = await collectBundle({
+      contentDir,
+      projectDir,
+      deps: makeDeterministicDeps(),
+    });
+
+    const paths = collected.manifest.files.map((f) => f.path);
+    expect(paths).toContain('telemetry/spans-current.jsonl');
+    expect(paths).toContain('logs/server-current.jsonl');
+    expect(paths).toContain('state/server.lock');
+    const staged = readFileSync(
+      join(collected.stagingDir, 'telemetry', 'spans-current.jsonl'),
+      'utf-8',
+    );
+    expect(staged).toBe(realSpans);
+    expect(staged).not.toContain('DECOY');
+    collected.cleanup();
+  });
+
+  test('defaults to contentDir as the project root when projectDir is omitted', async () => {
+    const contentDir = makeTmpDir();
+    writeAt(contentDir, '.ok/local/telemetry/spans-current.jsonl', '{"resourceSpans":[]}\n');
+    writeAt(contentDir, '.ok/local/server.lock', JSON.stringify({ port: 6222 }));
+
+    const collected = await collectBundle({ contentDir, deps: makeDeterministicDeps() });
+
+    const paths = collected.manifest.files.map((f) => f.path);
+    expect(paths).toContain('telemetry/spans-current.jsonl');
+    expect(paths).toContain('state/server.lock');
+    collected.cleanup();
+  });
+
   test('lists both spans-current.jsonl and spans-prev.jsonl when both exist', async () => {
     const contentDir = makeTmpDir();
     writeAt(contentDir, '.ok/local/telemetry/spans-current.jsonl', '{"resourceSpans":[]}\n');

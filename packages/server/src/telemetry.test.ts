@@ -19,9 +19,9 @@ import { spansCurrentPath } from './telemetry-file-sink.ts';
 
 const DEFAULT_DENYLIST = ['authorization', 'cookie'] as const;
 
-function makeLocalSinkOpts(contentDir: string): LocalSinkOptions {
+function makeLocalSinkOpts(projectDir: string): LocalSinkOptions {
   return {
-    contentDir,
+    projectDir,
     spansMaxBytes: 1_048_576,
     attributeDenylist: DEFAULT_DENYLIST,
   };

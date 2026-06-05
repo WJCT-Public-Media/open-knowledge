@@ -10,7 +10,7 @@ This public repository is mirrored from Inkeep's internal monorepo with Copybara
 
 Public pull requests are welcome. When a public PR opens here, automation mirrors it into the internal monorepo for review and merge. After the internal PR lands, Copybara syncs the accepted change back to this repository.
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full contribution flow, including the [Contributor License Agreement](./CLA.md), and [AGENTS.md](./AGENTS.md) for agent-facing development guidance.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full contribution flow and [AGENTS.md](./AGENTS.md) for agent-facing development guidance.
 
 ## Prerequisites
 

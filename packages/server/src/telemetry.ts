@@ -31,7 +31,7 @@ function noopResult(): { tracer: Tracer; meter: Meter } {
 }
 
 export interface LocalSinkOptions {
-  contentDir: string;
+  projectDir: string;
   spansMaxBytes: number;
   attributeDenylist: readonly string[];
 }
@@ -67,7 +67,7 @@ export function initTelemetry(opts: InitTelemetryOptions = {}): { tracer: Tracer
     spanProcessors.push(new ScrubbingSpanProcessor({ attributeDenylist }));
     if (fileSinkEnabled && opts.localSink !== undefined) {
       fileSpanExporter = new FileSpanExporter({
-        contentDir: opts.localSink.contentDir,
+        projectDir: opts.localSink.projectDir,
         maxBytes: opts.localSink.spansMaxBytes,
       });
       spanProcessors.push(new SimpleSpanProcessor(fileSpanExporter));

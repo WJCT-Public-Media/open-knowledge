@@ -62,7 +62,7 @@ function firstSpanName(envelope: ResourceSpansEnvelope): string {
 
 describe('FileSpanExporter', () => {
   test('first export creates spans-current.jsonl lazily with one ResourceSpans JSON line per batch', async () => {
-    const exporter = new FileSpanExporter({ contentDir: tmp, maxBytes: 1_000_000 });
+    const exporter = new FileSpanExporter({ projectDir: tmp, maxBytes: 1_000_000 });
     const currentPath = spansCurrentPath(tmp);
     expect(existsSync(currentPath)).toBe(false);
 
@@ -83,7 +83,7 @@ describe('FileSpanExporter', () => {
   });
 
   test('multiple batches each land as their own JSON line', async () => {
-    const exporter = new FileSpanExporter({ contentDir: tmp, maxBytes: 1_000_000 });
+    const exporter = new FileSpanExporter({ projectDir: tmp, maxBytes: 1_000_000 });
     const provider = makeProvider(exporter);
     const tracer = provider.getTracer('test');
 
@@ -102,7 +102,7 @@ describe('FileSpanExporter', () => {
   });
 
   test('parent directory is created lazily on first export', async () => {
-    const exporter = new FileSpanExporter({ contentDir: tmp, maxBytes: 1_000_000 });
+    const exporter = new FileSpanExporter({ projectDir: tmp, maxBytes: 1_000_000 });
     const telemetryDir = join(tmp, '.ok', 'local', 'telemetry');
     expect(existsSync(telemetryDir)).toBe(false);
 
@@ -117,7 +117,7 @@ describe('FileSpanExporter', () => {
   });
 
   test('rotates current → prev once size exceeds maxBytes', async () => {
-    const exporter = new FileSpanExporter({ contentDir: tmp, maxBytes: 50 });
+    const exporter = new FileSpanExporter({ projectDir: tmp, maxBytes: 50 });
     const provider = makeProvider(exporter);
     const tracer = provider.getTracer('test');
     const currentPath = spansCurrentPath(tmp);
@@ -150,7 +150,7 @@ describe('FileSpanExporter', () => {
 
   test('keeps current under threshold across multiple appends before rotating', async () => {
     const cap = 2_000;
-    const exporter = new FileSpanExporter({ contentDir: tmp, maxBytes: cap });
+    const exporter = new FileSpanExporter({ projectDir: tmp, maxBytes: cap });
     const provider = makeProvider(exporter);
     const tracer = provider.getTracer('test');
     const currentPath = spansCurrentPath(tmp);
@@ -179,7 +179,7 @@ describe('FileSpanExporter', () => {
   });
 
   test('appends cleanly even when the existing file has a partial trailing line', async () => {
-    const exporter = new FileSpanExporter({ contentDir: tmp, maxBytes: 1_000_000 });
+    const exporter = new FileSpanExporter({ projectDir: tmp, maxBytes: 1_000_000 });
     const currentPath = spansCurrentPath(tmp);
     await new Promise<void>((resolve, reject) => {
       const provider = makeProvider(exporter);
@@ -191,7 +191,7 @@ describe('FileSpanExporter', () => {
     });
     writeFileSync(currentPath, 'NOT-JSON-AT-ALL', { flag: 'a' });
 
-    const exporter2 = new FileSpanExporter({ contentDir: tmp, maxBytes: 1_000_000 });
+    const exporter2 = new FileSpanExporter({ projectDir: tmp, maxBytes: 1_000_000 });
     const provider2 = makeProvider(exporter2);
     provider2.getTracer('test').startSpan('after-partial').end();
     await provider2.forceFlush();
@@ -214,7 +214,7 @@ describe('FileSpanExporter', () => {
   });
 
   test('shutdown drains in-flight writes; further export() is rejected', async () => {
-    const exporter = new FileSpanExporter({ contentDir: tmp, maxBytes: 1_000_000 });
+    const exporter = new FileSpanExporter({ projectDir: tmp, maxBytes: 1_000_000 });
     const provider = makeProvider(exporter);
     provider.getTracer('test').startSpan('pre-shutdown').end();
     await provider.forceFlush();
@@ -238,7 +238,7 @@ describe('FileSpanExporter', () => {
   });
 
   test('forceFlush waits for in-flight writes to settle', async () => {
-    const exporter = new FileSpanExporter({ contentDir: tmp, maxBytes: 1_000_000 });
+    const exporter = new FileSpanExporter({ projectDir: tmp, maxBytes: 1_000_000 });
     const provider = makeProvider(exporter);
     const tracer = provider.getTracer('test');
     tracer.startSpan('to-flush').end();
@@ -495,7 +495,7 @@ describe('ScrubbingSpanProcessor', () => {
   });
 
   test('integrated with FileSpanExporter: denylisted values never reach the JSONL', async () => {
-    const exporter = new FileSpanExporter({ contentDir: tmp, maxBytes: 1_000_000 });
+    const exporter = new FileSpanExporter({ projectDir: tmp, maxBytes: 1_000_000 });
     const proc = new ScrubbingSpanProcessor({
       attributeDenylist: ['authorization'],
       maxValueBytes: 16,
@@ -612,7 +612,7 @@ describe('ScrubbingSpanProcessor', () => {
   });
 
   test('integrated with FileSpanExporter: event + link credentials never reach the JSONL', async () => {
-    const exporter = new FileSpanExporter({ contentDir: tmp, maxBytes: 1_000_000 });
+    const exporter = new FileSpanExporter({ projectDir: tmp, maxBytes: 1_000_000 });
     const proc = new ScrubbingSpanProcessor({
       attributeDenylist: ['authorization'],
       maxValueBytes: 16,

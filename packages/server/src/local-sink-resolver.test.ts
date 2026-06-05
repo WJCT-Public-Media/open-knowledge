@@ -29,13 +29,10 @@ describe('resolveLocalSinkConfig', () => {
   }
 
   it('returns the default sink config when no config files set anything', () => {
-    const resolved = resolveLocalSinkConfig({
-      projectDir,
-      contentDir: projectDir,
-    });
+    const resolved = resolveLocalSinkConfig({ projectDir });
     expect(resolved).not.toBeNull();
     if (resolved === null) throw new Error('expected non-null sink');
-    expect(resolved.telemetry.contentDir).toBe(projectDir);
+    expect(resolved.telemetry.projectDir).toBe(projectDir);
     expect(resolved.telemetry.spansMaxBytes).toBe(52_428_800);
     expect(resolved.logs.maxBytes).toBe(26_214_400);
     expect(resolved.telemetry.attributeDenylist).toContain('authorization');
@@ -44,29 +41,29 @@ describe('resolveLocalSinkConfig', () => {
 
   it('returns null when OK_DISABLE_LOCAL_SINK=1 — test-only opt-out', () => {
     process.env.OK_DISABLE_LOCAL_SINK = '1';
-    expect(resolveLocalSinkConfig({ projectDir, contentDir: projectDir })).toBeNull();
+    expect(resolveLocalSinkConfig({ projectDir })).toBeNull();
   });
 
   it('returns null when OK_DISABLE_LOCAL_SINK=true', () => {
     process.env.OK_DISABLE_LOCAL_SINK = 'true';
-    expect(resolveLocalSinkConfig({ projectDir, contentDir: projectDir })).toBeNull();
+    expect(resolveLocalSinkConfig({ projectDir })).toBeNull();
   });
 
   it('returns null when project config sets telemetry.localSink.enabled: false', () => {
     seedProject({ telemetry: { localSink: { enabled: false } } });
-    expect(resolveLocalSinkConfig({ projectDir, contentDir: projectDir })).toBeNull();
+    expect(resolveLocalSinkConfig({ projectDir })).toBeNull();
   });
 
   it('returns null when project-local config sets enabled: false (project-local wins)', () => {
     seedProject({ telemetry: { localSink: { enabled: true } } });
     seedProjectLocal({ telemetry: { localSink: { enabled: false } } });
-    expect(resolveLocalSinkConfig({ projectDir, contentDir: projectDir })).toBeNull();
+    expect(resolveLocalSinkConfig({ projectDir })).toBeNull();
   });
 
   it('returns the sink when project disables but project-local re-enables (project-local wins)', () => {
     seedProject({ telemetry: { localSink: { enabled: false } } });
     seedProjectLocal({ telemetry: { localSink: { enabled: true } } });
-    const resolved = resolveLocalSinkConfig({ projectDir, contentDir: projectDir });
+    const resolved = resolveLocalSinkConfig({ projectDir });
     expect(resolved).not.toBeNull();
   });
 
@@ -77,7 +74,7 @@ describe('resolveLocalSinkConfig', () => {
     seedProjectLocal({
       telemetry: { localSink: { spans: { maxBytes: 7 } } },
     });
-    const resolved = resolveLocalSinkConfig({ projectDir, contentDir: projectDir });
+    const resolved = resolveLocalSinkConfig({ projectDir });
     expect(resolved).not.toBeNull();
     if (resolved === null) throw new Error('expected non-null sink');
     expect(resolved.telemetry.spansMaxBytes).toBe(7);
@@ -90,7 +87,7 @@ describe('resolveLocalSinkConfig', () => {
     seedProjectLocal({
       telemetry: { localSink: { logs: { maxBytes: 17 } } },
     });
-    const resolved = resolveLocalSinkConfig({ projectDir, contentDir: projectDir });
+    const resolved = resolveLocalSinkConfig({ projectDir });
     expect(resolved).not.toBeNull();
     if (resolved === null) throw new Error('expected non-null sink');
     expect(resolved.logs.maxBytes).toBe(17);
@@ -103,7 +100,7 @@ describe('resolveLocalSinkConfig', () => {
     seedProjectLocal({
       telemetry: { localSink: { attributeDenylist: ['local-only'] } },
     });
-    const resolved = resolveLocalSinkConfig({ projectDir, contentDir: projectDir });
+    const resolved = resolveLocalSinkConfig({ projectDir });
     expect(resolved).not.toBeNull();
     if (resolved === null) throw new Error('expected non-null sink');
     expect(resolved.telemetry.attributeDenylist).toEqual(['local-only']);
@@ -119,23 +116,18 @@ describe('resolveLocalSinkConfig', () => {
       },
     });
     seedProjectLocal({});
-    const resolved = resolveLocalSinkConfig({ projectDir, contentDir: projectDir });
+    const resolved = resolveLocalSinkConfig({ projectDir });
     expect(resolved).not.toBeNull();
     if (resolved === null) throw new Error('expected non-null sink');
     expect(resolved.telemetry.spansMaxBytes).toBe(555);
     expect(resolved.logs.maxBytes).toBe(222);
   });
 
-  it('returns the resolved contentDir (not projectDir) in the sink configs', () => {
-    const contentDir = mkdtempSync(join(tmpdir(), 'ok-local-sink-content-'));
-    try {
-      const resolved = resolveLocalSinkConfig({ projectDir, contentDir });
-      expect(resolved).not.toBeNull();
-      if (resolved === null) throw new Error('expected non-null sink');
-      expect(resolved.telemetry.contentDir).toBe(contentDir);
-      expect(resolved.logs.contentDir).toBe(contentDir);
-    } finally {
-      rmSync(contentDir, { recursive: true, force: true });
-    }
+  it('anchors both sink configs on projectDir (not content.dir)', () => {
+    const resolved = resolveLocalSinkConfig({ projectDir });
+    expect(resolved).not.toBeNull();
+    if (resolved === null) throw new Error('expected non-null sink');
+    expect(resolved.telemetry.projectDir).toBe(projectDir);
+    expect(resolved.logs.projectDir).toBe(projectDir);
   });
 });

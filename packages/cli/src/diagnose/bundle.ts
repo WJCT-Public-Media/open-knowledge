@@ -124,20 +124,20 @@ const SPANS_PREVIOUS = 'spans-prev.jsonl';
 const LOGS_CURRENT = 'server-current.jsonl';
 const LOGS_PREVIOUS = 'server-prev.jsonl';
 
-function spansCurrentPath(contentDir: string): string {
-  return join(contentDir, ...TELEMETRY_REL, SPANS_CURRENT);
+function spansCurrentPath(projectDir: string): string {
+  return join(projectDir, ...TELEMETRY_REL, SPANS_CURRENT);
 }
 
-function spansPreviousPath(contentDir: string): string {
-  return join(contentDir, ...TELEMETRY_REL, SPANS_PREVIOUS);
+function spansPreviousPath(projectDir: string): string {
+  return join(projectDir, ...TELEMETRY_REL, SPANS_PREVIOUS);
 }
 
-function logsCurrentPath(contentDir: string): string {
-  return join(contentDir, ...LOGS_REL, LOGS_CURRENT);
+function logsCurrentPath(projectDir: string): string {
+  return join(projectDir, ...LOGS_REL, LOGS_CURRENT);
 }
 
-function logsPreviousPath(contentDir: string): string {
-  return join(contentDir, ...LOGS_REL, LOGS_PREVIOUS);
+function logsPreviousPath(projectDir: string): string {
+  return join(projectDir, ...LOGS_REL, LOGS_PREVIOUS);
 }
 
 export const _pathHelpersForTests = {
@@ -323,6 +323,7 @@ function relativeZipPath(stagingDir: string, absPath: string): string {
 
 export async function collectBundle(opts: CollectBundleOpts): Promise<CollectedBundle> {
   const contentDir = resolve(opts.contentDir);
+  const projectDir = resolve(opts.projectDir ?? opts.contentDir);
   const deps = opts.deps ?? {};
   const fetchAgentPresence = deps.fetchAgentPresence ?? defaultFetchAgentPresence;
   const readShadowHead = deps.readShadowHead ?? defaultReadShadowHead;
@@ -337,12 +338,12 @@ export async function collectBundle(opts: CollectBundleOpts): Promise<CollectedB
   mkdirSync(join(stagingDir, 'logs'), { recursive: true });
   mkdirSync(join(stagingDir, 'state'), { recursive: true });
 
-  stageFileIfPresent(spansCurrentPath(contentDir), join(stagingDir, 'telemetry', SPANS_CURRENT));
-  stageFileIfPresent(spansPreviousPath(contentDir), join(stagingDir, 'telemetry', SPANS_PREVIOUS));
-  stageFileIfPresent(logsCurrentPath(contentDir), join(stagingDir, 'logs', LOGS_CURRENT));
-  stageFileIfPresent(logsPreviousPath(contentDir), join(stagingDir, 'logs', LOGS_PREVIOUS));
+  stageFileIfPresent(spansCurrentPath(projectDir), join(stagingDir, 'telemetry', SPANS_CURRENT));
+  stageFileIfPresent(spansPreviousPath(projectDir), join(stagingDir, 'telemetry', SPANS_PREVIOUS));
+  stageFileIfPresent(logsCurrentPath(projectDir), join(stagingDir, 'logs', LOGS_CURRENT));
+  stageFileIfPresent(logsPreviousPath(projectDir), join(stagingDir, 'logs', LOGS_PREVIOUS));
 
-  const lockDir = join(contentDir, '.ok', 'local');
+  const lockDir = join(projectDir, '.ok', 'local');
   const lockPath = join(lockDir, 'server.lock');
   let serverStatus: BundleServerStatus = 'not-running';
   let serverStatusReason = 'no server.lock';
@@ -415,7 +416,7 @@ export async function collectBundle(opts: CollectBundleOpts): Promise<CollectedB
     redactionResult = redactStagedBundle({ stagingDir, contentDir });
   }
 
-  const localSink = resolveLocalSinkBlock(opts.projectDir ?? contentDir);
+  const localSink = resolveLocalSinkBlock(projectDir);
   const stagedFiles = walkStagedFiles(stagingDir);
   const files: BundleFileEntry[] = [];
   let totalBytes = 0;

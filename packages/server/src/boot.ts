@@ -152,7 +152,6 @@ const PINO_REDACT_MAX_DEPTH = 5;
 export async function bootServer(opts: BootServerOptions): Promise<BootedServer> {
   const localSinkConfig = resolveLocalSinkConfig({
     projectDir: opts.projectDir ?? opts.contentDir,
-    contentDir: opts.contentDir,
   });
   if (localSinkConfig) {
     const denylist = localSinkConfig.telemetry.attributeDenylist;

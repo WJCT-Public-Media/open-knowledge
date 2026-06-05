@@ -62,7 +62,7 @@ export class RotatingAppender {
 }
 
 export interface FileSpanExporterOpts {
-  contentDir: string;
+  projectDir: string;
   maxBytes: number;
 }
 
@@ -70,12 +70,12 @@ const TELEMETRY_SUBDIR = ['.ok', 'local', 'telemetry'] as const;
 const CURRENT_FILENAME = 'spans-current.jsonl';
 const PREVIOUS_FILENAME = 'spans-prev.jsonl';
 
-export function spansCurrentPath(contentDir: string): string {
-  return join(contentDir, ...TELEMETRY_SUBDIR, CURRENT_FILENAME);
+export function spansCurrentPath(projectDir: string): string {
+  return join(projectDir, ...TELEMETRY_SUBDIR, CURRENT_FILENAME);
 }
 
-export function spansPreviousPath(contentDir: string): string {
-  return join(contentDir, ...TELEMETRY_SUBDIR, PREVIOUS_FILENAME);
+export function spansPreviousPath(projectDir: string): string {
+  return join(projectDir, ...TELEMETRY_SUBDIR, PREVIOUS_FILENAME);
 }
 
 export class FileSpanExporter implements SpanExporter {
@@ -84,8 +84,8 @@ export class FileSpanExporter implements SpanExporter {
 
   constructor(opts: FileSpanExporterOpts) {
     this.#appender = new RotatingAppender({
-      currentPath: spansCurrentPath(opts.contentDir),
-      previousPath: spansPreviousPath(opts.contentDir),
+      currentPath: spansCurrentPath(opts.projectDir),
+      previousPath: spansPreviousPath(opts.projectDir),
       maxBytes: opts.maxBytes,
     });
   }
@@ -219,16 +219,16 @@ const LOGS_SUBDIR = ['.ok', 'local', 'logs'] as const;
 const LOGS_CURRENT_FILENAME = 'server-current.jsonl';
 const LOGS_PREVIOUS_FILENAME = 'server-prev.jsonl';
 
-export function logsCurrentPath(contentDir: string): string {
-  return join(contentDir, ...LOGS_SUBDIR, LOGS_CURRENT_FILENAME);
+export function logsCurrentPath(projectDir: string): string {
+  return join(projectDir, ...LOGS_SUBDIR, LOGS_CURRENT_FILENAME);
 }
 
-export function logsPreviousPath(contentDir: string): string {
-  return join(contentDir, ...LOGS_SUBDIR, LOGS_PREVIOUS_FILENAME);
+export function logsPreviousPath(projectDir: string): string {
+  return join(projectDir, ...LOGS_SUBDIR, LOGS_PREVIOUS_FILENAME);
 }
 
 export interface PinoFileSinkOpts {
-  contentDir: string;
+  projectDir: string;
   maxBytes: number;
 }
 
@@ -238,8 +238,8 @@ export class PinoFileSink extends Writable {
   constructor(opts: PinoFileSinkOpts) {
     super({ decodeStrings: false });
     this.#appender = new RotatingAppender({
-      currentPath: logsCurrentPath(opts.contentDir),
-      previousPath: logsPreviousPath(opts.contentDir),
+      currentPath: logsCurrentPath(opts.projectDir),
+      previousPath: logsPreviousPath(opts.projectDir),
       maxBytes: opts.maxBytes,
     });
   }
