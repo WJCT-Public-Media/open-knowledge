@@ -1,0 +1,67 @@
+---
+title: CLI
+description: Set up a project and open the editor from your terminal with the ok command.
+---
+If you are on macOS you should use the Open Knowledge desktop app. Use the `ok` CLI if you are on Linux or have an Intel-based Mac.
+
+<Callout type="info" title="Prerequisites">
+  - **macOS or Linux.** Windows is not supported.
+  - **Node.js ≥24.** Open Knowledge requires Node.js 24 or higher.
+  - **`git`.** Open Knowledge initializes a git repo for your project (used for the timeline and recovery features). Pre-installed via Xcode Command Line Tools on most macOS machines; install with `xcode-select --install` if missing.
+</Callout>
+
+
+## Install
+
+Install the Open Knowledge CLI globally to put `ok` on your `PATH`:
+
+```bash
+npm install -g @inkeep/open-knowledge
+```
+
+## Set up a project
+
+Run `ok init` in any folder to turn it into an Open Knowledge project. It scaffolds a `.ok/` directory and registers the Open Knowledge MCP server with the AI editors it detects on your machine (Claude, Cursor, Codex).
+
+```bash
+cd my-project
+ok init
+```
+
+Once you have initialized your project, launch the app in your browser:
+
+```bash
+ok start --open
+```
+
+## Editing a single file
+
+If you don't have a project initialized, you can still open a file directly in the editor.
+
+```bash
+ok open <path-to-your-file.md>
+```
+
+This opens your file directly in the WYSIWYG/source editor without any of the version history or `open with AI` frills.
+
+## Clone from GitHub
+
+You can pull repositories directly from GitHub and open them with Open Knowledge:
+
+1. Run `ok auth login` to complete device authentication (if you are already logged in with the `gh` CLI you can skip this step)
+2. Clone your repo with `ok clone <repo-url>`. This will clone the repository and initialize Open Knowledge if it is not already.
+
+## Manage local servers
+
+Each project runs its own local server. These commands let you see and stop them:
+
+| Command | What it does |
+| --- | --- |
+| `ok status` | Show whether a server and UI are running for the current project |
+| `ok ps` | List every running Open Knowledge server on your machine |
+| `ok stop` | Stop the server for the current directory (or pass a port, a path, pid or `all` to nuke all servers). |
+| `ok clean` | Remove stale lock files left behind by a crash (never touches live servers) |
+
+## Commands that run for you
+
+The rest of the CLI exists mostly for tooling and automation. Your AI editor spawns `ok mcp` to talk to the knowledge base; `ok repair-skills` refreshes bundled editor skills automatically during `ok start`; and `ok diagnose` / `ok bug-report` produce support bundles when something goes wrong. Run `ok --help` if you want to see an overview of all commands.

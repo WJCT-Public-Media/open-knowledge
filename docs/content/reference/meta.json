@@ -1,5 +1,5 @@
 {
   "title": "Reference",
   "icon": "LuBookText",
-  "pages": ["core-concepts", "configuration", "mcp"]
+  "pages": ["core-concepts", "cli", "configuration", "mcp"]
 }
