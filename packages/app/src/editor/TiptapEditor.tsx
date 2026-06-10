@@ -29,6 +29,7 @@ import { wrapExtensionsWithTiming } from '@/lib/perf/cold-mount-instrumentation'
 import { useIdentity } from '../presence/identity';
 import { registerEditor, unregisterEditor } from './active-editor';
 import { buildAwarenessUser } from './awareness-user';
+import { bindingStalenessGuardPlugin, type WedgeDetail } from './binding-staleness-guard';
 import { BubbleMenuBar } from './bubble-menu/BubbleMenuBar';
 import {
   createClipboardHtmlSerializer,
@@ -117,10 +118,11 @@ interface BuildEditorOptionsArgs {
   clipboard: ClipboardState;
   ctorStart: number;
   prebuiltMapping?: ProsemirrorMapping;
+  onWedged?: (detail: WedgeDetail) => void;
 }
 
 function buildExtensionList(args: BuildEditorOptionsArgs): AnyExtension[] {
-  const { provider, placeholder, prebuiltMapping } = args;
+  const { provider, placeholder, prebuiltMapping, onWedged } = args;
   return [
     ...sharedExtensions.map((ext) => {
       if (ext.name === 'link' || ext.name === 'wikiLink' || ext.name === 'jsxComponent') {
@@ -154,6 +156,18 @@ function buildExtensionList(args: BuildEditorOptionsArgs): AnyExtension[] {
         return [
           yCursorPlugin(awareness, {
             cursorBuilder: renderCursor,
+          }),
+        ];
+      },
+    }),
+    Extension.create({
+      name: 'bindingStalenessGuard',
+      addProseMirrorPlugins() {
+        return [
+          bindingStalenessGuardPlugin({
+            fragment: provider.document.getXmlFragment('default'),
+            docName: provider.configuration.name ?? '',
+            onWedged: onWedged ?? (() => {}),
           }),
         ];
       },
@@ -206,6 +220,7 @@ interface BuildPatternDConstructorOptionsArgs {
   placeholder?: string;
   clipboard: ClipboardState;
   ctorStart: number;
+  onWedged?: (detail: WedgeDetail) => void;
 }
 
 type PatternDConstructorOptions = Partial<EditorOptions> & { element: null };
@@ -213,13 +228,20 @@ type PatternDConstructorOptions = Partial<EditorOptions> & { element: null };
 export function buildPatternDConstructorOptions(
   args: BuildPatternDConstructorOptionsArgs,
 ): PatternDConstructorOptions {
-  const { provider, placeholder, clipboard, ctorStart } = args;
+  const { provider, placeholder, clipboard, ctorStart, onWedged } = args;
   const baseExtensions = buildExtensionList({ provider, placeholder, clipboard, ctorStart });
   const schema = getSchema(baseExtensions);
   const fragment = provider.document.getXmlFragment('default');
   const { doc: prebuiltDoc, mapping: prebuiltMapping } = initProseMirrorDoc(fragment, schema);
   return {
-    ...buildEditorOptions({ provider, placeholder, clipboard, ctorStart, prebuiltMapping }),
+    ...buildEditorOptions({
+      provider,
+      placeholder,
+      clipboard,
+      ctorStart,
+      prebuiltMapping,
+      onWedged,
+    }),
     content: prebuiltDoc.toJSON(),
     element: null,
   };
@@ -234,7 +256,7 @@ export const TiptapEditor: FC<TiptapEditorProps> = ({
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const flashStateRef = useRef(INITIAL_FLASH_STATE);
   const identity = useIdentity();
-  const { principal, activeDocName } = useDocumentContext();
+  const { principal, activeDocName, recycleDocument } = useDocumentContext();
   const docName = provider.configuration.name ?? '';
 
   const [clipboard] = useState(buildClipboardState);
@@ -247,6 +269,10 @@ export const TiptapEditor: FC<TiptapEditorProps> = ({
         placeholder,
         clipboard,
         ctorStart,
+        onWedged: ({ externalSeq, appliedSeq }) => {
+          mark('ok/editor/binding-wedge-recycle', { docName, externalSeq, appliedSeq });
+          recycleDocument(docName);
+        },
       }),
     );
     return {

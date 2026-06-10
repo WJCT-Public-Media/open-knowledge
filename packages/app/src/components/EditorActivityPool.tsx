@@ -681,7 +681,7 @@ function ActivityEntry({
                         {gate.renderVisual ? (
                           <div className={isSourceMode ? 'ok-mode-hidden h-full' : 'h-full'}>
                             <TiptapEditor
-                              key={`${entry.docName}-${String(isNewDoc)}`}
+                              key={`${entry.docName}-${String(isNewDoc)}-${entry.poolEventId}`}
                               provider={entry.provider}
                               placeholder={editorPlaceholder}
                               isSourceMode={isSourceMode}
