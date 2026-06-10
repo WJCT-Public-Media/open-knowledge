@@ -1,5 +1,7 @@
+import { resolve } from 'node:path';
 import { type Config, isProcessAlive, resolveLockDir } from '@inkeep/open-knowledge-server';
 import { Command } from 'commander';
+import { getInvocationCwd } from '../project-anchor.ts';
 import { discoverLockDirs } from '../utils/process-scan.ts';
 import { inspectLock, type LockState } from './lock-state.ts';
 import { runPs } from './ps.ts';
@@ -187,7 +189,7 @@ export function stopCommand(getConfig: () => Config): Command {
         return;
       }
 
-      const lockDir = resolveLockDir(target);
+      const lockDir = resolveLockDir(resolve(getInvocationCwd(), target));
       executeStop(lockDir);
     });
 }

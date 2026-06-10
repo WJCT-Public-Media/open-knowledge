@@ -46,6 +46,7 @@ import { syncCommand } from './commands/sync.ts';
 import { uiCommand } from './commands/ui.ts';
 import { PACKAGE_VERSION } from './constants.ts';
 import { loadConfig } from './index.ts';
+import { recordInvocationCwd, resolveProjectAnchor } from './project-anchor.ts';
 import { buildVersionNotice } from './version-notice.ts';
 
 const program = new Command();
@@ -87,7 +88,15 @@ program
       process.env.OK_CONSOLE_LEVEL = level;
     }
 
-    const { config } = loadConfig(cwd);
+    const subcommandName = thisCommand.args?.[0];
+    const anchorRoot = resolveProjectAnchor(subcommandName, process.cwd());
+    if (anchorRoot !== null) {
+      recordInvocationCwd(process.cwd());
+      process.chdir(anchorRoot);
+      console.error(`[ok] Using Open Knowledge project at ${anchorRoot}`);
+    }
+
+    const { config } = loadConfig(anchorRoot ?? cwd);
     resolvedConfig = config;
 
     const commandName = thisCommand.args?.[0] ?? thisCommand.name() ?? 'cli';
