@@ -21,12 +21,14 @@ import {
 } from './UpdateNotices';
 
 type UpdateDownloadedCb = (info: { version: string }) => void;
+type RelaunchingCb = (info: { version: string }) => void;
 type WhatsNewCb = (info: { version: string; releaseUrl: string }) => void;
 type WhatsNewDismissedCb = (info: { version: string }) => void;
 type StuckHintCb = (info: { downloadUrl: string }) => void;
 
 interface FakeBridge {
   onUpdateDownloaded: ReturnType<typeof mock>;
+  onUpdateRelaunching: ReturnType<typeof mock>;
   onWhatsNew: ReturnType<typeof mock>;
   onWhatsNewDismissed: ReturnType<typeof mock>;
   onUpdateStuckHint: ReturnType<typeof mock>;
@@ -40,10 +42,12 @@ interface FakeBridge {
   };
   shell: { openExternal: ReturnType<typeof mock> };
   _downloaded?: UpdateDownloadedCb;
+  _relaunching?: RelaunchingCb;
   _whatsNew?: WhatsNewCb;
   _whatsNewDismissed?: WhatsNewDismissedCb;
   _stuckHint?: StuckHintCb;
   _downloadedUnsub: ReturnType<typeof mock>;
+  _relaunchingUnsub: ReturnType<typeof mock>;
   _whatsNewUnsub: ReturnType<typeof mock>;
   _whatsNewDismissedUnsub: ReturnType<typeof mock>;
   _stuckHintUnsub: ReturnType<typeof mock>;
@@ -52,10 +56,12 @@ interface FakeBridge {
 function makeFakeBridge(): FakeBridge {
   const b: FakeBridge = {
     _downloadedUnsub: mock(() => {}),
+    _relaunchingUnsub: mock(() => {}),
     _whatsNewUnsub: mock(() => {}),
     _whatsNewDismissedUnsub: mock(() => {}),
     _stuckHintUnsub: mock(() => {}),
     onUpdateDownloaded: mock(() => {}),
+    onUpdateRelaunching: mock(() => {}),
     onWhatsNew: mock(() => {}),
     onWhatsNewDismissed: mock(() => {}),
     onUpdateStuckHint: mock(() => {}),
@@ -72,6 +78,10 @@ function makeFakeBridge(): FakeBridge {
   b.onUpdateDownloaded = mock((cb: UpdateDownloadedCb) => {
     b._downloaded = cb;
     return b._downloadedUnsub;
+  });
+  b.onUpdateRelaunching = mock((cb: RelaunchingCb) => {
+    b._relaunching = cb;
+    return b._relaunchingUnsub;
   });
   b.onWhatsNew = mock((cb: WhatsNewCb) => {
     b._whatsNew = cb;
@@ -155,25 +165,65 @@ describe('appendErrorDetail', () => {
 });
 
 describe('attachUpdateSubscribers — registration', () => {
-  test('subscribes to all four update channels on the bridge', () => {
+  test('subscribes to all five update channels on the bridge', () => {
     const bridge = makeFakeBridge();
     const addNotice = mock<(notice: UpdateNotice) => void>(() => {});
     attachUpdateSubscribers(castBridge(bridge), addNotice);
     expect(bridge.onUpdateDownloaded).toHaveBeenCalledTimes(1);
+    expect(bridge.onUpdateRelaunching).toHaveBeenCalledTimes(1);
     expect(bridge.onWhatsNew).toHaveBeenCalledTimes(1);
     expect(bridge.onWhatsNewDismissed).toHaveBeenCalledTimes(1);
     expect(bridge.onUpdateStuckHint).toHaveBeenCalledTimes(1);
   });
 
-  test('returns a single unsubscribe closure that detaches ALL four listeners', () => {
+  test('returns a single unsubscribe closure that detaches ALL five listeners', () => {
     const bridge = makeFakeBridge();
     const addNotice = mock<(notice: UpdateNotice) => void>(() => {});
     const unsubscribe = attachUpdateSubscribers(castBridge(bridge), addNotice);
     unsubscribe();
     expect(bridge._downloadedUnsub).toHaveBeenCalledTimes(1);
+    expect(bridge._relaunchingUnsub).toHaveBeenCalledTimes(1);
     expect(bridge._whatsNewUnsub).toHaveBeenCalledTimes(1);
     expect(bridge._whatsNewDismissedUnsub).toHaveBeenCalledTimes(1);
     expect(bridge._stuckHintUnsub).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Notice A cross-window relaunch — ok:update:relaunching', () => {
+  test('swaps the update-downloaded card to the button-less in-progress card', () => {
+    const bridge = makeFakeBridge();
+    const addNotice = mock<(notice: UpdateNotice) => void>(() => {});
+    attachUpdateSubscribers(castBridge(bridge), addNotice);
+
+    bridge._relaunching?.({ version: '0.1.1' });
+    expect(addNotice).toHaveBeenCalledTimes(1);
+    const inProgress = addNotice.mock.calls[0]?.[0] as UpdateNotice;
+    expect(inProgress.id).toBe('update-downloaded');
+    expect(inProgress.body).toBe(TOAST_A_PROGRESS_BODY);
+    expect(inProgress.action).toBeUndefined();
+    expect(inProgress.priority).toBe(2);
+    expect(inProgress.dismissible).toBe(false);
+  });
+
+  test('does NOT invoke relaunchNow — it is the echo, not the trigger (no loop)', () => {
+    const bridge = makeFakeBridge();
+    const addNotice = mock<(notice: UpdateNotice) => void>(() => {});
+    attachUpdateSubscribers(castBridge(bridge), addNotice);
+    bridge._relaunching?.({ version: '0.1.1' });
+    expect(bridge.update.relaunchNow).not.toHaveBeenCalled();
+  });
+
+  test('a downloaded re-broadcast after a failed relaunch replaces the stuck in-progress card in place', () => {
+    const bridge = makeFakeBridge();
+    const addNotice = mock<(notice: UpdateNotice) => void>(() => {});
+    attachUpdateSubscribers(castBridge(bridge), addNotice);
+    bridge._relaunching?.({ version: '0.1.1' });
+    bridge._downloaded?.({ version: '0.1.1' });
+    const reArmed = addNotice.mock.calls.at(-1)?.[0] as UpdateNotice;
+    expect(reArmed.id).toBe('update-downloaded');
+    expect(reArmed.body).toBe(toastABody('0.1.1'));
+    expect(reArmed.action?.label).toBe(TOAST_A_ACTION);
+    expect(reArmed.dismissible).toBeUndefined();
   });
 });
 
@@ -565,12 +615,13 @@ describe('pickActiveNotice', () => {
 });
 
 describe('unsubscribe semantics', () => {
-  test('after unsubscribe, all four per-channel unsub closures fire', () => {
+  test('after unsubscribe, all five per-channel unsub closures fire', () => {
     const bridge = makeFakeBridge();
     const addNotice = mock<(notice: UpdateNotice) => void>(() => {});
     const unsubscribe = attachUpdateSubscribers(castBridge(bridge), addNotice);
     unsubscribe();
     expect(bridge._downloadedUnsub).toHaveBeenCalledTimes(1);
+    expect(bridge._relaunchingUnsub).toHaveBeenCalledTimes(1);
     expect(bridge._whatsNewUnsub).toHaveBeenCalledTimes(1);
     expect(bridge._whatsNewDismissedUnsub).toHaveBeenCalledTimes(1);
     expect(bridge._stuckHintUnsub).toHaveBeenCalledTimes(1);

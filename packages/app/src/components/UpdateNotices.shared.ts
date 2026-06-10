@@ -61,9 +61,11 @@ export function attachUpdateSubscribers(
   const unsubscribers: Array<() => void> = [];
   const autoDismissTimers = new Set<ReturnType<typeof setTimeout>>();
 
+  const downloadedNoticeId = 'update-downloaded';
+
   unsubscribers.push(
     bridge.onUpdateDownloaded(({ version }) => {
-      const noticeId = 'update-downloaded';
+      const noticeId = downloadedNoticeId;
 
       const armReadyNotice = () => {
         addNotice({
@@ -99,6 +101,17 @@ export function attachUpdateSubscribers(
       };
 
       armReadyNotice();
+    }),
+  );
+
+  unsubscribers.push(
+    bridge.onUpdateRelaunching(() => {
+      addNotice({
+        id: downloadedNoticeId,
+        body: TOAST_A_PROGRESS_BODY,
+        priority: PRIORITY_UPDATE_DOWNLOADED,
+        dismissible: false,
+      });
     }),
   );
 

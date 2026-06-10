@@ -16,6 +16,7 @@ import type {
   OkShareReceivedPayload,
   OkThemeSource,
   OkUpdateDownloadedInfo,
+  OkUpdateRelaunchingInfo,
   OkUpdateStuckHintInfo,
   OkWhatsNewInfo,
 } from '../shared/bridge-contract.ts';
@@ -185,6 +186,13 @@ const bridge: OkDesktopBridge = {
     // biome-ignore lint/plugin/no-loosely-typed-webcontents-ipc: preload-side subscription wrapper (precedent #14)
     ipcRenderer.on('ok:update:downloaded', listener);
     return () => ipcRenderer.removeListener('ok:update:downloaded', listener);
+  },
+
+  onUpdateRelaunching(cb: (info: OkUpdateRelaunchingInfo) => void) {
+    const listener = (_event: IpcRendererEvent, info: OkUpdateRelaunchingInfo) => cb(info);
+    // biome-ignore lint/plugin/no-loosely-typed-webcontents-ipc: preload-side subscription wrapper (precedent #14)
+    ipcRenderer.on('ok:update:relaunching', listener);
+    return () => ipcRenderer.removeListener('ok:update:relaunching', listener);
   },
 
   onWhatsNew(cb: (info: OkWhatsNewInfo) => void) {

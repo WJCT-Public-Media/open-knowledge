@@ -1044,6 +1044,83 @@ describe('ok:update:relaunch-now IPC handler (AC18)', () => {
     expect(rig.logger.warn).toHaveBeenCalled();
   });
 
+  test('broadcasts ok:update:relaunching to EVERY open window so all swap in lockstep', () => {
+    const { rig } = makeRig({ versionPendingInstall: '0.3.2', extraWindowCount: 2 });
+    expect(rig.windows).toHaveLength(3);
+    rig.ipc.invoke('ok:update:relaunch-now');
+    for (const win of rig.windows) {
+      const relaunching = win.filter((c) => c.channel === 'ok:update:relaunching');
+      expect(relaunching).toHaveLength(1);
+      expect(relaunching[0]?.payload).toEqual({ version: '0.3.2' });
+    }
+    expect(rig.dispatches.filter((d) => d === 'relaunching-broadcast')).toHaveLength(1);
+  });
+
+  test('quitAndInstall throw → state restored + every window re-armed via ok:update:downloaded + invoke rejects', async () => {
+    const { rig } = makeRig({ versionPendingInstall: '0.3.2', extraWindowCount: 2 });
+    rig.updater.quitAndInstall = mock(() => {
+      throw new Error('SQRLInstallerErrorDomain Code=-9');
+    });
+    await expect(Promise.resolve(rig.ipc.invoke('ok:update:relaunch-now'))).rejects.toThrow(
+      'SQRLInstallerErrorDomain Code=-9',
+    );
+    expect(rig.state.versionPendingInstall).toBe('0.3.2');
+    for (const win of rig.windows) {
+      expect(win.filter((c) => c.channel === 'ok:update:relaunching')).toHaveLength(1);
+      const reArm = win.filter((c) => c.channel === 'ok:update:downloaded');
+      expect(reArm).toHaveLength(1);
+      expect(reArm[0]?.payload).toEqual({ version: '0.3.2' });
+    }
+    expect(rig.dispatches).toContain('relaunch-failed-rearm' as DispatchKind);
+    rig.updater.quitAndInstall = mock(() => {});
+    await rig.ipc.invoke('ok:update:relaunch-now');
+    expect(rig.updater.quitAndInstall).toHaveBeenCalledTimes(1);
+  });
+
+  test('does NOT broadcast ok:update:relaunching when nothing is pending (gated)', () => {
+    const { rig } = makeRig({ versionPendingInstall: null, extraWindowCount: 2 });
+    rig.ipc.invoke('ok:update:relaunch-now');
+    for (const win of rig.windows) {
+      expect(win.filter((c) => c.channel === 'ok:update:relaunching')).toHaveLength(0);
+    }
+    expect(rig.dispatches).not.toContain('relaunching-broadcast' as DispatchKind);
+  });
+
+  test('broadcasts ok:update:relaunching BEFORE the prepareForRelaunch teardown runs', async () => {
+    const captured: CapturedSend[] = [];
+    const ipc = makeFakeIpc();
+    let state: AppState = { ...emptyState(), versionPendingInstall: '0.3.2' };
+    let relaunchingSeenAtTeardown = -1;
+    const win = makeFakeWindow(captured);
+    startAutoUpdater({
+      updater: new FakeUpdater(),
+      ipcMain: ipc,
+      readState: () => state,
+      writeState: (next) => {
+        state = next;
+      },
+      getPrimaryWindow: () => win,
+      getAllWindows: () => [win],
+      getAppVersion: () => '0.3.1',
+      isPackaged: true,
+      prepareForRelaunch: async () => {
+        relaunchingSeenAtTeardown = captured.filter(
+          (c) => c.channel === 'ok:update:relaunching',
+        ).length;
+      },
+      clock: makeFakeClock(),
+      now: () => new Date(),
+      logger: {
+        info: mock(() => {}),
+        warn: mock(() => {}),
+        error: mock(() => {}),
+        debug: mock(() => {}),
+      },
+    });
+    await ipc.invoke('ok:update:relaunch-now');
+    expect(relaunchingSeenAtTeardown).toBe(1);
+  });
+
   test('destroy() removes the IPC handler', () => {
     const { rig, handle } = makeRig();
     handle.destroy();

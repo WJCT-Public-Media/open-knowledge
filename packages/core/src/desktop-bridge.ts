@@ -81,6 +81,10 @@ interface OkUpdateDownloadedInfo {
   readonly version: string;
 }
 
+interface OkUpdateRelaunchingInfo {
+  readonly version: string;
+}
+
 interface OkWhatsNewInfo {
   readonly version: string;
   readonly releaseUrl: string;
@@ -411,6 +415,7 @@ export interface OkDesktopBridge {
   onProjectSwitched(cb: (next: OkDesktopConfig) => void): OkUnsubscribe;
   onMenuAction(cb: (action: OkMenuAction) => void): OkUnsubscribe;
   onUpdateDownloaded(cb: (info: OkUpdateDownloadedInfo) => void): OkUnsubscribe;
+  onUpdateRelaunching(cb: (info: OkUpdateRelaunchingInfo) => void): OkUnsubscribe;
   onWhatsNew(cb: (info: OkWhatsNewInfo) => void): OkUnsubscribe;
   onWhatsNewDismissed(cb: (info: { readonly version: string }) => void): OkUnsubscribe;
   onUpdateStuckHint(cb: (info: OkUpdateStuckHintInfo) => void): OkUnsubscribe;

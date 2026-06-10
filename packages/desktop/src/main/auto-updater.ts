@@ -45,6 +45,8 @@ export type DispatchKind =
   | 'error-classified'
   | 'error-unclassified'
   | 'relaunch-now'
+  | 'relaunching-broadcast'
+  | 'relaunch-failed-rearm'
   | 'skipped-dev-mode'
   | 'stale-pending-cleared'
   | 'cross-channel-blocked';
@@ -457,6 +459,8 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
     const pending = snapshot.versionPendingInstall;
     if (!persistSafely({ ...snapshot, versionPendingInstall: null }, 'relaunch-now'))
       return undefined;
+    broadcastToAllWindows('ok:update:relaunching', { version: pending });
+    onDispatch?.('relaunching-broadcast');
     if (opts.prepareForRelaunch) {
       try {
         await opts.prepareForRelaunch();
@@ -468,7 +472,21 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
     }
     logger.info('relaunch-now invoked — calling autoUpdater.quitAndInstall', { pending });
     onDispatch?.('relaunch-now');
-    updater.quitAndInstall();
+    try {
+      updater.quitAndInstall();
+    } catch (err) {
+      if (
+        persistSafely({ ...readState(), versionPendingInstall: pending }, 'relaunch-failed-restore')
+      ) {
+        broadcastToAllWindows('ok:update:downloaded', { version: pending });
+      }
+      logger.warn('quitAndInstall threw — restored pending install and re-armed windows', {
+        pending,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      onDispatch?.('relaunch-failed-rearm');
+      throw err;
+    }
     return undefined;
   });
 

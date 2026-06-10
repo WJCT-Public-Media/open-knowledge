@@ -76,6 +76,7 @@ describe('M3 update-listener subscribe/unsubscribe pattern', () => {
   test('all update listeners follow the same pattern (channel-name parametric)', () => {
     const channels = [
       'ok:update:downloaded',
+      'ok:update:relaunching',
       'ok:update:whats-new',
       'ok:update:whats-new-dismissed',
       'ok:update:stuck-hint',
