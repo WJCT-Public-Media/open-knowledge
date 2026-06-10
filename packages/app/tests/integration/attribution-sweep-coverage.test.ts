@@ -73,7 +73,6 @@ const EXEMPT_HANDLERS = new Set([
   'handleSyncConflicts',
   'handleSyncConflictContent',
   'handleSyncTrigger',
-  'handleSyncAbortMerge',
   'handleSyncResolveConflict',
   'handleLocalOpClone',
   'handleLocalOpOpen',

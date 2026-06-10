@@ -149,7 +149,6 @@ import {
   SkillInstallStateSuccessSchema,
   SuggestLinksSuccessSchema,
   SYSTEM_DOC_NAME,
-  SyncAbortMergeSuccessSchema,
   SyncConflictContentSuccessSchema,
   SyncConflictsSuccessSchema,
   SyncResolveConflictRequestSchema,
@@ -9398,41 +9397,6 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
     }
   }
 
-  async function handleSyncAbortMerge(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    if (!checkLocalOpSecurity(req, res, { handler: 'sync-abort-merge' })) return;
-    if (req.method !== 'POST') {
-      errorResponse(res, 405, 'urn:ok:error:method-not-allowed', 'Method not allowed.', {
-        handler: 'sync-abort-merge',
-        extraHeaders: { Allow: 'POST' },
-      });
-      return;
-    }
-    const engine = getSyncEngine?.();
-    if (!engine) {
-      errorResponse(res, 503, 'urn:ok:error:sync-not-active', 'Sync engine not active.', {
-        handler: 'sync-abort-merge',
-      });
-      return;
-    }
-    try {
-      await engine.abortMerge();
-      successResponse(
-        res,
-        200,
-        SyncAbortMergeSuccessSchema,
-        {},
-        {
-          handler: 'sync-abort-merge',
-        },
-      );
-    } catch (e) {
-      errorResponse(res, 500, 'urn:ok:error:internal-server-error', 'Failed to abort merge.', {
-        handler: 'sync-abort-merge',
-        cause: e,
-      });
-    }
-  }
-
   const handleTagsList = withValidation(
     EmptyRequestSchema,
     async (_req, res) => {
@@ -11408,7 +11372,6 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
     '/api/sync/conflicts': handleSyncConflicts,
     '/api/sync/conflict-content': handleSyncConflictContent,
     '/api/sync/resolve-conflict': handleSyncResolveConflict,
-    '/api/sync/abort-merge': handleSyncAbortMerge,
     '/api/local-op/clone': handleLocalOpClone,
     '/api/local-op/open': handleLocalOpOpen,
     '/api/local-op/ok-init': handleLocalOpOkInit,
@@ -11455,7 +11418,6 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
     '/api/rollback',
     '/api/sync/trigger',
     '/api/sync/resolve-conflict',
-    '/api/sync/abort-merge',
     '/api/git/checkout',
     '/api/test-reset',
     '/api/test-rescan-backlinks',

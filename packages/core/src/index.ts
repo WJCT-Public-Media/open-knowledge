@@ -731,8 +731,6 @@ export {
   type SummaryResponseField,
   SummaryResponseFieldSchema,
   SYNC_ERROR_CODES,
-  type SyncAbortMergeSuccess,
-  SyncAbortMergeSuccessSchema,
   type SyncConflictContentSuccess,
   SyncConflictContentSuccessSchema,
   type SyncConflictsSuccess,

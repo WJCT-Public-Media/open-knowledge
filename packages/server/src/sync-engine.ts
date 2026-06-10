@@ -1500,20 +1500,6 @@ export class SyncEngine {
     }
   }
 
-  async abortMerge(): Promise<void> {
-    const handle = createGitInstance(this.projectDir, { credentialArgs: this.credentialArgs });
-    try {
-      await handle.git.raw(['merge', '--abort']);
-      log.info({}, '[sync] merge aborted');
-    } catch (e) {
-      log.warn({ err: e }, '[sync] git merge --abort failed — conflicts.json still cleared');
-    }
-    this.conflictStore.clear();
-    this.conflictCount = 0;
-    this.transitionTo('idle');
-    this.scheduleSaveState();
-  }
-
   private clearPushError(): void {
     this.pushError = undefined;
     this.pushErrorCode = undefined;

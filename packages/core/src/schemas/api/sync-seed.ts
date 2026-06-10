@@ -135,9 +135,6 @@ export const SyncConflictContentSuccessSchema = z
   .loose() satisfies StandardSchemaV1;
 export type SyncConflictContentSuccess = z.infer<typeof SyncConflictContentSuccessSchema>;
 
-export const SyncAbortMergeSuccessSchema = z.object({}).loose() satisfies StandardSchemaV1;
-export type SyncAbortMergeSuccess = z.infer<typeof SyncAbortMergeSuccessSchema>;
-
 export const SeedPlanSuccessSchema = z
   .object({
     plan: z.custom<unknown>((v) => v !== undefined, { message: 'plan is required' }),

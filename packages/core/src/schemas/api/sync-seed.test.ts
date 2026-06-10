@@ -6,7 +6,6 @@ import {
   SeedApplyRequestSchema,
   SeedApplySuccessSchema,
   SeedPlanSuccessSchema,
-  SyncAbortMergeSuccessSchema,
   SyncConflictContentSuccessSchema,
   SyncConflictsSuccessSchema,
   SyncRemoteSchema,
@@ -326,10 +325,9 @@ describe('SyncConflictContentSuccessSchema', () => {
   });
 });
 
-describe('SyncResolveConflictSuccessSchema and SyncAbortMergeSuccessSchema', () => {
-  test('both parse empty body', () => {
+describe('SyncResolveConflictSuccessSchema', () => {
+  test('parses empty body', () => {
     expect(SyncResolveConflictSuccessSchema.safeParse({}).success).toBe(true);
-    expect(SyncAbortMergeSuccessSchema.safeParse({}).success).toBe(true);
   });
 });
 
