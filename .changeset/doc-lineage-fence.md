@@ -1,5 +1,0 @@
----
-"@inkeep/open-knowledge": patch
----
-
-Fixed a document-corruption bug where reopening a doc the server had unloaded and re-read from disk (an external delete + recreate — e.g. a `git pull` or checkout rewriting files — a rename, or any other server-side unload) could merge the browser's cached copy into the fresh document as a second materialization: every block appeared twice, and content deleted on disk resurrected. The server now stamps each loaded document with a lineage epoch; browsers record the epoch they synced and present it when rejoining, and a stale rejoin is rejected up front — the client clears its cached copy and reloads the document cleanly instead of corrupting it. The same fence covers the deferred cache-attach window during boot, so a cache learned to be stale after sync is discarded rather than merged. Also fixes a separate, pre-existing cleanup gap the fence depends on: clearing the browser cache of a renamed or deleted doc was silently skipped in tabs that had not yet observed a branch, leaving stale rows that could re-merge on a later open.
