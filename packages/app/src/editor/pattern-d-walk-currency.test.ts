@@ -2,22 +2,22 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test
 import { randomUUID } from 'node:crypto';
 import type { HocuspocusProvider } from '@hocuspocus/provider';
 import { Editor } from '@tiptap/core';
-import { TextSelection } from '@tiptap/pm/state';
-import { Awareness } from 'y-protocols/awareness';
-import * as Y from 'yjs';
+import type { Awareness } from 'y-protocols/awareness';
+import type * as Y from 'yjs';
 import { __resetCacheForTests, evictTiptapEditor } from './editor-cache';
 import { __resetMountPromiseCache, mountTiptapEditorPromise } from './mount-promise';
 import { buildPatternDConstructorOptions } from './TiptapEditor';
 import {
   appendToFirstParagraph,
   applyRemoteEdit,
+  buildSeededPatternDProvider,
   createGapOrderingRecorder,
+  dispatchSelectionOnly,
   fakeClipboard,
   flushMicrotasksAndTimers,
   type GapOrderingRecorder,
   insertParagraphAt,
   installDomGlobals,
-  seedFragmentParagraph,
   viewCreationSignalExtension,
 } from './walk-currency-test-harness';
 
@@ -31,11 +31,6 @@ afterAll(() => {
   restoreDomGlobals?.();
   restoreDomGlobals = null;
 });
-
-function dispatchSelectionOnly(editor: Editor): void {
-  const { state } = editor.view;
-  editor.view.dispatch(state.tr.setSelection(TextSelection.create(state.doc, 1)));
-}
 
 interface GapMountHarness {
   docName: string;
@@ -53,16 +48,14 @@ interface GapMountHarness {
 }
 
 function createGapMountHarness(gapEdit: (fragment: Y.XmlFragment) => void): GapMountHarness {
-  const docName = `walk-currency-${randomUUID()}`;
-  const ydoc = new Y.Doc();
-  seedFragmentParagraph(ydoc, 'hello world');
-  const fragment = ydoc.getXmlFragment('default');
-  const awareness = new Awareness(ydoc);
-  const provider = {
-    document: ydoc,
-    configuration: { name: docName },
+  const {
+    docName,
+    ydoc,
+    fragment,
     awareness,
-  } as unknown as HocuspocusProvider;
+    provider,
+    cleanup: providerCleanup,
+  } = buildSeededPatternDProvider('walk-currency');
 
   const ordering = createGapOrderingRecorder();
 
@@ -100,8 +93,7 @@ function createGapMountHarness(gapEdit: (fragment: Y.XmlFragment) => void): GapM
 
   const cleanup = () => {
     evictTiptapEditor(docName);
-    awareness.destroy();
-    ydoc.destroy();
+    providerCleanup();
   };
 
   return { docName, ydoc, fragment, awareness, provider, mountWithGapEdit, ordering, cleanup };

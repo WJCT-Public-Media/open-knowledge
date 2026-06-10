@@ -214,6 +214,7 @@ export function mountTiptapEditorPromise(
       docName,
       mountId: entry.mountId,
       reason: 'unhandled-body-throw',
+      message: wrapped.message,
     });
     rejectFn(wrapped);
     finalizeColdMountSpan(entry.mountId);
@@ -327,6 +328,7 @@ async function runMountBody(params: MountBodyParams): Promise<void> {
       docName,
       mountId: entry.mountId,
       reason: 'construct-failed',
+      message: wrapped.message,
     });
     rejectFn(wrapped);
     finalizeColdMountSpan(entry.mountId);
@@ -353,6 +355,7 @@ async function runMountBody(params: MountBodyParams): Promise<void> {
       docName,
       mountId: entry.mountId,
       reason: 'mount-failed',
+      message: wrapped.message,
     });
     rejectFn(wrapped);
     finalizeColdMountSpan(entry.mountId);
@@ -377,6 +380,7 @@ async function runMountBody(params: MountBodyParams): Promise<void> {
       docName,
       mountId: entry.mountId,
       reason: 'v2-register-failed',
+      message: wrapped.message,
     });
     rejectFn(wrapped);
     finalizeColdMountSpan(entry.mountId);

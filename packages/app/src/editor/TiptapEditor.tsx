@@ -8,7 +8,7 @@ import {
   hasNewEntries,
   MarkdownManager,
 } from '@inkeep/open-knowledge-core';
-import { type AnyExtension, Editor, type EditorOptions, Extension, getSchema } from '@tiptap/core';
+import { type AnyExtension, Editor, type EditorOptions, Extension } from '@tiptap/core';
 import Collaboration from '@tiptap/extension-collaboration';
 import Placeholder from '@tiptap/extension-placeholder';
 import { EditorContent } from '@tiptap/react';
@@ -255,20 +255,28 @@ export function buildPatternDConstructorOptions(
   args: BuildPatternDConstructorOptionsArgs,
 ): PatternDConstructorOptions {
   const { provider, placeholder, clipboard, ctorStart, onWedged } = args;
-  const baseExtensions = buildExtensionList({ provider, placeholder, clipboard, ctorStart });
-  const schema = getSchema(baseExtensions);
   const fragment = provider.document.getXmlFragment('default');
-  const { doc: prebuiltDoc, mapping: prebuiltMapping } = initProseMirrorDoc(fragment, schema);
+  const prebuiltMapping: ProsemirrorMapping = new Map();
+  const baseOptions = buildEditorOptions({
+    provider,
+    placeholder,
+    clipboard,
+    ctorStart,
+    prebuiltMapping,
+    onWedged,
+  });
+  const baseOnBeforeCreate = baseOptions.onBeforeCreate;
   return {
-    ...buildEditorOptions({
-      provider,
-      placeholder,
-      clipboard,
-      ctorStart,
-      prebuiltMapping,
-      onWedged,
-    }),
-    content: prebuiltDoc.toJSON(),
+    ...baseOptions,
+    onBeforeCreate: (props) => {
+      baseOnBeforeCreate?.(props);
+      const { editor } = props;
+      const { doc, mapping } = initProseMirrorDoc(fragment, editor.schema);
+      mapping.forEach((node, key) => {
+        prebuiltMapping.set(key, node);
+      });
+      editor.options.content = doc.toJSON();
+    },
     element: null,
   };
 }

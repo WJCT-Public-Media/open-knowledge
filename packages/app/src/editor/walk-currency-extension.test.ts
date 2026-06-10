@@ -231,9 +231,9 @@ describe('non-stale fast path', () => {
         const collaboration = opts.extensions?.find((ext) => ext.name === 'collaboration') as
           | { options?: { ySyncOptions?: { mapping?: Map<unknown, unknown> } } }
           | undefined;
+        const editor = new Editor(opts);
         prebuiltMapping = collaboration?.options?.ySyncOptions?.mapping ?? null;
         prebuiltParagraphNode = prebuiltMapping?.get(yParagraph) ?? null;
-        const editor = new Editor(opts);
         editor.on('transaction', ({ transaction }) => {
           const meta = transaction.getMeta(ySyncPluginKey) as
             | { isChangeOrigin?: boolean }

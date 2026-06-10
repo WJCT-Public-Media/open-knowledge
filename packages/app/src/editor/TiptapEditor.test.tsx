@@ -1,7 +1,25 @@
-import { describe, expect, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { HocuspocusProvider } from '@hocuspocus/provider';
+import { Editor } from '@tiptap/core';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import * as Y from 'yjs';
 import { buildPatternDConstructorOptions } from './TiptapEditor';
+import {
+  buildSeededPatternDProvider,
+  fakeClipboard,
+  installDomGlobals,
+} from './walk-currency-test-harness';
+
+let restoreDomGlobals: (() => void) | null = null;
+
+beforeAll(() => {
+  restoreDomGlobals = installDomGlobals();
+});
+
+afterAll(() => {
+  restoreDomGlobals?.();
+  restoreDomGlobals = null;
+});
 
 describe('buildPatternDConstructorOptions', () => {
   function makeFakeProvider(): HocuspocusProvider {
@@ -13,16 +31,7 @@ describe('buildPatternDConstructorOptions', () => {
     } as unknown as HocuspocusProvider;
   }
 
-  type ClipboardArg = Parameters<typeof buildPatternDConstructorOptions>[0]['clipboard'];
-  const fakeClipboard = {
-    mdManager: {},
-    text: () => '',
-    html: { serializer: {}, setView: () => {} },
-    paste: () => false,
-    drop: () => false,
-  } as unknown as ClipboardArg;
-
-  test('always passes element: null explicitly (D12 1-way door regression guard)', () => {
+  test('always passes element: null explicitly (1-way door regression guard)', () => {
     const opts = buildPatternDConstructorOptions({
       provider: makeFakeProvider(),
       clipboard: fakeClipboard,
@@ -33,27 +42,70 @@ describe('buildPatternDConstructorOptions', () => {
     expect(opts.element).not.toBeUndefined();
   });
 
-  test('content is set from a pre-built PM doc walk (Q21 pre-warm)', () => {
-    const opts = buildPatternDConstructorOptions({
-      provider: makeFakeProvider(),
+  /** Build options against a seeded one-paragraph fragment, exposing the
+   *  mapping Map the options handed to the Collaboration extension so the
+   *  pins can observe it across the `new Editor(...)` boundary. */
+  function buildSeededOptions() {
+    const { provider, cleanup } = buildSeededPatternDProvider('tiptap-editor-pins');
+    const options = buildPatternDConstructorOptions({
+      provider,
       clipboard: fakeClipboard,
       ctorStart: 0,
     });
-    expect(opts.content).toBeDefined();
-    expect(opts.content).toMatchObject({ type: 'doc' });
+    const collaboration = options.extensions?.find((ext) => ext.name === 'collaboration') as
+      | {
+          options?: {
+            ySyncOptions?: { mapping?: Map<unknown, ProseMirrorNode | ProseMirrorNode[]> };
+          };
+        }
+      | undefined;
+    const handedMapping = collaboration?.options?.ySyncOptions?.mapping;
+    if (!(handedMapping instanceof Map)) {
+      throw new Error('expected the options to hand a Map via ySyncOptions.mapping');
+    }
+    return { options, handedMapping, cleanup };
+  }
+
+  test('the construct-time walk injects the walked fragment content into the editor state (Q21 pre-warm)', () => {
+    const { options, cleanup } = buildSeededOptions();
+    let editor: Editor | null = null;
+    try {
+      editor = new Editor(options);
+      expect(editor.state.doc.textContent).toContain('hello world');
+    } finally {
+      editor?.destroy();
+      cleanup();
+    }
   });
 
-  test('Collaboration extension carries ySyncOptions.mapping populated by the same walk', () => {
-    const opts = buildPatternDConstructorOptions({
-      provider: makeFakeProvider(),
-      clipboard: fakeClipboard,
-      ctorStart: 0,
-    });
-    const collaboration = opts.extensions?.find((ext) => ext.name === 'collaboration') as
-      | { options?: { ySyncOptions?: { mapping?: unknown } } }
-      | undefined;
-    expect(collaboration).toBeDefined();
-    expect(collaboration?.options?.ySyncOptions?.mapping).toBeDefined();
-    expect(collaboration?.options?.ySyncOptions?.mapping).toBeInstanceOf(Map);
+  test('ySyncOptions.mapping is the options-handed Map instance, populated in place by construction', () => {
+    const { options, handedMapping, cleanup } = buildSeededOptions();
+    let editor: Editor | null = null;
+    try {
+      expect(handedMapping.size).toBe(0);
+      editor = new Editor(options);
+      expect(handedMapping.size).toBeGreaterThanOrEqual(1);
+    } finally {
+      editor?.destroy();
+      cleanup();
+    }
+  });
+
+  test('every mapping node belongs to the constructed editor schema instance (schema affinity)', () => {
+    const { options, handedMapping, cleanup } = buildSeededOptions();
+    let editor: Editor | null = null;
+    try {
+      editor = new Editor(options);
+      const nodes = [...handedMapping.values()].flatMap((value) =>
+        Array.isArray(value) ? value : [value],
+      );
+      expect(nodes.length).toBeGreaterThanOrEqual(1);
+      for (const node of nodes) {
+        expect(node.type.schema).toBe(editor.schema);
+      }
+    } finally {
+      editor?.destroy();
+      cleanup();
+    }
   });
 });

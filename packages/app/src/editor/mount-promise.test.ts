@@ -493,6 +493,7 @@ describe('mount-failure error path', () => {
   });
 
   test('construct() throws → promise rejects with the original error, no mount call', async () => {
+    getCollector()?.reset();
     const constructError = new Error('synthetic construct failure');
     const promise = mountTiptapEditorPromise({
       docName: 'doc-construct-fail',
@@ -503,6 +504,10 @@ describe('mount-failure error path', () => {
     });
     await expect(promise).rejects.toBe(constructError);
     expect(__getCacheSize('tiptap')).toBe(0);
+    const marks = getCollector()?.marks.toArray() ?? [];
+    const rejectMark = marks.find((m) => m.name === 'ok/mount/reject');
+    expect(rejectMark?.properties?.reason).toBe('construct-failed');
+    expect(rejectMark?.properties?.message).toContain('synthetic construct failure');
   });
 
   test('destroy() throws after mount() throws → promise still rejects with original mount error', async () => {

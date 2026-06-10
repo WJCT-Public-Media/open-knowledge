@@ -1,6 +1,9 @@
-import { Extension } from '@tiptap/core';
-import { Plugin } from '@tiptap/pm/state';
+import { randomUUID } from 'node:crypto';
+import type { HocuspocusProvider } from '@hocuspocus/provider';
+import { type Editor, Extension } from '@tiptap/core';
+import { Plugin, TextSelection } from '@tiptap/pm/state';
 import { JSDOM } from 'jsdom';
+import { Awareness } from 'y-protocols/awareness';
 import * as Y from 'yjs';
 import type { buildPatternDConstructorOptions } from './TiptapEditor';
 
@@ -66,6 +69,41 @@ export function seedFragmentParagraph(ydoc: Y.Doc, text: string): void {
   const paragraph = new Y.XmlElement('paragraph');
   paragraph.insert(0, [new Y.XmlText(text)]);
   fragment.insert(0, [paragraph]);
+}
+
+export function dispatchSelectionOnly(editor: Editor): void {
+  const { state } = editor.view;
+  editor.view.dispatch(state.tr.setSelection(TextSelection.create(state.doc, 1)));
+}
+
+export interface SeededPatternDProvider {
+  docName: string;
+  ydoc: Y.Doc;
+  fragment: Y.XmlFragment;
+  awareness: Awareness;
+  provider: HocuspocusProvider;
+  cleanup: () => void;
+}
+
+export function buildSeededPatternDProvider(
+  docNamePrefix: string,
+  seed: (ydoc: Y.Doc) => void = (ydoc) => seedFragmentParagraph(ydoc, 'hello world'),
+): SeededPatternDProvider {
+  const docName = `${docNamePrefix}-${randomUUID()}`;
+  const ydoc = new Y.Doc();
+  seed(ydoc);
+  const fragment = ydoc.getXmlFragment('default');
+  const awareness = new Awareness(ydoc);
+  const provider = {
+    document: ydoc,
+    configuration: { name: docName },
+    awareness,
+  } as unknown as HocuspocusProvider;
+  const cleanup = () => {
+    awareness.destroy();
+    ydoc.destroy();
+  };
+  return { docName, ydoc, fragment, awareness, provider, cleanup };
 }
 
 /** Any Y transaction origin other than the binding's own — in production the
