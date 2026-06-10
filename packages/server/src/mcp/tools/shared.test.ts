@@ -222,10 +222,26 @@ describe('resolveProjectConfigContext', () => {
     expect(result).toEqual({
       ok: true,
       cwd: '/workspace/project',
+      executionCwd: '/workspace/project',
       config: {
         ...TEST_CONFIG,
         content: { ...TEST_CONFIG.content, dir: '/workspace/project' },
       },
+    });
+  });
+
+  test('executionCwd is the literal explicit cwd; cwd is the walked-up root', async () => {
+    const result = await resolveProjectConfigContext(
+      async () => '/workspace/project',
+      TEST_CONFIG,
+      '/workspace/project/subdir/nested',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      cwd: '/workspace/project',
+      executionCwd: '/workspace/project/subdir/nested',
+      config: TEST_CONFIG,
     });
   });
 
@@ -260,6 +276,7 @@ describe('resolveProjectServerContext', () => {
     expect(result).toEqual({
       ok: true,
       cwd: '/workspace/project',
+      executionCwd: '/workspace/project',
       config: TEST_CONFIG,
       url: 'ws://localhost/project',
     });

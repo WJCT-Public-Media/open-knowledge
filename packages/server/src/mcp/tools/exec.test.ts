@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -712,5 +712,120 @@ describe('exec — per-row route-only previewUrl (FR-2.2)', () => {
     const paths = s.enrichedPaths.map((e) => e.path);
     expect(paths).toContain('meetings/2026-05-01.md');
     expect(paths.some((p) => p.includes('.ok/'))).toBe(false);
+  });
+});
+
+describe('exec — explicit subdirectory cwd', () => {
+  function walkUpResolveCwd(start: string): string {
+    let dir = resolve(start);
+    for (;;) {
+      if (existsSync(resolve(dir, '.ok', 'config.yml'))) return dir;
+      const parent = resolve(dir, '..');
+      if (parent === dir) throw new Error(`no OK project at or above ${start}`);
+      dir = parent;
+    }
+  }
+
+  async function bootstrapWithMarker(): Promise<{ project: string; subdir: string }> {
+    const project = await bootstrap();
+    mkdirSync(resolve(project, '.ok'), { recursive: true });
+    writeFileSync(resolve(project, '.ok', 'config.yml'), 'content:\n  dir: .\n');
+    const subdir = resolve(project, 'subdir');
+    mkdirSync(subdir, { recursive: true });
+    return { project, subdir };
+  }
+
+  test('runs in the passed subdir — bare subdir-relative path resolves', async () => {
+    const { subdir } = await bootstrapWithMarker();
+    writeFileSync(resolve(subdir, 'UNIQUE_MARKER.md'), 'marker contents\n');
+
+    const result = (await buildExecResult(
+      { command: 'cat UNIQUE_MARKER.md', cwd: subdir },
+      {
+        resolveCwd: async (explicit) => walkUpResolveCwd(explicit ?? subdir),
+        serverUrl: undefined,
+        config: DEFAULT_CONFIG,
+      },
+    )) as ExecResult;
+
+    expect(result.isError).toBeFalsy();
+    expect(structured(result).text).toContain('marker contents');
+  });
+
+  test('structuredContent.cwd reports the passed subdir, not the walked-up root', async () => {
+    const { project, subdir } = await bootstrapWithMarker();
+    writeFileSync(resolve(subdir, 'UNIQUE_MARKER.md'), 'marker contents\n');
+
+    const result = (await buildExecResult(
+      { command: 'cat UNIQUE_MARKER.md', cwd: subdir },
+      {
+        resolveCwd: async (explicit) => walkUpResolveCwd(explicit ?? subdir),
+        serverUrl: undefined,
+        config: DEFAULT_CONFIG,
+      },
+    )) as ExecResult;
+
+    expect(structured(result).cwd).toBe(subdir);
+    expect(structured(result).cwd).not.toBe(project);
+  });
+
+  test('enrichment addresses subdir files project-relative (docName under the root)', async () => {
+    const { subdir } = await bootstrapWithMarker();
+    writeFileSync(resolve(subdir, 'note.md'), '---\ntitle: Subdir Note\n---\n\nBody\n');
+
+    const result = (await buildExecResult(
+      { command: 'cat note.md', cwd: subdir },
+      {
+        resolveCwd: async (explicit) => walkUpResolveCwd(explicit ?? subdir),
+        serverUrl: undefined,
+        config: DEFAULT_CONFIG,
+      },
+    )) as ExecResult;
+
+    expect(result.isError).toBeFalsy();
+    const files = fileEntries(structured(result));
+    expect(files.length).toBe(1);
+    expect(files[0].path).toBe('subdir/note.md');
+    expect(files[0].title).toBe('Subdir Note');
+    expect(structured(result).text?.startsWith('==> subdir/note.md <==\n')).toBe(true);
+  });
+
+  test('ls provenance header is rebased to the project-relative dir from a subdir', async () => {
+    const { subdir } = await bootstrapWithMarker();
+    const inner = resolve(subdir, 'inner');
+    mkdirSync(inner, { recursive: true });
+    writeFileSync(resolve(inner, 'doc.md'), '---\ntitle: Inner\n---\nBody');
+
+    const result = (await buildExecResult(
+      { command: 'ls inner/', cwd: subdir },
+      {
+        resolveCwd: async (explicit) => walkUpResolveCwd(explicit ?? subdir),
+        serverUrl: undefined,
+        config: DEFAULT_CONFIG,
+      },
+    )) as ExecResult;
+
+    expect(result.isError).toBeFalsy();
+    expect(structured(result).text?.startsWith('subdir/inner/:\n')).toBe(true);
+  });
+
+  test('passing the project root still runs there (unchanged behavior)', async () => {
+    const { project } = await bootstrapWithMarker();
+    const articles = resolve(project, 'articles');
+    mkdirSync(articles, { recursive: true });
+    writeFileSync(resolve(articles, 'auth.md'), '---\ntitle: Auth\n---\nBody');
+
+    const result = (await buildExecResult(
+      { command: 'cat articles/auth.md', cwd: project },
+      {
+        resolveCwd: async (explicit) => walkUpResolveCwd(explicit ?? project),
+        serverUrl: undefined,
+        config: DEFAULT_CONFIG,
+      },
+    )) as ExecResult;
+
+    expect(result.isError).toBeFalsy();
+    expect(structured(result).cwd).toBe(project);
+    expect(fileEntries(structured(result))[0].path).toBe('articles/auth.md');
   });
 });

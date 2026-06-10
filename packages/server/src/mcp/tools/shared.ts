@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { validateDocName, WriteWarningSchema } from '@inkeep/open-knowledge-core';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -213,16 +214,19 @@ export async function resolveProjectConfigContext(
   resolveCwd: (explicit?: string) => Promise<string>,
   config: ConfigOrResolver,
   explicitCwd?: string,
-): Promise<{ ok: true; cwd: string; config: Config } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; cwd: string; executionCwd: string; config: Config } | { ok: false; error: string }
+> {
   let cwd: string;
   try {
     cwd = await resolveCwd(explicitCwd);
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
+  const executionCwd = explicitCwd !== undefined ? resolve(explicitCwd) : cwd;
   try {
     const resolvedConfig = await resolveConfig(config, cwd);
-    return { ok: true, cwd, config: resolvedConfig };
+    return { ok: true, cwd, executionCwd, config: resolvedConfig };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -234,16 +238,17 @@ export async function resolveProjectServerContext(
   serverUrl: ServerUrlOrResolver,
   explicitCwd?: string,
 ): Promise<
-  { ok: true; cwd: string; config: Config; url: string | undefined } | { ok: false; error: string }
+  | { ok: true; cwd: string; executionCwd: string; config: Config; url: string | undefined }
+  | { ok: false; error: string }
 > {
   const configContext = await resolveProjectConfigContext(resolveCwd, config, explicitCwd);
   if (!configContext.ok) {
     return configContext;
   }
-  const { cwd, config: resolvedConfig } = configContext;
+  const { cwd, executionCwd, config: resolvedConfig } = configContext;
   try {
     const url = await resolveServerUrl(serverUrl, cwd);
-    return { ok: true, cwd, config: resolvedConfig, url };
+    return { ok: true, cwd, executionCwd, config: resolvedConfig, url };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }

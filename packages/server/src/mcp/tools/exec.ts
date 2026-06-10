@@ -1,5 +1,5 @@
 import { stat } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import { z } from 'zod';
 import { argsOf, extractReferencedPaths, nonFlagArgs } from '../../bash/extract-paths.ts';
 import { createBashInstance, execBash, StdoutOverflowError } from '../../bash/index.ts';
@@ -224,6 +224,7 @@ function buildStdoutProvenance(
   stages: Stage[],
   dirByPath: Map<string, DirectoryMeta>,
   fileByPath: Map<string, EnrichedMeta>,
+  rebase: (p: string) => string,
 ): string {
   let stage: Stage | null = null;
   for (let i = stages.length - 1; i >= 0; i--) {
@@ -248,13 +249,15 @@ function buildStdoutProvenance(
     let n = dirArg.replace(/\/+/g, '/');
     if (n.startsWith('./')) n = n.slice(2);
     if (n.endsWith('/')) n = n.slice(0, -1);
-    if (!n || !dirByPath.has(n)) return '';
-    return `${n}/:\n`;
+    if (!n) return '';
+    const key = rebase(n);
+    if (!dirByPath.has(key)) return '';
+    return `${key}/:\n`;
   }
 
-  const wikiFiles = pathArgs.filter((p) => /\.(md|mdx)$/.test(p) && fileByPath.has(p));
+  const wikiFiles = pathArgs.filter((p) => /\.(md|mdx)$/.test(p) && fileByPath.has(rebase(p)));
   if (wikiFiles.length !== 1) return '';
-  return `==> ${wikiFiles[0]} <==\n`;
+  return `==> ${rebase(wikiFiles[0])} <==\n`;
 }
 
 function formatEnrichedBlock(enriched: EnrichedEntry[]): string {
@@ -326,7 +329,12 @@ export async function buildExecResult(
   if (!context.ok) {
     return errorCategoryResult('shell_construct_blocked', `exec failed: ${context.error}`);
   }
-  const { cwd, config, url: resolvedServerUrl } = context;
+  const { cwd, executionCwd, config, url: resolvedServerUrl } = context;
+
+  const rebaseToProject =
+    executionCwd === cwd
+      ? (p: string) => p
+      : (p: string) => relative(cwd, resolve(executionCwd, p));
 
   const parsed = parseCommand(args.command);
   if ('error' in parsed) {
@@ -335,9 +343,9 @@ export async function buildExecResult(
   const stages = augmentStagesWithExcludes(parsed.stages);
   const effectiveCommand = serializeStages(stages);
 
-  const pre = await snapshotMtimes(cwd);
+  const pre = await snapshotMtimes(executionCwd);
 
-  const bash = createBashInstance(cwd);
+  const bash = createBashInstance(executionCwd);
   let stdout = '';
   let stderr = '';
   try {
@@ -357,7 +365,7 @@ export async function buildExecResult(
     );
   }
 
-  const post = await snapshotMtimes(cwd);
+  const post = await snapshotMtimes(executionCwd);
   const mtimeDiff = diffMtimes(pre.snapshot, post.snapshot);
   if (mtimeDiff.changed.length > 0) {
     return errorCategoryResult(
@@ -369,7 +377,7 @@ export async function buildExecResult(
   const capped = applySoftCap(stdout);
 
   const rawPaths = extractReferencedPaths(stdout, stages);
-  const paths = rawPaths.filter((p) => resolveWithinRoot(cwd, p).ok);
+  const paths = rawPaths.filter((p) => resolveWithinRoot(executionCwd, p).ok).map(rebaseToProject);
   const { files, dirs } = await classifyPaths(cwd, paths);
   const isSinglePathCat = stages.length === 1 && stages[0].command === 'cat' && files.length === 1;
   const fileEnriched: EnrichedMeta[] = await Promise.all(
@@ -450,21 +458,21 @@ export async function buildExecResult(
   }
 
   const bannerText = banners.length > 0 ? `${banners.join('\n')}\n\n` : '';
-  const provenance = buildStdoutProvenance(stages, dirByPath, fileByPath);
+  const provenance = buildStdoutProvenance(stages, dirByPath, fileByPath, rebaseToProject);
   const stdoutText = provenance + capped.text;
   const enrichmentBlock = formatEnrichedBlock(enriched);
   const content = `${bannerText}${stdoutText}${enrichmentBlock}`;
 
-  const { resolve } = await buildListResolver({
+  const { resolve: resolvePreviewUrl } = await buildListResolver({
     config,
     resolveCwd: async () => cwd,
   });
-  const enrichedWithPreview: ExecEnrichedEntry[] = withPreviewUrls(enriched, resolve);
+  const enrichedWithPreview: ExecEnrichedEntry[] = withPreviewUrls(enriched, resolvePreviewUrl);
 
   const structured: ExecStructuredResult = {
     enrichedPaths: enrichedWithPreview,
     stdoutTruncated: capped.truncated,
-    cwd,
+    cwd: executionCwd,
     ...(banners.length > 0 ? { warnings: banners } : {}),
   };
   return textPlusStructured(content, structured);
