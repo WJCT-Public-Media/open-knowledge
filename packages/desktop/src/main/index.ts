@@ -1,3 +1,4 @@
+
 import { spawn } from 'node:child_process';
 import {
   closeSync,
@@ -67,6 +68,7 @@ import {
   Menu,
   nativeImage,
   nativeTheme,
+  screen,
   session,
   shell,
   utilityProcess,
@@ -105,6 +107,7 @@ import {
   type BundleReplaceWatcherHandle,
   startBundleReplaceWatcher,
 } from './bundle-replace-detector.ts';
+import { cascadePosition } from './cascade-position.ts';
 import { checkTargetExists as checkTargetExistsImpl } from './check-target-exists.ts';
 import { requestUserConsent, walkExceedsCap } from './consent-dialog.ts';
 import {
@@ -244,6 +247,44 @@ const DEFAULT_WIN_OPTS: BrowserWindowConstructorOptions = {
   },
 };
 
+const cascadeOrder: BrowserWindow[] = [];
+
+function pickCascadeAnchor(): BrowserWindow | null {
+  const focused = BrowserWindow.getFocusedWindow();
+  if (
+    focused &&
+    cascadeOrder.includes(focused) &&
+    !focused.isDestroyed() &&
+    !focused.isFullScreen()
+  ) {
+    return focused;
+  }
+  for (let i = cascadeOrder.length - 1; i >= 0; i--) {
+    const win = cascadeOrder[i];
+    if (win && !win.isDestroyed() && !win.isFullScreen()) return win;
+  }
+  return null;
+}
+
+function applyCascadePosition(win: BrowserWindow): void {
+  const anchor = pickCascadeAnchor();
+  if (anchor) {
+    const anchorBounds = anchor.getBounds();
+    const { width, height } = win.getBounds();
+    const pos = cascadePosition({
+      anchor: { x: anchorBounds.x, y: anchorBounds.y },
+      size: { width, height },
+      workArea: screen.getDisplayMatching(anchorBounds).workArea,
+    });
+    if (pos) win.setPosition(pos.x, pos.y);
+  }
+  cascadeOrder.push(win);
+  win.on('closed', () => {
+    const idx = cascadeOrder.indexOf(win);
+    if (idx !== -1) cascadeOrder.splice(idx, 1);
+  });
+}
+
 function probeWsUpgrade(url: string, timeoutMs: number): Promise<boolean> {
   return new Promise<boolean>((resolveProbe) => {
     let settled = false;
@@ -252,7 +293,8 @@ function probeWsUpgrade(url: string, timeoutMs: number): Promise<boolean> {
       settled = true;
       try {
         ws.close();
-      } catch {}
+      } catch {
+      }
       resolveProbe(ok);
     };
     const ws = new WebSocket(url);
@@ -367,7 +409,8 @@ function runDriverBootSmokeInProduction(): void {
     quit: () => {
       try {
         app.quit();
-      } catch {}
+      } catch {
+      }
     },
     setTimeout: (fn, ms) => {
       setTimeout(fn, ms);
@@ -429,6 +472,7 @@ function ensureWindowManager() {
       win.on('page-title-updated', (e) => {
         e.preventDefault();
       });
+      applyCascadePosition(win);
       return win as unknown as BrowserWindowLike;
     },
     forkUtility: (entry, args, opts) => {
@@ -502,7 +546,8 @@ function ensureWindowManager() {
             } catch (spawnErr) {
               try {
                 closeSync(spawnErrorLogFd);
-              } catch {}
+              } catch {
+              }
               throw Object.assign(
                 new Error(
                   `spawnDetachedServer: child_process.spawn threw synchronously: ${
@@ -543,7 +588,8 @@ function ensureWindowManager() {
             } finally {
               try {
                 closeSync(spawnErrorLogFd);
-              } catch {}
+              } catch {
+              }
             }
             childRef.unref();
             const pid = childRef.pid;
@@ -1166,6 +1212,7 @@ async function runApplicationMenuRefresh(): Promise<void> {
     onCollapseAll: () => sendMenuActionToFocused('collapse-all-tree'),
   });
 }
+
 
 function sendMenuActionToFocused(action: OkMenuAction): void {
   const target = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
@@ -1845,6 +1892,7 @@ function registerIpcHandlers() {
       return { ok: false, reason: 'other' };
     }
   });
+
 
   handle('ok:fs:default-projects-root', async () => {
     return resolveDefaultProjectsRoot(appState.lastUsedProjectParent, app.getPath('documents'));
