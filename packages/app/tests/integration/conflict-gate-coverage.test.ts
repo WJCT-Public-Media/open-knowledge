@@ -64,7 +64,6 @@ const EXEMPT_HANDLERS = new Set([
   'handleAgentBurstDiff',
   'handleTemplateGet',
   'handleLocalOpClone',
-  'handleLocalOpOpen',
   'handleLocalOpOkInit',
   'handleLocalOpAuthLogin',
   'handleLocalOpAuthStatus',

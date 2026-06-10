@@ -102,8 +102,6 @@ import {
   LocalOpEmbeddingsSetKeyRequestSchema,
   LocalOpOkInitRequestSchema,
   LocalOpOkInitResponseSchema,
-  LocalOpOpenRequestSchema,
-  LocalOpOpenSuccessSchema,
   MetricsAgentPresenceSuccessSchema,
   MetricsParseHealthSuccessSchema,
   MetricsReconciliationSuccessSchema,
@@ -7834,7 +7832,6 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
   }
 
   const LOCAL_OP_CLONE_KEY = '/api/local-op/clone';
-  const LOCAL_OP_OPEN_KEY = '/api/local-op/open';
   const LOCAL_OP_OK_INIT_KEY = '/api/local-op/ok-init';
   const LOCAL_OP_TIMEOUT_MS = 10 * 60 * 1000;
   const LOCAL_OP_OPEN_TIMEOUT_MS = 45_000;
@@ -8013,7 +8010,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
         stderrChunks.push(chunk);
         log.warn(
           { cwd: absDir, cliCmd, msg: chunk.toString('utf-8').trim() },
-          '[local-op/open] child stderr',
+          '[local-op/clone] child stderr',
         );
       });
 
@@ -8029,7 +8026,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
         earlyExitCode = -1;
         log.error(
           { cwd: absDir, cliCmd, err: err.message },
-          '[local-op/open] failed to spawn child',
+          '[local-op/clone] failed to spawn child',
         );
       });
 
@@ -8078,64 +8075,6 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
     if ('port' in result) return result;
     return { error: result.error };
   }
-
-  const HANDLE_LOCAL_OP_OPEN = 'local-op-open';
-  const handleLocalOpOpen = withValidation(
-    LocalOpOpenRequestSchema,
-    async (_req, res, body) => {
-      const { dir, port } = body;
-
-      if (!isSafeLocalPath(dir)) {
-        errorResponse(
-          res,
-          400,
-          'urn:ok:error:dir-outside-home',
-          'dir must be within the user home directory.',
-          { handler: HANDLE_LOCAL_OP_OPEN, cause: new Error(`dir=${dir}`) },
-        );
-        return;
-      }
-
-      if (!localOpGuard.tryAcquire(LOCAL_OP_OPEN_KEY)) {
-        errorResponse(
-          res,
-          429,
-          'urn:ok:error:concurrent-operation',
-          'A server-open operation is already in progress.',
-          { handler: HANDLE_LOCAL_OP_OPEN, extraHeaders: { 'Retry-After': '5' } },
-        );
-        return;
-      }
-
-      try {
-        const result = await startServerAtDirAndGetPort(dir, port);
-        if ('port' in result) {
-          successResponse(
-            res,
-            200,
-            LocalOpOpenSuccessSchema,
-            { port: result.port },
-            { handler: HANDLE_LOCAL_OP_OPEN },
-          );
-        } else {
-          errorResponse(
-            res,
-            504,
-            'urn:ok:error:server-open-failed',
-            'Failed to open project server.',
-            { handler: HANDLE_LOCAL_OP_OPEN, cause: new Error(result.error) },
-          );
-        }
-      } finally {
-        localOpGuard.release(LOCAL_OP_OPEN_KEY);
-      }
-    },
-    {
-      handler: HANDLE_LOCAL_OP_OPEN,
-      method: 'POST',
-      preBodyGate: (req, res) => checkLocalOpSecurity(req, res, { handler: HANDLE_LOCAL_OP_OPEN }),
-    },
-  );
 
   const HANDLE_LOCAL_OP_OK_INIT = 'local-op-ok-init';
   const handleLocalOpOkInit = withValidation(
@@ -11166,7 +11105,6 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
     '/api/sync/conflict-content': handleSyncConflictContent,
     '/api/sync/resolve-conflict': handleSyncResolveConflict,
     '/api/local-op/clone': handleLocalOpClone,
-    '/api/local-op/open': handleLocalOpOpen,
     '/api/local-op/ok-init': handleLocalOpOkInit,
     '/api/local-op/auth/login': handleLocalOpAuthLogin,
     '/api/local-op/auth/status': handleLocalOpAuthStatus,

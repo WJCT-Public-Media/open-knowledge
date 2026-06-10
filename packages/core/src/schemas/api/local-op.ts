@@ -1,21 +1,6 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { z } from 'zod';
 
-export const LocalOpOpenRequestSchema = z
-  .object({
-    dir: z.string().min(1),
-    port: z.number().int().min(1).max(65535).optional(),
-  })
-  .loose() satisfies StandardSchemaV1;
-export type LocalOpOpenRequest = z.infer<typeof LocalOpOpenRequestSchema>;
-
-export const LocalOpOpenSuccessSchema = z
-  .object({
-    port: z.number().int().positive(),
-  })
-  .loose() satisfies StandardSchemaV1;
-export type LocalOpOpenSuccess = z.infer<typeof LocalOpOpenSuccessSchema>;
-
 export const LocalOpOkInitRequestSchema = z
   .object({
     projectPath: z.string().min(1),

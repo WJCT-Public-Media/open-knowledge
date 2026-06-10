@@ -74,7 +74,6 @@ const EXEMPT_HANDLERS = new Set([
   'handleSyncTrigger',
   'handleSyncResolveConflict',
   'handleLocalOpClone',
-  'handleLocalOpOpen',
   'handleLocalOpOkInit',
   'handleLocalOpAuthLogin',
   'handleLocalOpAuthStatus',

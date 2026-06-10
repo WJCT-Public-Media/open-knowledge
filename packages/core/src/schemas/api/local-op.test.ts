@@ -4,8 +4,6 @@ import {
   LocalOpAuthHostRequestSchema,
   LocalOpAuthSetIdentityRequestSchema,
   LocalOpAuthStatusSuccessSchema,
-  LocalOpOpenRequestSchema,
-  LocalOpOpenSuccessSchema,
   ProblemTypeSchema,
 } from './index.ts';
 
@@ -18,47 +16,6 @@ describe('Cluster G URN tokens (US-012)', () => {
   });
   test('server-open-failed is a member of ProblemTypeSchema', () => {
     expect(ProblemTypeSchema.safeParse('urn:ok:error:server-open-failed').success).toBe(true);
-  });
-});
-
-describe('LocalOpOpenRequestSchema', () => {
-  test('parses a valid dir', () => {
-    expect(LocalOpOpenRequestSchema.safeParse({ dir: '~/Projects/notes' }).success).toBe(true);
-  });
-  test('rejects empty dir', () => {
-    expect(LocalOpOpenRequestSchema.safeParse({ dir: '' }).success).toBe(false);
-  });
-  test('rejects missing dir', () => {
-    expect(LocalOpOpenRequestSchema.safeParse({}).success).toBe(false);
-  });
-  test('accepts an optional positive integer port (worktree-preview pane port)', () => {
-    const parsed = LocalOpOpenRequestSchema.safeParse({ dir: '~/Projects/notes', port: 39848 });
-    expect(parsed.success).toBe(true);
-    if (parsed.success) expect(parsed.data.port).toBe(39848);
-  });
-  test('rejects a non-positive, non-integer, or out-of-range port', () => {
-    expect(LocalOpOpenRequestSchema.safeParse({ dir: '~/p', port: 0 }).success).toBe(false);
-    expect(LocalOpOpenRequestSchema.safeParse({ dir: '~/p', port: -1 }).success).toBe(false);
-    expect(LocalOpOpenRequestSchema.safeParse({ dir: '~/p', port: 1.5 }).success).toBe(false);
-    expect(LocalOpOpenRequestSchema.safeParse({ dir: '~/p', port: 99999 }).success).toBe(false);
-    expect(LocalOpOpenRequestSchema.safeParse({ dir: '~/p', port: 65535 }).success).toBe(true);
-  });
-  test('omitting port still parses (clone-complete + legacy open paths)', () => {
-    const parsed = LocalOpOpenRequestSchema.safeParse({ dir: '~/p' });
-    expect(parsed.success).toBe(true);
-    if (parsed.success) expect(parsed.data.port).toBeUndefined();
-  });
-});
-
-describe('LocalOpOpenSuccessSchema', () => {
-  test('parses a valid port', () => {
-    expect(LocalOpOpenSuccessSchema.safeParse({ port: 5173 }).success).toBe(true);
-  });
-  test('rejects negative port', () => {
-    expect(LocalOpOpenSuccessSchema.safeParse({ port: -1 }).success).toBe(false);
-  });
-  test('rejects zero port', () => {
-    expect(LocalOpOpenSuccessSchema.safeParse({ port: 0 }).success).toBe(false);
   });
 });
 
