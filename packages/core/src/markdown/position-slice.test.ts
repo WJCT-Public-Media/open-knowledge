@@ -643,74 +643,74 @@ describe('position-slice: inline-link title marker recovery (FR-20)', () => {
 });
 
 describe('position-slice: blockquote marker spacing recovery (FR-23)', () => {
-  test('single-space marker → sourceMarkerSpacings=["single"]', () => {
+  test('single-space marker → sourceMarkerSpacings=[1]', () => {
     const tree = parseMdast('> foo\n');
     const bq = findNode(tree, 'blockquote');
-    expect(bq?.data?.sourceMarkerSpacings).toEqual(['single']);
+    expect(bq?.data?.sourceMarkerSpacings).toEqual([1]);
   });
 
-  test('no-space marker → sourceMarkerSpacings=["none"]', () => {
+  test('no-space marker → sourceMarkerSpacings=[0]', () => {
     const tree = parseMdast('>foo\n');
     const bq = findNode(tree, 'blockquote');
-    expect(bq?.data?.sourceMarkerSpacings).toEqual(['none']);
+    expect(bq?.data?.sourceMarkerSpacings).toEqual([0]);
   });
 
   test('multi-line single-space → array of length 2', () => {
     const tree = parseMdast('> line 1\n> line 2\n');
     const bq = findNode(tree, 'blockquote');
-    expect(bq?.data?.sourceMarkerSpacings).toEqual(['single', 'single']);
+    expect(bq?.data?.sourceMarkerSpacings).toEqual([1, 1]);
   });
 
   test('multi-line no-space → array of length 2', () => {
     const tree = parseMdast('>line 1\n>line 2\n');
     const bq = findNode(tree, 'blockquote');
-    expect(bq?.data?.sourceMarkerSpacings).toEqual(['none', 'none']);
+    expect(bq?.data?.sourceMarkerSpacings).toEqual([0, 0]);
   });
 
   test('mixed single + none → per-line array', () => {
     const tree = parseMdast('> line 1\n>line 2\n');
     const bq = findNode(tree, 'blockquote');
-    expect(bq?.data?.sourceMarkerSpacings).toEqual(['single', 'none']);
+    expect(bq?.data?.sourceMarkerSpacings).toEqual([1, 0]);
   });
 
   test('mixed none + single → per-line array', () => {
     const tree = parseMdast('>line 1\n> line 2\n');
     const bq = findNode(tree, 'blockquote');
-    expect(bq?.data?.sourceMarkerSpacings).toEqual(['none', 'single']);
+    expect(bq?.data?.sourceMarkerSpacings).toEqual([0, 1]);
   });
 
   test('blank-line `>` continuation EXCLUDED from capture', () => {
     const tree = parseMdast('> p1\n>\n> p2\n');
     const bq = findNode(tree, 'blockquote');
-    expect(bq?.data?.sourceMarkerSpacings).toEqual(['single', 'single']);
+    expect(bq?.data?.sourceMarkerSpacings).toEqual([1, 1]);
   });
 
   test('nested blockquote captures outer marker spacing on outer node', () => {
     const tree = parseMdast('> > nested\n');
     const allBqs = findNodes(tree, 'blockquote');
     expect(allBqs.length).toBe(2);
-    expect(allBqs[0]?.data?.sourceMarkerSpacings).toEqual(['single']);
-    expect(allBqs[1]?.data?.sourceMarkerSpacings).toEqual(['single']);
+    expect(allBqs[0]?.data?.sourceMarkerSpacings).toEqual([1]);
+    expect(allBqs[1]?.data?.sourceMarkerSpacings).toEqual([1]);
   });
 
   test('nested blockquote `>>` → outer none, inner single', () => {
     const tree = parseMdast('>> nested\n');
     const allBqs = findNodes(tree, 'blockquote');
     expect(allBqs.length).toBe(2);
-    expect(allBqs[0]?.data?.sourceMarkerSpacings).toEqual(['none']);
-    expect(allBqs[1]?.data?.sourceMarkerSpacings).toEqual(['single']);
+    expect(allBqs[0]?.data?.sourceMarkerSpacings).toEqual([0]);
+    expect(allBqs[1]?.data?.sourceMarkerSpacings).toEqual([1]);
   });
 
   test('tab-after-marker treated as single-spacing', () => {
     const tree = parseMdast('>\tfoo\n');
     const bq = findNode(tree, 'blockquote');
-    expect(bq?.data?.sourceMarkerSpacings).toEqual(['single']);
+    expect(bq?.data?.sourceMarkerSpacings).toEqual([1]);
   });
 
   test('1-3 leading spaces of indent before `>` tolerated (CommonMark §5.1)', () => {
     const tree = parseMdast('   > foo\n');
     const bq = findNode(tree, 'blockquote');
-    expect(bq?.data?.sourceMarkerSpacings).toEqual(['single']);
+    expect(bq?.data?.sourceMarkerSpacings).toEqual([1]);
   });
 });
 

@@ -1,5 +1,11 @@
 import type { BridgeToleranceClass, CC1Channel } from '@inkeep/open-knowledge-core';
 
+export type MapDrivenSpliceFallbackReason =
+  | 'text-mismatch'
+  | 'synthetic-doc'
+  | 'parse-error'
+  | 'missing-position';
+
 export interface ReconciliationMetrics {
   reconcileCount: number;
   conflictCount: number;
@@ -159,6 +165,25 @@ export interface ReconciliationMetrics {
    *  Path-B rate via `actual_rate = observerAPathBFires +
    *  observerAPathBFiresSuppressed`. */
   observerAPathBFiresSuppressed: number;
+  /** Count of Observer A drains where the map-driven block-aligned splice
+   *  computed and applied — the byte-preserving default path that keeps
+   *  untouched blocks byte-identical in Y.Text. The companion
+   *  `mapDrivenSpliceFallback` records every drain the splice could NOT
+   *  serve, keyed by reason; `splice_rate = applied / (applied + Σfallback)`
+   *  is the health signal for the default fidelity path. */
+  mapDrivenSpliceApplied: number;
+  /** Companion to `mapDrivenSpliceApplied` — count of Observer A drains
+   *  that fell back off the map-driven splice, keyed by reason:
+   *  `text-mismatch` (Y.Text diverged from baseline → Path B; expected
+   *  under concurrent edits), `synthetic-doc` (system/config docs never
+   *  use the splice; expected), `parse-error` (parse/serialize threw
+   *  inside the splice computation — a sustained non-zero here means a
+   *  serializer/parser regression is silently routing every edit through
+   *  the lossier incremental-diff fallback), and `missing-position` (a
+   *  top-level mdast block lacked byte offsets). Keys are a closed
+   *  4-value union, mirroring `bridgeToleranceApplied`'s compile-time
+   *  bounded-cardinality guard. */
+  mapDrivenSpliceFallback: Partial<Record<MapDrivenSpliceFallbackReason, number>>;
   /** Y.Text-is-truth contract — count of Observer A in-sync canonical-base
    *  residual merges: the byte-preserving slow path on docs whose settled
    *  bytes sit beyond `normalizeBridge` tolerance of the canonical witness.
@@ -347,6 +372,8 @@ const counters: ReconciliationMetrics = {
   bridgeToleranceApplied: {},
   observerAPathBFires: 0,
   observerAPathBFiresSuppressed: 0,
+  mapDrivenSpliceApplied: 0,
+  mapDrivenSpliceFallback: {},
   observerAResidualMergeRuns: 0,
   bridgeSplitBrainRederives: 0,
   bridgeSplitBrainRederivesSuppressed: 0,
@@ -479,6 +506,14 @@ export function incrementObserverAPathBFiresSuppressed(): void {
   counters.observerAPathBFiresSuppressed++;
 }
 
+export function incrementMapDrivenSpliceApplied(): void {
+  counters.mapDrivenSpliceApplied++;
+}
+
+export function incrementMapDrivenSpliceFallback(reason: MapDrivenSpliceFallbackReason): void {
+  counters.mapDrivenSpliceFallback[reason] = (counters.mapDrivenSpliceFallback[reason] ?? 0) + 1;
+}
+
 export function incrementObserverAResidualMergeRuns(): void {
   counters.observerAResidualMergeRuns++;
 }
@@ -577,6 +612,7 @@ export function getMetrics(): ReconciliationMetrics {
     ...counters,
     cc1LastSeq: { ...counters.cc1LastSeq },
     bridgeToleranceApplied: { ...counters.bridgeToleranceApplied },
+    mapDrivenSpliceFallback: { ...counters.mapDrivenSpliceFallback },
   };
 }
 
@@ -618,6 +654,8 @@ export function resetMetrics(): void {
   counters.bridgeToleranceApplied = {};
   counters.observerAPathBFires = 0;
   counters.observerAPathBFiresSuppressed = 0;
+  counters.mapDrivenSpliceApplied = 0;
+  counters.mapDrivenSpliceFallback = {};
   counters.observerAResidualMergeRuns = 0;
   counters.bridgeSplitBrainRederives = 0;
   counters.bridgeSplitBrainRederivesSuppressed = 0;

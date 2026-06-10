@@ -77,11 +77,11 @@ describe('inline math (single-line `$$x$$` only) → mathInline atom', () => {
     expect(out).toBe(source);
   });
 
-  test('single-dollar `$x^2$` normalizes to `$$x^2$$` on serialize (D-M5b normalization)', () => {
+  test('single-dollar `$x^2$` round-trips byte-identical on serialize', () => {
     const source = 'Result: $x^2$.\n';
     const json = mdManager.parse(source);
     const out = mdManager.serialize(json);
-    expect(out).toBe('Result: $$x^2$$.\n');
+    expect(out).toBe('Result: $x^2$.\n');
   });
 
   test('`<InlineMath formula="x" id="eq-1" />` round-trips byte-identical (id-bearing JSX form)', () => {

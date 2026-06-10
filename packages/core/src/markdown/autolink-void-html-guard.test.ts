@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import type { JSONContent } from '@tiptap/core';
 import { sharedExtensions } from '../extensions/shared.ts';
+import { protectFromMdx } from './autolink-void-html-guard.ts';
 import { MarkdownManager } from './index.ts';
+import { mdastToHtml } from './mdast-to-html.ts';
 
 const mdManager = new MarkdownManager({ extensions: sharedExtensions });
 
@@ -272,5 +274,117 @@ describe('R6a: safeText idempotency for §2.4 ambiguous chars', () => {
 
   test('literal backslash before matched pair is still a literal', () => {
     expect(() => mdManager.parse('\\\\{a}\n')).not.toThrow();
+  });
+});
+
+describe('R23 guard: angle-bracket link destinations', () => {
+  function findNodes(node: unknown, type: string): Array<Record<string, unknown>> {
+    const out: Array<Record<string, unknown>> = [];
+    const rec = node as Record<string, unknown>;
+    if (rec && typeof rec === 'object') {
+      if (rec.type === type) out.push(rec);
+      const children = rec.children;
+      if (Array.isArray(children)) {
+        for (const child of children) out.push(...findNodes(child, type));
+      }
+    }
+    return out;
+  }
+
+  function expectByteStable(md: string): void {
+    const r1 = roundTrip(md);
+    expect(r1).toBe(md);
+    expect(roundTrip(r1)).toBe(r1);
+  }
+
+  test('[link](</my uri>) parses to a link node with the space-bearing url', () => {
+    const tree = mdManager.parseToMdast('[link](</my uri>)\n');
+    const links = findNodes(tree, 'link');
+    expect(links.length).toBe(1);
+    expect(links[0].url).toBe('/my uri');
+  });
+
+  test('the destination < is not PUA-protected when the resource forms', () => {
+    const src = '[link](</my uri>)';
+    expect(protectFromMdx(src)).toBe(src);
+  });
+
+  test('angle destination link renders href /my%20uri', () => {
+    const html = mdastToHtml(mdManager.parseToMdast('[link](</my uri>)\n'));
+    expect(html).toContain('href="/my%20uri"');
+    expect(html).toContain('>link</a>');
+  });
+
+  test('angle destination link round-trips byte-identically and idempotently', () => {
+    expectByteStable('[link](</my uri>)\n');
+  });
+
+  test('image form ![img](</a b.png>) parses to an image and round-trips', () => {
+    const tree = mdManager.parseToMdast('![img](</a b.png>)\n');
+    const images = [...findNodes(tree, 'image'), ...findNodes(tree, 'mdxJsxFlowElement')];
+    expect(images.length).toBeGreaterThanOrEqual(1);
+    expectByteStable('![img](</a b.png>)\n');
+  });
+
+  test('uppercase-name space-bearing destination forms a link', () => {
+    const tree = mdManager.parseToMdast('[x](<My uri>)\n');
+    const links = findNodes(tree, 'link');
+    expect(links.length).toBe(1);
+    expect(links[0].url).toBe('My uri');
+    expectByteStable('[x](<My uri>)\n');
+  });
+
+  const mustStayGuarded: Array<[string, string]> = [
+    ['[link](</my uri', 'mid-typing: unclosed destination'],
+    ['[link](</my uri>', 'mid-typing: destination closed, resource open'],
+    ['[link](</my uri> junk)', 'resource fails after destination'],
+    ['x](</a b>)', 'no label-start before ]('],
+    ['link](</a b>)', 'label-start deleted mid-edit'],
+    ['a](<', 'bare ](< at EOF'],
+    ['a](</', 'bare ](</ at EOF'],
+    ['[x] y](</a b>)', 'label already closed before ]('],
+    ['[[page]](</a b>)', 'wikilink-consumed brackets before ]('],
+    ['[a\\](</b c>)', 'escaped ] cannot end a label'],
+    ['`a[b` ](</x y>)', 'code-span-consumed [ before ]('],
+    ['[^fn](</a b>)', 'footnote-shaped label'],
+    ['[a][b](</c d>)', 'reference-link-shaped label'],
+    ['[a](</x \\> y>)', 'escaped > inside destination'],
+    ['[a](</x <i:j> k>)', 'autolink inside destination'],
+    ['[a](<x\ny>)', 'destination spans a line ending'],
+    ['[link](</my uri> "t")', 'title after destination'],
+    ['[link]( </my uri>)', 'whitespace between ( and <'],
+    ['[a](</b c> )', 'whitespace between > and )'],
+    [`[a](<${' '.repeat(2000)}x y>)`, 'destination exceeding the scan cap'],
+  ];
+
+  for (const [input, label] of mustStayGuarded) {
+    test(`does not throw: ${label}`, () => {
+      expect(() => mdManager.parse(`${input}\n`)).not.toThrow();
+    });
+  }
+
+  test('conservative rejections form no link and stay byte-stable', () => {
+    for (const src of [
+      '[link](</my uri> "t")\n',
+      '[link]( </my uri>)\n',
+      '[a](</b c> )\n',
+      'x](</a b>)\n',
+      'link](</a b>)\n',
+    ]) {
+      const links = findNodes(mdManager.parseToMdast(src), 'link');
+      expect(links.length).toBe(0);
+      expectByteStable(src);
+    }
+  });
+
+  test('rejected destination < stays PUA-protected', () => {
+    expect(protectFromMdx('x](</a b>)')).toContain('\uE000');
+    expect(protectFromMdx('[link](</my uri')).toContain('\uE000');
+  });
+
+  test('no-space angle destinations keep their current byte-stable behavior', () => {
+    expectByteStable('[t](<u>)\n');
+    expectByteStable('[link](<foo%20bar>)\n');
+    expectByteStable('[link](</no-space>)\n');
   });
 });

@@ -5,9 +5,11 @@ import { join } from 'node:path';
 import {
   agentPatch,
   agentWriteMd,
+  createTestClients,
   createTestServer,
   pollUntil,
   readTestDoc,
+  type TestClient,
   type TestServer,
 } from './test-harness.ts';
 
@@ -102,6 +104,51 @@ describe('PRD-6832 β L1: agent write reconciles a newer out-of-band disk edit',
     const after = readTestDoc(contentDir, docName);
     expect(after).toContain('New Title'); // FM patch applied
     expect(after).toContain('native-body-line'); // out-of-band body edit preserved
+  });
+
+  test('concurrent un-flushed CRDT edit: the L1 wholesale ingest drops it (current behavior, recorded honestly)', async () => {
+    server = await createTestServer({ debounce: 300_000, maxDebounce: 600_000 });
+    const { port, contentDir } = server;
+    const docName = `reconcile-concurrent-${randomUUID()}`;
+    const filePath = join(contentDir, `${docName}.md`);
+
+    writeFileSync(filePath, '# Doc\n\nseed-body\n', 'utf-8');
+
+    let clients: TestClient[] = [];
+    try {
+      clients = await createTestClients(port, { count: 1, docName });
+      const client = clients[0];
+      if (!client) throw new Error('client setup failed');
+      await pollUntil(() => client.ytext.toString().includes('seed-body'));
+
+      client.doc.transact(() => {
+        client.ytext.insert(client.ytext.length, '\ncrdt-unflushed-line\n');
+      });
+      const serverYtext = () =>
+        server?.instance.hocuspocus.documents.get(docName)?.getText('source').toString() ?? '';
+      await pollUntil(() => serverYtext().includes('crdt-unflushed-line'));
+      expect(readTestDoc(contentDir, docName)).not.toContain('crdt-unflushed-line');
+
+      writeFileSync(filePath, '# Doc\n\nseed-body\n\ndisk-oob-line\n', 'utf-8');
+
+      const res = await fetch(`http://localhost:${port}/api/agent-write-md`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ docName, markdown: 'agent-line\n', position: 'append' }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { warning?: { kind?: string } };
+      expect(body.warning?.kind).toBe('disk-edit-reconciled');
+
+      await pollUntil(() => serverYtext().includes('agent-line'));
+      expect(serverYtext()).toContain('disk-oob-line');
+
+      expect(serverYtext()).not.toContain('crdt-unflushed-line');
+    } finally {
+      for (const c of clients) {
+        await c.cleanup();
+      }
+    }
   });
 
   test('rename: the renamed doc carries the newer out-of-band disk content', async () => {

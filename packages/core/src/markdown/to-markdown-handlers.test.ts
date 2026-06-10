@@ -198,8 +198,8 @@ describe('to-markdown: lone backtick in text NOT escaped (FR-1d)', () => {
 });
 
 describe('to-markdown: thematic break preservation', () => {
-  test('doc-start --- normalizes to *** (NG10 serialize-side)', () => {
-    expect(roundTrip('---\n')).toBe('***\n');
+  test('doc-start --- round-trips as --- (the *** override is retired)', () => {
+    expect(roundTrip('---\n')).toBe('---\n');
   });
 
   test('*** round-trips as ***', () => {
@@ -1406,7 +1406,7 @@ describe('to-markdown: blockquote marker spacing (FR-23)', () => {
     const doc = schema.nodeFromJSON(json);
     const blockquote = doc.firstChild;
     expect(blockquote?.type.name).toBe('blockquote');
-    expect(blockquote?.attrs.sourceMarkerSpacings).toEqual(['single', 'none']);
+    expect(blockquote?.attrs.sourceMarkerSpacings).toEqual([1, 0]);
   });
 
   test('PM blockquote attr is null for WYSIWYG-authored blockquote (no source)', () => {

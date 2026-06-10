@@ -14,6 +14,18 @@
         },
         "spread": {
           "hasDefault": true
+        },
+        "sourceMarkerSpacing": {
+          "hasDefault": true
+        },
+        "sourceOrdinal": {
+          "hasDefault": true
+        },
+        "sourceCheckboxChar": {
+          "hasDefault": true
+        },
+        "sourceContinuationIndent": {
+          "hasDefault": true
         }
       },
       "content": "paragraph block*",
@@ -22,7 +34,11 @@
       "atom": false
     },
     "doc": {
-      "attrs": {},
+      "attrs": {
+        "sourceDocBoundary": {
+          "hasDefault": true
+        }
+      },
       "content": "block+",
       "group": "",
       "inline": false,
@@ -99,6 +115,9 @@
         },
         "language": {
           "hasDefault": true
+        },
+        "sourceDelimiter": {
+          "hasDefault": true
         }
       },
       "content": "",
@@ -118,6 +137,15 @@
           "hasDefault": true
         },
         "resolved": {
+          "hasDefault": true
+        },
+        "sourceTarget": {
+          "hasDefault": true
+        },
+        "sourceAnchor": {
+          "hasDefault": true
+        },
+        "sourceAlias": {
           "hasDefault": true
         }
       },
@@ -196,6 +224,18 @@
         },
         "sourceStyle": {
           "hasDefault": true
+        },
+        "sourceClosingFenceLength": {
+          "hasDefault": true
+        },
+        "sourceFenceIndent": {
+          "hasDefault": true
+        },
+        "sourceInfoPadding": {
+          "hasDefault": true
+        },
+        "sourceIndents": {
+          "hasDefault": true
         }
       },
       "content": "text*",
@@ -229,6 +269,12 @@
           "hasDefault": true
         },
         "sourceContiguousNext": {
+          "hasDefault": true
+        },
+        "sourceLeadingIndent": {
+          "hasDefault": true
+        },
+        "sourceInteriorSpacing": {
           "hasDefault": true
         }
       },
@@ -296,6 +342,12 @@
     "table": {
       "attrs": {
         "sourceDashCounts": {
+          "hasDefault": true
+        },
+        "sourceOuterPipes": {
+          "hasDefault": true
+        },
+        "sourceAlignmentPadding": {
           "hasDefault": true
         }
       },
@@ -447,16 +499,12 @@
         },
         "sourceFenceLength": {
           "hasDefault": true
+        },
+        "sourcePadded": {
+          "hasDefault": true
         }
       },
       "excludes": "",
-      "group": "",
-      "inclusive": true,
-      "spanning": true
-    },
-    "strike": {
-      "attrs": {},
-      "excludes": "strike",
       "group": "",
       "inclusive": true,
       "spanning": true
@@ -493,6 +541,17 @@
         }
       },
       "excludes": "strong",
+      "group": "",
+      "inclusive": true,
+      "spanning": true
+    },
+    "strike": {
+      "attrs": {
+        "sourceDelimiter": {
+          "hasDefault": true
+        }
+      },
+      "excludes": "strike",
       "group": "",
       "inclusive": true,
       "spanning": true
@@ -583,6 +642,7 @@
     "listItem",
     "emphasis",
     "strong",
+    "strike",
     "code",
     "codeBlock",
     "blockquote",
@@ -593,6 +653,7 @@
     "linkRefDef",
     "hardBreak",
     "escapeMark",
+    "docFidelity",
     "sourceLiteral",
     "starterKit",
     "table",

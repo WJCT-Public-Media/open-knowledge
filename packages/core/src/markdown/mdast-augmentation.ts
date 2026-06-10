@@ -23,6 +23,9 @@ export interface WikiLinkMdast {
     target: string;
     alias: string | null;
     anchor: string | null;
+    sourceTarget?: string | null;
+    sourceAnchor?: string | null;
+    sourceAlias?: string | null;
     [key: string]: unknown;
   };
   children: Array<{ type: 'text'; value: string }>;
@@ -36,6 +39,12 @@ export interface WikiLinkEmbedMdast {
     target: string;
     alias: string | null;
     anchor: string | null;
+    /** Untrimmed source segments — see WikiLinkMdast. Captured by the
+     * shared micromark exits; the embed serialization path currently
+     * ignores them (embed fidelity is tracked separately). */
+    sourceTarget?: string | null;
+    sourceAnchor?: string | null;
+    sourceAlias?: string | null;
     [key: string]: unknown;
   };
   children: Array<{ type: 'text'; value: string }>;
@@ -91,7 +100,20 @@ export interface TagMdast {
   position?: Position;
 }
 
+export interface SourceDocBoundary {
+  bom?: true;
+  leading?: string;
+  trailing?: string;
+  gapBlankLines?: ReadonlyArray<number | null>;
+}
+
 declare module 'mdast' {
+  interface Data {
+    sourcePrecedingBlankLines?: number;
+  }
+  interface RootData {
+    sourceDocBoundary?: SourceDocBoundary;
+  }
   interface TextData {
     escapedChars?: Array<{ offset: number; char: string }>;
     sourceRaw?: string;
@@ -121,27 +143,45 @@ declare module 'mdast' {
   interface HeadingData {
     sourceStyle?: string;
     sourceTrailingHashes?: number;
+    sourceLeadingIndent?: number;
+    sourceInteriorSpacing?: number;
     sourceUnderlineLength?: number;
     sourceContiguousNext?: boolean;
   }
   interface CodeData {
     sourceFenceChar?: string;
     sourceFenceLength?: number;
+    sourceClosingFenceLength?: number;
+    sourceFenceIndent?: number;
+    sourceInfoPadding?: number;
     sourceStyle?: 'indented' | 'fenced';
+    sourceIndents?: string[];
   }
   interface InlineCodeData {
     sourceFenceChar?: string;
     sourceFenceLength?: number;
+    sourcePadded?: boolean;
   }
   interface ListData {
     bulletMarker?: string;
     listMarkerDelimiter?: string;
   }
+  interface ListItemData {
+    sourceMarkerSpacing?: number;
+    sourceOrdinal?: number;
+    sourceCheckboxChar?: 'X';
+    sourceContinuationIndent?: number;
+  }
+  interface DeleteData {
+    sourceDelimiter?: '~' | '~~';
+  }
   interface BlockquoteData {
-    sourceMarkerSpacings?: Array<'single' | 'none'>;
+    sourceMarkerSpacings?: Array<number | 'single' | 'none'>;
   }
   interface TableData {
     sourceDashCounts?: number[];
+    sourceOuterPipes?: { leading: boolean; trailing: boolean };
+    sourceAlignmentPadding?: Array<{ left: number; right: number }>;
   }
   interface TableCellData {
     sourcePadding?: { left: number; right: number };
@@ -177,5 +217,11 @@ declare module 'mdast-util-mdx-expression' {
   }
   interface MdxTextExpressionData {
     sourceRaw?: string;
+  }
+}
+
+declare module 'mdast-util-math' {
+  interface InlineMathData {
+    sourceDelimiter?: string;
   }
 }

@@ -7,6 +7,7 @@ export default {
     'husky',
     '@lingui/babel-plugin-lingui-macro',
     '@lingui/format-po',
+    'micromark',
   ],
   ignoreBinaries: ['printf'],
   ignoreIssues: {
@@ -15,7 +16,7 @@ export default {
     'docs/source.config.ts': ['exports'],
     'packages/app/src/editor/extensions/internal-link.ts': ['exports', 'types'],
     'packages/app/src/editor/clipboard/serialize.ts': ['types'],
-    '{tech-probes,reports,specs}/**': ['files'],
+    '{tech-probes,reports,specs}/**': ['files', 'exports', 'types'],
     'tests/integration/**': ['files'],
     'packages/core/src/desktop-bridge.ts': ['files', 'types'],
     'packages/desktop/src/shared/ipc-events.ts': ['files'],

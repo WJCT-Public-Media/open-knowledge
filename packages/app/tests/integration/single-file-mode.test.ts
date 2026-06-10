@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { MarkdownManager, sharedExtensions } from '@inkeep/open-knowledge-core';
 import * as Y from 'yjs';
 import { createTestClient, createTestServer, pollUntil, wait } from './test-harness';
 
@@ -154,8 +155,20 @@ describe('single-file mode — write-back (FR3)', () => {
 });
 
 describe('single-file mode — no rewrite on open (FR4 / G8)', () => {
-  const RAW = '> q\nq2\n';
-  const CANONICAL = '> q\n> q2\n';
+  const RAW = '\tfoo\n';
+  const CANONICAL = '    foo\n';
+
+  /** Parse-side tab dropper: reproduces the pre-capture engine's leading-tab
+   *  expansion (a parse-time loss) while serialize stays the real engine. */
+  class TabDroppingManager extends MarkdownManager {
+    override parseWithFallback(
+      markdown: string,
+      opts?: Parameters<MarkdownManager['parseWithFallback']>[1],
+    ): ReturnType<MarkdownManager['parseWithFallback']> {
+      return super.parseWithFallback(markdown.replace(/^\t/gm, '    '), opts);
+    }
+  }
+  const tabDroppingManager = new TabDroppingManager({ extensions: sharedExtensions });
 
   test('a reconciliation to the file’s own canonical form is suppressed; a genuine edit persists', async () => {
     const contentDir = ephemeralContentDir({ 'notes.md': RAW });
@@ -165,6 +178,7 @@ describe('single-file mode — no rewrite on open (FR4 / G8)', () => {
       keepContentDir: true,
       singleDocRelPath: 'notes.md',
       debounce: 100,
+      mdManager: tabDroppingManager,
     });
     const client = await createTestClient(server.port, 'notes');
     try {
@@ -186,7 +200,12 @@ describe('single-file mode — no rewrite on open (FR4 / G8)', () => {
 
   test('CONTRAST: a regular (non-ephemeral) project persists the same canonicalization on open', async () => {
     const contentDir = ephemeralContentDir({ 'notes.md': RAW });
-    const server = await createTestServer({ contentDir, keepContentDir: true, debounce: 100 });
+    const server = await createTestServer({
+      contentDir,
+      keepContentDir: true,
+      debounce: 100,
+      mdManager: tabDroppingManager,
+    });
     const client = await createTestClient(server.port, 'notes');
     try {
       setSource(client.ytext, CANONICAL);

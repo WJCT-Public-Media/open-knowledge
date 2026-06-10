@@ -34,6 +34,7 @@ export function applyPositionSliceToNode(
   node: Nodes,
   source: string,
   debug: boolean = false,
+  parent?: { type?: string },
 ): void {
   if (!source) return;
   const pos = node.position;
@@ -116,6 +117,18 @@ export function applyPositionSliceToNode(
       const segment = source.slice(startOff, endOff);
       if (prefix === '#') {
         node.data.sourceStyle = 'atx';
+        if (parent?.type === 'root') {
+          let lineStart = startOff;
+          while (lineStart > 0 && source[lineStart - 1] !== '\n') lineStart--;
+          const indentSlice = source.slice(lineStart, startOff);
+          if (indentSlice.length >= 1 && indentSlice.length <= 3 && /^ +$/.test(indentSlice)) {
+            node.data.sourceLeadingIndent = indentSlice.length;
+          }
+        }
+        const interior = /^#+( {2,})[^ ]/.exec(segment);
+        if (interior) {
+          node.data.sourceInteriorSpacing = interior[1].length;
+        }
         const trailing = /^.*?[ \t](#+)[ \t]*$/.exec(segment);
         if (trailing) {
           node.data.sourceTrailingHashes = trailing[1].length;
@@ -147,7 +160,7 @@ export function applyPositionSliceToNode(
 
       const slice = source.slice(startOff, endOff);
       const lines = slice.split('\n');
-      const markerSpacings: Array<'single' | 'none'> = [];
+      const markerSpacings: number[] = [];
       for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
         const line = lines[lineIdx];
         if (line.length === 0) continue;
@@ -156,11 +169,12 @@ export function applyPositionSliceToNode(
         if (stripped[0] !== '>') continue;
         const restAfterMarker = stripped.slice(1).trimEnd();
         if (restAfterMarker === '') continue;
-        const afterMarker = stripped[1];
-        if (afterMarker === ' ' || afterMarker === '\t') {
-          markerSpacings.push('single');
+        if (stripped[1] === '\t') {
+          markerSpacings.push(1);
         } else {
-          markerSpacings.push('none');
+          let spaceRun = 0;
+          while (stripped[1 + spaceRun] === ' ') spaceRun++;
+          markerSpacings.push(spaceRun);
         }
       }
       if (markerSpacings.length > 0) {
@@ -187,6 +201,58 @@ export function applyPositionSliceToNode(
       break;
     }
 
+    case 'listItem': {
+      const slice = source.slice(startOff, endOff);
+      const m = /^(?:([-+*])|(\d{1,9})[.)])( *)/.exec(slice);
+      if (!m) break;
+      const markerLen = m[1] ? 1 : (m[2]?.length ?? 0) + 1;
+      const spacing = m[3].length;
+      if (spacing >= 2 && spacing <= 4) {
+        node.data.sourceMarkerSpacing = spacing;
+      }
+      if (m[2]) {
+        node.data.sourceOrdinal = Number.parseInt(m[2], 10);
+      }
+      if (node.checked != null) {
+        const checkbox = /^\[([xX])\] /.exec(slice.slice(markerLen + Math.max(spacing, 1)));
+        if (checkbox?.[1] === 'X') {
+          node.data.sourceCheckboxChar = 'X';
+        }
+      }
+      const effectiveSpacing = spacing >= 2 && spacing <= 4 ? spacing : 1;
+      const contentCol = markerLen + effectiveSpacing;
+      let itemLineStart = startOff;
+      while (itemLineStart > 0 && source[itemLineStart - 1] !== '\n') itemLineStart--;
+      const itemCol = pos.start.column;
+      for (const child of node.children ?? []) {
+        if (child.type !== 'list') continue;
+        const childStart = child.position?.start?.offset;
+        const childCol = child.position?.start?.column;
+        if (typeof childStart !== 'number' || typeof childCol !== 'number') continue;
+        let childLineStart = childStart;
+        while (childLineStart > 0 && source[childLineStart - 1] !== '\n') childLineStart--;
+        if (childLineStart === itemLineStart) continue; // same-line list — no pad applies
+        const indent = childCol - itemCol;
+        if (
+          indent !== contentCol &&
+          indent >= contentCol &&
+          indent <= contentCol + 3 &&
+          /^ +$/.test(source.slice(childLineStart, childStart))
+        ) {
+          node.data.sourceContinuationIndent = indent;
+        }
+        break;
+      }
+      break;
+    }
+
+    case 'delete': {
+      if (source[startOff] === '~') {
+        node.data.sourceDelimiter = source[startOff + 1] === '~' ? '~~' : '~';
+      }
+      break;
+    }
+
     case 'code': {
       const ch = source[startOff];
       if (ch === '`' || ch === '~') {
@@ -199,8 +265,58 @@ export function applyPositionSliceToNode(
         if (count >= 3) {
           node.data.sourceFenceLength = count;
         }
+
+        if (parent?.type === 'root') {
+          let fenceLineStart = startOff;
+          while (fenceLineStart > 0 && source[fenceLineStart - 1] !== '\n') fenceLineStart--;
+          const fenceIndent = source.slice(fenceLineStart, startOff);
+          if (fenceIndent.length >= 1 && fenceIndent.length <= 3 && /^ +$/.test(fenceIndent)) {
+            node.data.sourceFenceIndent = fenceIndent.length;
+          }
+        }
+
+        if (node.lang) {
+          let gap = 0;
+          while (source[startOff + count + gap] === ' ') gap++;
+          if (gap >= 1) {
+            node.data.sourceInfoPadding = gap;
+          }
+        }
+
+        const fenceSlice = source.slice(startOff, endOff);
+        const closing = new RegExp(`\\n[ \\t]*(\\${ch}+)[ \\t]*$`).exec(fenceSlice);
+        if (closing && closing[1].length > count) {
+          node.data.sourceClosingFenceLength = closing[1].length;
+        }
       } else {
         node.data.sourceStyle = 'indented';
+        if (parent?.type === 'root') {
+          const sliceLines = source.slice(startOff, endOff).split('\n');
+          const valueLines = (node.value ?? '').split('\n');
+          if (sliceLines.length === valueLines.length) {
+            const indents: string[] = [];
+            let nonCanonical = false;
+            let valid = true;
+            for (let i = 0; i < sliceLines.length; i++) {
+              const sliceLine = sliceLines[i];
+              const valueLine = valueLines[i];
+              if (!sliceLine.endsWith(valueLine)) {
+                valid = false;
+                break;
+              }
+              const indent = sliceLine.slice(0, sliceLine.length - valueLine.length);
+              if (!/^[ \t]*$/.test(indent)) {
+                valid = false;
+                break;
+              }
+              indents.push(indent);
+              if (indent !== (valueLine.length > 0 ? '    ' : '')) nonCanonical = true;
+            }
+            if (valid && nonCanonical) {
+              node.data.sourceIndents = indents;
+            }
+          }
+        }
       }
       break;
     }
@@ -216,6 +332,22 @@ export function applyPositionSliceToNode(
         if (count >= 1) {
           node.data.sourceFenceLength = count;
         }
+        const inner = source.slice(startOff + count, endOff - count);
+        const value: string = node.value ?? '';
+        if (inner !== value && inner === ` ${value} `) {
+          node.data.sourcePadded = true;
+        }
+      }
+      break;
+    }
+
+    case 'inlineMath': {
+      if (source[startOff] === '$') {
+        let count = 0;
+        while (startOff + count < source.length && source[startOff + count] === '$') {
+          count++;
+        }
+        node.data.sourceDelimiter = '$'.repeat(count);
       }
       break;
     }
@@ -243,6 +375,50 @@ export function applyPositionSliceToNode(
       }
       if (dashCounts.some((c) => c > 0)) {
         node.data.sourceDashCounts = dashCounts;
+      }
+
+      {
+        const trimmedAlign = alignmentLine.trim();
+        const segments = splitGfmCellSegments(trimmedAlign);
+        if (segments.length > 0 && segments[0] === '' && trimmedAlign.startsWith('|')) {
+          segments.shift();
+        }
+        if (
+          segments.length > 0 &&
+          segments[segments.length - 1] === '' &&
+          trimmedAlign.endsWith('|')
+        ) {
+          segments.pop();
+        }
+        const allDelimiterCells = segments.every((seg) => /^[-: ]+$/.test(seg));
+        const alignPadding: Array<{ left: number; right: number }> = [];
+        for (const seg of segments) {
+          let left = 0;
+          while (left < seg.length && seg[left] === ' ') left++;
+          let right = 0;
+          while (right < seg.length - left && seg[seg.length - 1 - right] === ' ') right++;
+          alignPadding.push({ left, right });
+        }
+        if (allDelimiterCells && alignPadding.length > 0) {
+          node.data.sourceAlignmentPadding = alignPadding;
+        }
+      }
+
+      {
+        const tableLines = tableSrc.split('\n').filter((l) => l.trim().length > 0);
+        if (tableLines.length >= 2) {
+          const leadingStates = tableLines.map((l) => l.trimStart().startsWith('|'));
+          const trailingStates = tableLines.map((l) => /(^|[^\\])\|$/.test(l.trimEnd()));
+          const uniformLeading = leadingStates.every((s) => s === leadingStates[0]);
+          const uniformTrailing = trailingStates.every((s) => s === trailingStates[0]);
+          if (uniformLeading && uniformTrailing) {
+            const leading = leadingStates[0];
+            const trailing = trailingStates[0];
+            if (!leading || !trailing) {
+              node.data.sourceOuterPipes = { leading, trailing };
+            }
+          }
+        }
       }
 
       for (const row of node.children ?? []) {
@@ -370,8 +546,8 @@ export function positionSlicePlugin() {
 
     const debug = typeof process !== 'undefined' && process.env?.OK_DEBUG_POSITION_SLICE === '1';
 
-    visit(tree, (node: Nodes) => {
-      applyPositionSliceToNode(node, source, debug);
+    visit(tree, (node: Nodes, _index, parent) => {
+      applyPositionSliceToNode(node, source, debug, parent ?? undefined);
     });
   };
 }

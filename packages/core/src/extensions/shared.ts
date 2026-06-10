@@ -6,6 +6,7 @@ import { CodeBlockFidelity } from './code-block-fidelity.ts';
 import { CodeMarkFidelity } from './code-mark-fidelity.ts';
 import { CommentBlock } from './comment-block.ts';
 import { CommentMark } from './comment-mark.ts';
+import { DocFidelity } from './doc-fidelity.ts';
 import { EmphasisFidelity, StrongFidelity } from './emphasis-fidelity.ts';
 import { EscapeMark } from './escape-mark.ts';
 import { FootnoteDefinition } from './footnote-definition.ts';
@@ -23,6 +24,7 @@ import { List, ListItem } from './list.ts';
 import { MathInline } from './math-inline.ts';
 import { RawMdxFallback } from './raw-mdx-fallback.ts';
 import { SourceLiteralMark } from './source-literal-mark.ts';
+import { StrikeFidelity } from './strike-fidelity.ts';
 import { TableCellFidelity, TableFidelity, TableHeaderFidelity } from './table-fidelity.ts';
 import { Tag } from './tag.ts';
 import { ThematicBreakFidelity } from './thematic-break-fidelity.ts';
@@ -41,6 +43,7 @@ export const sharedExtensions = [
   ListItem,
   EmphasisFidelity,
   StrongFidelity,
+  StrikeFidelity,
   CodeMarkFidelity,
   CodeBlockFidelity,
   BlockquoteFidelity,
@@ -51,6 +54,7 @@ export const sharedExtensions = [
   LinkRefDefFidelity,
   HardBreakFidelity,
   EscapeMark,
+  DocFidelity,
   SourceLiteralMark,
   StarterKit.configure({
     undoRedo: false,
@@ -59,6 +63,7 @@ export const sharedExtensions = [
     listItem: false,
     italic: false,
     bold: false,
+    strike: false,
     code: false,
     codeBlock: false,
     heading: false,

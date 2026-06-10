@@ -54,3 +54,12 @@ export {
   normalizeBridge,
 } from './normalize.ts';
 export { defaultScheduler, type Scheduler } from './scheduler.ts';
+export {
+  classifySeverity,
+  emitToleranceFire,
+  findFirstDivergenceIndex,
+  setToleranceTelemetryHook,
+  type ToleranceClassSeverity,
+  type ToleranceFireRecord,
+  type ToleranceTelemetryHook,
+} from './tolerance-telemetry.ts';

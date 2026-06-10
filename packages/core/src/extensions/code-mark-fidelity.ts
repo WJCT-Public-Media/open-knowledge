@@ -8,6 +8,7 @@ export const CodeMarkFidelity = Code.extend({
       ...this.parent?.(),
       sourceFenceChar: { default: '`' },
       sourceFenceLength: { default: 1 },
+      sourcePadded: { default: false, rendered: false },
     };
   },
 });

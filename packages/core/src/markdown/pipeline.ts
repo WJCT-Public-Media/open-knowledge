@@ -26,6 +26,7 @@ import { highlightPromoterPlugin } from './highlight-promoter.ts';
 import { imagePromoterPlugin } from './image-promoter.ts';
 import { indentedCodePromoterPlugin } from './indented-code-promoter.ts';
 import { mathPromoterPlugin } from './math-promoter.ts';
+import type { SourceDocBoundary } from './mdast-augmentation.ts';
 import { mergedPostParseWalkerPlugin } from './merged-walker.ts';
 import { mermaidPromoterPlugin } from './mermaid-promoter.ts';
 import { positionAwareBlankLineJoin } from './position-aware-join.ts';
@@ -65,7 +66,6 @@ function ensureNonEmptyDoc(tree: MdastRoot): MdastRoot {
 
 export const ACTIVE_MDAST_PLUGINS = [
   { name: 'remark-parse', plugin: remarkParse },
-  { name: 'remark-frontmatter', plugin: remarkFrontmatter, options: ['yaml'] },
   { name: 'remark-mdx-agnostic', plugin: remarkMdxAgnostic },
   { name: 'remark-gfm', plugin: remarkGfm },
   { name: 'remark-math', plugin: remarkMath, options: { singleDollarTextMath: false } },
@@ -115,7 +115,9 @@ export function createParseProcessor(opts: PipelineOptions): Processor {
   return processor;
 }
 
-export function createSerializeProcessor(opts: PipelineOptions): Processor {
+export function createSerializeProcessor(
+  opts: Pick<PipelineOptions, 'toMarkdownHandlers'>,
+): Processor {
   const processor = unified()
     .use(remarkFrontmatter, ['yaml'])
     .use(remarkGfm, { tablePipeAlign: false })
@@ -134,7 +136,90 @@ export function createSerializeProcessor(opts: PipelineOptions): Processor {
   return processor as unknown as Processor;
 }
 
-export function parseMd(source: string, processor: Processor): PmNode {
+function splitDocumentHeadBom(source: string): { source: string; hadBom: boolean } {
+  return source.charCodeAt(0) === 0xfeff
+    ? { source: source.slice(1), hadBom: true }
+    : { source, hadBom: false };
+}
+
+function captureDocBoundary(
+  root: MdastRoot,
+  source: string,
+  hadBom: boolean,
+): SourceDocBoundary | undefined {
+  let leading: string | undefined;
+  let trailing: string | undefined;
+  let gapBlankLines: Array<number | null> | undefined;
+
+  const children = root.children;
+  if (children.length > 0) {
+    const firstStart = children[0]?.position?.start?.offset;
+    if (typeof firstStart === 'number' && firstStart > 0) {
+      const gap = source.slice(0, firstStart);
+      if (/^\n+$/.test(gap)) leading = gap;
+    }
+    const lastEnd = children[children.length - 1]?.position?.end?.offset;
+    if (typeof lastEnd === 'number' && lastEnd <= source.length) {
+      const gap = source.slice(lastEnd);
+      if (/^\n{2,}$/.test(gap)) trailing = gap;
+    }
+    const gaps: Array<number | null> = [];
+    let anyGap = false;
+    for (let i = 1; i < children.length; i++) {
+      const prevEnd = children[i - 1]?.position?.end?.offset;
+      const nextStart = children[i]?.position?.start?.offset;
+      let blanks: number | null = null;
+      if (typeof prevEnd === 'number' && typeof nextStart === 'number' && nextStart >= prevEnd) {
+        const gap = source.slice(prevEnd, nextStart);
+        if (/^\n{3,}$/.test(gap)) {
+          blanks = gap.length - 1;
+          anyGap = true;
+        }
+      }
+      gaps.push(blanks);
+    }
+    if (anyGap) gapBlankLines = gaps;
+  }
+
+  if (!hadBom && leading === undefined && trailing === undefined && !gapBlankLines) {
+    return undefined;
+  }
+  const boundary: SourceDocBoundary = {
+    ...(hadBom ? { bom: true as const } : {}),
+    ...(leading !== undefined ? { leading } : {}),
+    ...(trailing !== undefined ? { trailing } : {}),
+    ...(gapBlankLines ? { gapBlankLines } : {}),
+  };
+  root.data ??= {};
+  root.data.sourceDocBoundary = boundary;
+  return boundary;
+}
+
+function readDocBoundary(value: unknown): SourceDocBoundary | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const v = value as Record<string, unknown>;
+  const out: {
+    bom?: true;
+    leading?: string;
+    trailing?: string;
+    gapBlankLines?: Array<number | null>;
+  } = {};
+  if (v.bom === true) out.bom = true;
+  if (typeof v.leading === 'string' && /^\n+$/.test(v.leading)) out.leading = v.leading;
+  if (typeof v.trailing === 'string' && /^\n{2,}$/.test(v.trailing)) out.trailing = v.trailing;
+  if (
+    Array.isArray(v.gapBlankLines) &&
+    v.gapBlankLines.every(
+      (g) => g === null || (typeof g === 'number' && Number.isInteger(g) && g >= 2),
+    )
+  ) {
+    out.gapBlankLines = v.gapBlankLines as Array<number | null>;
+  }
+  return out.bom || out.leading || out.trailing || out.gapBlankLines ? out : undefined;
+}
+
+export function parseMd(rawSource: string, processor: Processor): PmNode {
+  const { source, hadBom } = splitDocumentHeadBom(rawSource);
   const protectedFr14 = encodeBackslashEscapes(source);
   const protectedR23 = protectFromMdx(protectedFr14);
   const protected_ = encodeEntityRefs(protectedR23);
@@ -142,16 +227,22 @@ export function parseMd(source: string, processor: Processor): PmNode {
   const file = new VFile(protected_);
   const tree = processor.parse(file);
   file.value = source;
-  const transformed = processor.runSync(tree, file);
-  return (processor as unknown as { stringify(tree: unknown): PmNode }).stringify(transformed);
+  const transformed = processor.runSync(tree, file) as MdastRoot;
+  const boundary = captureDocBoundary(transformed, source, hadBom);
+  const doc = (processor as unknown as { stringify(tree: unknown): PmNode }).stringify(transformed);
+  if (!boundary) return doc;
+  return doc.type.create({ ...doc.attrs, sourceDocBoundary: boundary }, doc.content, doc.marks);
 }
 
-export function parseMdToMdast(source: string, processor: Processor): MdastRoot {
+export function parseMdToMdast(rawSource: string, processor: Processor): MdastRoot {
+  const { source, hadBom } = splitDocumentHeadBom(rawSource);
   const protected_ = encodeEntityRefs(protectFromMdx(encodeBackslashEscapes(source)));
   const file = new VFile(protected_);
   const tree = processor.parse(file);
   file.value = source;
-  return processor.runSync(tree, file) as MdastRoot;
+  const transformed = processor.runSync(tree, file) as MdastRoot;
+  captureDocBoundary(transformed, source, hadBom);
+  return transformed;
 }
 
 export function serializeMd(doc: PmNode, processor: Processor, opts: SerializeMdOptions): string {
@@ -161,5 +252,24 @@ export function serializeMd(doc: PmNode, processor: Processor, opts: SerializeMd
     markHandlers: opts.pmMarkHandlers,
   });
 
-  return String(processor.stringify(mdast));
+  const boundary = readDocBoundary(doc.attrs?.sourceDocBoundary);
+  const gaps = boundary?.gapBlankLines;
+  if (gaps && gaps.length === mdast.children.length - 1) {
+    for (let i = 1; i < mdast.children.length; i++) {
+      const blanks = gaps[i - 1];
+      if (typeof blanks === 'number') {
+        const child = mdast.children[i];
+        child.data ??= {};
+        child.data.sourcePrecedingBlankLines = blanks;
+      }
+    }
+  }
+
+  let out = String(processor.stringify(mdast));
+  if (boundary?.leading) out = boundary.leading + out;
+  if (boundary?.trailing) {
+    out = out.replace(/\n+$/, '') + boundary.trailing;
+  }
+  if (boundary?.bom) out = `\uFEFF${out}`;
+  return out;
 }

@@ -1,0 +1,98 @@
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { setTimeout as wait } from 'node:timers/promises';
+import * as Y from 'yjs';
+import {
+  assertBridgeInvariant,
+  createTestClients,
+  createTestServer,
+  pollUntil,
+  type TestClient,
+  type TestServer,
+} from './test-harness';
+
+let server: TestServer;
+
+beforeAll(async () => {
+  server = await createTestServer();
+});
+
+afterAll(async () => {
+  await server.cleanup();
+});
+
+function appendParagraph(client: TestClient, text: string): void {
+  const paragraph = new Y.XmlElement('paragraph');
+  const ytext = new Y.XmlText();
+  ytext.applyDelta([{ insert: text }]);
+  paragraph.insert(0, [ytext]);
+  client.fragment.push([paragraph]);
+}
+
+async function awaitConvergence(clients: TestClient[], markers: string[]): Promise<void> {
+  for (const marker of markers) {
+    for (const client of clients) {
+      await pollUntil(() => client.ytext.toString().includes(marker), 5000);
+    }
+  }
+  await wait(500);
+}
+
+describe('map-driven Observer A — cross-CRDT integration', () => {
+  test('(a) two-client concurrent edits converge to byte-identical Y.Text', async () => {
+    const clients = await createTestClients(server.port, {
+      count: 2,
+      perClientOptions: { skipInvariantWatcher: true },
+    });
+    try {
+      appendParagraph(clients[0], 'MAP-DRIVEN-A-WYSIWYG');
+      appendParagraph(clients[1], 'MAP-DRIVEN-B-WYSIWYG');
+
+      await awaitConvergence(clients, ['MAP-DRIVEN-A-WYSIWYG', 'MAP-DRIVEN-B-WYSIWYG']);
+
+      const ytexts = clients.map((c) => c.ytext.toString());
+      expect(ytexts[1]).toBe(ytexts[0]);
+
+      for (const client of clients) {
+        assertBridgeInvariant(client.ytext, client.fragment);
+      }
+    } finally {
+      for (const c of clients) await c.cleanup();
+    }
+  });
+
+  test('(b) per-replica AC1 ≡ post-convergence AC1 — non-overlapping splices preserve each others bytes', async () => {
+    const clients = await createTestClients(server.port, {
+      count: 2,
+      perClientOptions: { skipInvariantWatcher: true },
+    });
+    try {
+      appendParagraph(clients[0], 'AC1-NONOVERLAP-CLIENT-A');
+      await awaitConvergence(clients, ['AC1-NONOVERLAP-CLIENT-A']);
+
+      appendParagraph(clients[0], 'AC1-NONOVERLAP-EDIT-A');
+      appendParagraph(clients[1], 'AC1-NONOVERLAP-EDIT-B');
+
+      await awaitConvergence(clients, [
+        'AC1-NONOVERLAP-CLIENT-A',
+        'AC1-NONOVERLAP-EDIT-A',
+        'AC1-NONOVERLAP-EDIT-B',
+      ]);
+
+      for (const client of clients) {
+        const text = client.ytext.toString();
+        expect(text).toContain('AC1-NONOVERLAP-CLIENT-A');
+        expect(text).toContain('AC1-NONOVERLAP-EDIT-A');
+        expect(text).toContain('AC1-NONOVERLAP-EDIT-B');
+      }
+
+      const ytexts = clients.map((c) => c.ytext.toString());
+      expect(ytexts[1]).toBe(ytexts[0]);
+
+      for (const client of clients) {
+        assertBridgeInvariant(client.ytext, client.fragment);
+      }
+    } finally {
+      for (const c of clients) await c.cleanup();
+    }
+  });
+});

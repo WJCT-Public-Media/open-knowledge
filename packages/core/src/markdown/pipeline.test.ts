@@ -139,21 +139,31 @@ describe('position-aware blank-line Join (FR-12)', () => {
     });
   });
 
-  describe('PM round-trip path (positions absent → default 1 blank line)', () => {
+  describe('PM round-trip path (doc-boundary snapshot carries the counts)', () => {
     test('1 blank line between paragraphs is the dominant case (byte-identical)', () => {
       const input = 'P1\n\nP2\n';
       const json = mdManager.parse(input);
       expect(mdManager.serialize(json)).toBe(input);
     });
 
-    test('2+ blank lines collapse to 1 (NG1 floor on PM route)', () => {
+    test('2+ blank lines round-trip via the sourceDocBoundary attr', () => {
       const json = mdManager.parse('P1\n\n\nP2\n');
-      expect(mdManager.serialize(json)).toBe('P1\n\nP2\n');
+      expect(mdManager.serialize(json)).toBe('P1\n\n\nP2\n');
     });
 
-    test('4 blank lines collapse to 1 on PM route (NG1 floor)', () => {
+    test('4 blank lines round-trip via the sourceDocBoundary attr', () => {
       const json = mdManager.parse('P1\n\n\n\n\nP2\n');
-      expect(mdManager.serialize(json)).toBe('P1\n\nP2\n');
+      expect(mdManager.serialize(json)).toBe('P1\n\n\n\n\nP2\n');
+    });
+
+    test('a doc without the attr (the CRDT/fragment shape) collapses to the canonical 1 blank line', () => {
+      const json = mdManager.parse('P1\n\n\n\n\nP2\n');
+      const { sourceDocBoundary: _dropped, ...attrs } = (json.attrs ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const stripped = { ...json, attrs };
+      expect(mdManager.serialize(stripped)).toBe('P1\n\nP2\n');
     });
   });
 
@@ -165,7 +175,7 @@ describe('position-aware blank-line Join (FR-12)', () => {
       expect(round).toEqual(initial);
     });
 
-    test('PM identity holds even when source has 2+ blank lines (PM does not carry counts)', () => {
+    test('PM identity holds even when source has 2+ blank lines', () => {
       const md = 'P1\n\n\n\nP2\n';
       const initial = mdManager.parse(md);
       const round = mdManager.parse(mdManager.serialize(initial));

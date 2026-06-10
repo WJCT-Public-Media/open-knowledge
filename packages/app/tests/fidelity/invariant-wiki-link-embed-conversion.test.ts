@@ -10,7 +10,6 @@ const nonImageExt = fc.constantFrom('mp4', 'webm', 'mov', 'mp3', 'wav', 'ogg', '
 const fileAttachmentExt = fc.constantFrom('pdf', 'zip', 'docx', 'csv');
 const opaqueExt = fc.constantFrom('xyz', 'qux', 'wat');
 
-const renderableExt = fc.oneof(imageExt, nonImageExt, fileAttachmentExt);
 const allExts = fc.oneof(imageExt, nonImageExt, fileAttachmentExt, opaqueExt);
 
 const anchor = fc.option(fc.stringMatching(/^[a-zA-Z0-9_=-]{1,12}$/), { nil: null });
@@ -23,19 +22,16 @@ function buildEmbed(s: string, e: string, a: string | null, l: string | null): s
   return `${out}]]`;
 }
 
-const renderableEmbedMd = fc
-  .tuple(stem, renderableExt, anchor, alias)
-  .map(([s, e, a, l]) => buildEmbed(s, e, a, l));
 const anyEmbedMd = fc
   .tuple(stem, allExts, anchor, alias)
   .map(([s, e, a, l]) => buildEmbed(s, e, a, l));
 
 describe('wiki-embed conversion invariants — mdManager path (US-010)', () => {
   test(
-    'I1 — parse → serialize is byte-identical for renderable extensions (image + non-image wikiembed)',
+    'I1 — parse → serialize is byte-identical for every extension class (renderable + opaque)',
     () => {
       assertAcrossSeeds(
-        fc.property(renderableEmbedMd, (md) => {
+        fc.property(anyEmbedMd, (md) => {
           const out = normalize(mdRoundTrip(md));
           expect(out).toBe(md);
         }),
@@ -58,9 +54,9 @@ describe('wiki-embed conversion invariants — mdManager path (US-010)', () => {
     PBT_TIMEOUT_MS,
   );
 
-  test('truly-opaque wikiembed round-trip normalizes to plain markdown link', () => {
-    expect(normalize(mdRoundTrip('![[archive.xyz]]'))).toBe('[archive.xyz](archive.xyz)');
-    expect(normalize(mdRoundTrip('![[archive.xyz|Download]]'))).toBe('[Download](archive.xyz)');
+  test('truly-opaque wikiembed round-trips byte-identical (no downcast to plain link)', () => {
+    expect(normalize(mdRoundTrip('![[archive.xyz]]'))).toBe('![[archive.xyz]]');
+    expect(normalize(mdRoundTrip('![[archive.xyz|Download]]'))).toBe('![[archive.xyz|Download]]');
   });
 
   test('block-context image-extension embed dispatches to jsxComponent(WikiEmbedImage)', () => {
@@ -86,14 +82,15 @@ describe('wiki-embed conversion invariants — mdManager path (US-010)', () => {
     expect(props?.alias).toBe('Draft');
   });
 
-  test('US-013 — truly-opaque extensions dispatch to plain link (no sourceForm)', () => {
+  test('truly-opaque extensions dispatch to the wikiembed-tagged link chip, never a PM wikiLinkEmbed node', () => {
     const json = mdManager.parse('![[archive.xyz]]');
     const para = json.content?.[0];
     const text = para?.content?.[0];
     expect(text?.type).toBe('text');
     const linkMark = text?.marks?.find((mk) => mk.type === 'link');
     expect(linkMark).toBeDefined();
-    expect(linkMark?.attrs?.sourceForm).toBeNull();
+    expect(linkMark?.attrs?.sourceForm).toBe('wikiembed');
+    expect(linkMark?.attrs?.target).toBe('archive.xyz');
     expect(linkMark?.attrs?.href).toBe('archive.xyz');
   });
 

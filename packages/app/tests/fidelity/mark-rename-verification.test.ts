@@ -72,8 +72,8 @@ describe('renamed marks round-trip markdown correctly', () => {
     expect(normalize(mdRoundTrip('*em*\n'))).toBe(normalize('*em*\n'));
   });
 
-  test('doc-start --- normalizes to *** (NG10)', () => {
-    expect(normalize(mdRoundTrip('---\n'))).toBe(normalize('***\n'));
+  test('doc-start --- round-trips byte-identical (NG10 retired)', () => {
+    expect(normalize(mdRoundTrip('---\n'))).toBe(normalize('---\n'));
   });
 
   test('non-doc-start --- preserves authoring form', () => {

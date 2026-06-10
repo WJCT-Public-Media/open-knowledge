@@ -263,6 +263,10 @@ export const ListItemNode = Node.create({
     return {
       checked: { default: null },
       spread: { default: false },
+      sourceMarkerSpacing: { default: null, rendered: false },
+      sourceOrdinal: { default: null, rendered: false },
+      sourceCheckboxChar: { default: null, rendered: false },
+      sourceContinuationIndent: { default: null, rendered: false },
     };
   },
 

@@ -99,6 +99,54 @@ The rule does NOT catch:
 
 Plugin: [`biome-plugins/playwright-topass-budget.grit`](playwright-topass-budget.grit). Fixture: [`biome-plugins/__fixtures__/playwright-topass-budget.fixture.tsx`](__fixtures__/playwright-topass-budget.fixture.tsx). Test: [`packages/desktop/tests/integration/playwright-topass-budget.test.ts`](../packages/desktop/tests/integration/playwright-topass-budget.test.ts). See [PRECEDENTS.md #42](../PRECEDENTS.md#custom-lint-enforcement-precedent-42) for the GritQL-plugin convention.
 
+### `path-conditional-map-driven-origin.grit`
+
+Observer A origin discipline. Inside `packages/server/src/server-observers.ts`, every `Y.Doc.transact()` call MUST pass the sanctioned origin `OBSERVER_SYNC_ORIGIN` as its second argument (`doc.transact(fn, OBSERVER_SYNC_ORIGIN)`). Bare `doc.transact(fn)` - or a wrong origin - routes the write to `openknowledge-service` and breaks per-session UndoManager attribution (the `trackedOrigins` Set-identity match skips the transaction).
+
+**Scoped via `overrides[].plugins`** to `packages/server/src/server-observers.ts`. Other server files routing through `session.dc.document.transact(fn, session.origin)` are out of scope - that contract is enforced by `paired-write-enforcement.test.ts`.
+
+The rule checks the **argument position** (the second argument node), not whether the call subtree contains the identifier somewhere. It matches every `transact(...)` call, then excludes the two sanctioned shapes (`transact($_, OBSERVER_SYNC_ORIGIN)` and the 3-arg `transact($_, OBSERVER_SYNC_ORIGIN, $...)`). A callback body that mentions `OBSERVER_SYNC_ORIGIN` for an unrelated reason therefore neither clears a bare/wrong call nor trips a correct one - the prior `contains`-based shape was falsely cleared by such a mention.
+
+The rule does NOT catch:
+- Transact calls outside `server-observers.ts` (scoped to the one observer-dispatch file)
+- An origin passed in a position other than the second argument (the contract is second-argument placement; no real call site does otherwise)
+
+Plugin: [`biome-plugins/path-conditional-map-driven-origin.grit`](path-conditional-map-driven-origin.grit). Fixture: [`biome-plugins/__fixtures__/path-conditional-map-driven-origin.fixture.tsx`](__fixtures__/path-conditional-map-driven-origin.fixture.tsx). Test: [`packages/server/src/path-conditional-map-driven-origin.test.ts`](../packages/server/src/path-conditional-map-driven-origin.test.ts).
+
+### `cst-pm-handler-todo-stub.grit`
+
+Codemod handler TODO-stub grep. Flags handler files under `packages/md-conformance/src/substrates/*/handlers/` that still contain the codemod's stub body (`throw new Error("TODO: implement <substrate>:<dir>/<key>")`), so a codemod stub that survives to lint time is caught.
+
+This is a TODO-stub grep, NOT an exhaustiveness check. Whether a substrate covers every PM node type (the node-set traversal over `packages/core/schema-snapshot.json`) is a separate concern owned by a suite-self-consistency gate. The compile-time backstop for missing methods is the TypeScript handlers-table type check against `ICstEngine`.
+
+**Scoped via `overrides[].plugins`** to `packages/md-conformance/src/substrates/*/handlers/**/*.ts`. The codemod implementation, harness tests, and oracles are out of scope (they legitimately produce strings containing "TODO: implement" in their own contexts).
+
+The rule does NOT catch:
+- Missing handler FILES (file-presence is out of GritQL's scope; TypeScript + codemod coverage handle this)
+- Whether the handler set is complete per the PM schema (a separate node-set traversal, deferred to the suite-self-consistency gate)
+- Error subclasses (only matches `new Error(...)`)
+- Non-anchored "TODO" mentions (regex requires the message to start with `TODO: implement`)
+
+Plugin: [`biome-plugins/cst-pm-handler-todo-stub.grit`](cst-pm-handler-todo-stub.grit). Fixture: [`biome-plugins/__fixtures__/cst-pm-handler-todo-stub.fixture.tsx`](__fixtures__/cst-pm-handler-todo-stub.fixture.tsx). Test: [`packages/md-conformance/src/lint-plugins/cst-pm-handler-todo-stub.test.ts`](../packages/md-conformance/src/lint-plugins/cst-pm-handler-todo-stub.test.ts).
+
+### `class-proof-registration-discipline.grit`
+
+Class-proof DSL contract enforcement. Two patterns (GritQL `or` — short-circuit, Pattern A wins when both apply):
+
+- **Pattern A (missing args):** flags `defineClassProof(name, opts)` when `opts` doesn't contain both `predicate:` and `proof:` property assignments.
+- **Pattern B (outside canonical dir):** flags any `defineClassProof(...)` call. The override scope excludes `packages/md-conformance/src/class-proofs/proofs/**`, so this fires only on registrations outside the sanctioned location.
+
+Inside the canonical proofs/ dir, neither pattern fires — TypeScript's `ClassProofOptions<M>` signature backstops the missing-args check, and any `defineClassProof` call there is in the sanctioned location.
+
+**Scoped via `overrides[].plugins`** to all `.ts`/`.tsx` files EXCEPT `packages/md-conformance/src/class-proofs/proofs/**` and `*.test.ts`/`*.test.tsx` (test files that exercise the DSL are exempt — `dsl.test.ts` legitimately calls `defineClassProof` outside the canonical dir).
+
+The rule does NOT catch:
+- Missing-args violations inside the canonical proofs/ dir (TypeScript catches those)
+- Functions with similar names (`myDefineClassProofVariant`) — pattern matches the exact function name
+- Type references to `defineClassProof` — pattern scopes to call expressions
+
+Plugin: [`biome-plugins/class-proof-registration-discipline.grit`](class-proof-registration-discipline.grit). Fixture: [`biome-plugins/__fixtures__/class-proof-registration-discipline.fixture.tsx`](__fixtures__/class-proof-registration-discipline.fixture.tsx). Test: [`packages/md-conformance/src/lint-plugins/class-proof-registration-discipline.test.ts`](../packages/md-conformance/src/lint-plugins/class-proof-registration-discipline.test.ts).
+
 ### `playwright-prefer-to-have-count.grit`
 
 Flags `expect(await locator.count())` — the one-shot count snapshot that never retries. Under CI CPU contention the DOM settles a few frames after the read, so the assertion flakes while the auto-retrying web-first form `await expect(locator).toHaveCount(n)` passes deterministically (the no-retry read was one of the hidden-flake shapes in the 2026-06 e2e CI audit). The pattern matches the probe sub-expression regardless of the matcher that follows (`.toBe`, `.toEqual`, `.toBeGreaterThanOrEqual`, ...). Upstream precedent: eslint-plugin-playwright `prefer-to-have-count`.

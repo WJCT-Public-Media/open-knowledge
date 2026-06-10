@@ -88,6 +88,7 @@ export interface CreateTestServerOptions {
   ephemeral?: boolean;
   projectDir?: string;
   singleDocRelPath?: string;
+  mdManager?: MarkdownManager;
 }
 
 export async function createTestServer(options: CreateTestServerOptions = {}): Promise<TestServer> {
@@ -128,6 +129,7 @@ export async function createTestServer(options: CreateTestServerOptions = {}): P
     contentRoot: options.gitEnabled === true ? '.' : undefined,
     enableTestRoutes: true,
     localOpCliArgs: options.localOpCliArgs,
+    mdManager: options.mdManager,
     ...(ephemeral ? { ephemeral: true, singleDocRelPath: options.singleDocRelPath } : {}),
     skipStateManifestCheck: true,
   });

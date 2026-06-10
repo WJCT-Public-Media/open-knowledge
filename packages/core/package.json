@@ -51,15 +51,20 @@
     "@tiptap/extension-image": "^3.22.3",
     "@tiptap/extension-italic": "^3.22.3",
     "@tiptap/extension-link": "^3.22.3",
+    "@tiptap/extension-strike": "^3.22.3",
     "@tiptap/extension-table": "^3.22.3",
     "@tiptap/pm": "^3.22.3",
     "@tiptap/starter-kit": "^3.22.3",
+    "decode-named-character-reference": "^1.3.0",
     "diff-match-patch": "^1.0.5",
     "mdast-util-from-markdown": "^2.0.3",
     "mdast-util-math": "^3.0.0",
     "mdast-util-mdx": "3.0.0",
     "mdast-util-to-markdown": "^2.1.2",
     "micromark-extension-mdx": "2.1.0",
+    "micromark-util-classify-character": "^2.0.1",
+    "micromark-util-decode-numeric-character-reference": "^2.0.2",
+    "micromark-util-sanitize-uri": "^2.0.1",
     "micromark-util-types": "^2.0.2",
     "node-diff3": "^3.2.0",
     "rehype-parse": "^9.0.1",
@@ -91,7 +96,8 @@
     "test:perf:regression": "bun run tests/perf/run-regression-gate.ts",
     "test:health:unit": "bun test tests/health/parse-health-gate.test.ts",
     "test:health": "bun run tests/health/parse-health-gate.ts tests/health/baseline.json",
-    "regen-schema-snapshot": "bun run scripts/regen-schema-snapshot.ts"
+    "regen-schema-snapshot": "bun run scripts/regen-schema-snapshot.ts",
+    "gen:guard-flanking-matrix": "OK_UPDATE_GUARD_FLANKING_MATRIX=1 bun test src/markdown/guard-flanking-matrix.test.ts && biome check --write src/markdown/guard-flanking-matrix.json"
   },
   "devDependencies": {
     "@standard-schema/spec": "^1.1.0",
@@ -110,6 +116,8 @@
     "culori": "^4.0.2",
     "fast-check": "^4.6.0",
     "mdast-util-to-hast": "^13.2.1",
+    "micromark": "^4.0.2",
+    "micromark-util-symbol": "^2.0.1",
     "tsdown": "^0.21.7",
     "typescript": "^5.9.3"
   }

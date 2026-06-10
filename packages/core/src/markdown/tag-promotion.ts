@@ -1,5 +1,6 @@
 import type { Parent, Text } from 'mdast';
 import type { TagMdast } from './mdast-augmentation.ts';
+import { deriveFragmentPosition } from './promoter-position.ts';
 
 export const TAG_IN_TEXT_PATTERN_SOURCE = '(^|\\s)#([a-zA-Z][\\w/-]*)';
 export function createTagInTextRegex(): RegExp {
@@ -71,10 +72,20 @@ export function promoteTagsInParent(parent: Parent, source: string = ''): void {
       }
 
       if (tagStart > lastIndex) {
-        segments.push({ type: 'text', value: text.slice(lastIndex, tagStart) } as Text);
+        const lead: Text = { type: 'text', value: text.slice(lastIndex, tagStart) };
+        const pos = deriveFragmentPosition(source, child as Text, lastIndex, tagStart);
+        if (pos) lead.position = pos;
+        segments.push(lead);
       }
 
       const tagNode: TagMdast = { type: 'tag', value: tagValue };
+      const tagPos = deriveFragmentPosition(
+        source,
+        child as Text,
+        tagStart,
+        tagStart + 1 + tagValue.length,
+      );
+      if (tagPos) tagNode.position = tagPos;
       segments.push(tagNode as unknown as Parent['children'][number]);
 
       lastIndex = tagStart + 1 + tagValue.length; // 1 for `#`
@@ -85,7 +96,10 @@ export function promoteTagsInParent(parent: Parent, source: string = ''): void {
       newChildren.push(child);
     } else {
       if (lastIndex < text.length) {
-        segments.push({ type: 'text', value: text.slice(lastIndex) } as Text);
+        const tail: Text = { type: 'text', value: text.slice(lastIndex) };
+        const pos = deriveFragmentPosition(source, child as Text, lastIndex, text.length);
+        if (pos) tail.position = pos;
+        segments.push(tail);
       }
       newChildren.push(...segments);
     }

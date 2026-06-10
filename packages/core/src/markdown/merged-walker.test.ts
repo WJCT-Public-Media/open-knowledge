@@ -34,7 +34,7 @@ describe('mergedPostParseWalkerPlugin — Phase B dispatch', () => {
     expect(para.children[0].data?.sourceStyle).toBe('autolink');
   });
 
-  test('pass 3: doc-start empty yaml → thematicBreak(s) with data.sourceRaw', () => {
+  test('pass 3 retired: a root-position empty yaml node is left untouched', () => {
     const src = '---\n\n---\n';
     const tree: MdastRoot = {
       type: 'root',
@@ -45,11 +45,8 @@ describe('mergedPostParseWalkerPlugin — Phase B dispatch', () => {
     };
     mergedPostParseWalkerPlugin()(tree, new VFile(src));
 
-    expect(tree.children.length).toBe(2);
-    expect(tree.children[0].type).toBe('thematicBreak');
-    expect(tree.children[1].type).toBe('thematicBreak');
-    expect(tree.children[0].data?.sourceRaw).toBe('---');
-    expect(tree.children[1].data?.sourceRaw).toBe('---');
+    expect(tree.children.length).toBe(1);
+    expect(tree.children[0].type).toBe('yaml');
   });
 
   test('pass 4: attaches sourceDelimiter to emphasis node based on source', () => {
@@ -183,7 +180,7 @@ describe('mergedPostParseWalkerPlugin — Phase B dispatch', () => {
     expect(fallback.originalType).toBe('brandNew');
   });
 
-  test('non-root-first yaml is left untouched (pass 3 is root[0]-specific)', () => {
+  test('non-root-first yaml is left untouched', () => {
     const tree = {
       type: 'root',
       children: [

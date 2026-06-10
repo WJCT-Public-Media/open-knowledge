@@ -77,6 +77,18 @@ export const WikiLink = Node.create({
       resolved: {
         default: false,
       },
+      sourceTarget: {
+        default: null,
+        rendered: false,
+      },
+      sourceAnchor: {
+        default: null,
+        rendered: false,
+      },
+      sourceAlias: {
+        default: null,
+        rendered: false,
+      },
     };
   },
 

@@ -253,6 +253,32 @@ describe('restoreEntityRefsPlugin — mdast walk', () => {
     expect(image.alt).toBe('Tom &amp; Jerry');
   });
 
+  test('restores encoded entity in code-node `lang` field (fenced-code info string)', () => {
+    const encoded = encodeEntityRefs('f&ouml;&ouml;');
+    const tree: Root = {
+      type: 'root',
+      children: [{ type: 'code', lang: encoded, meta: null, value: 'code' }],
+    };
+    runPlugin(tree);
+    const code = tree.children[0];
+    if (code?.type !== 'code') throw new Error('expected code');
+    expect(code.lang).toBe('f&ouml;&ouml;');
+    expect((code as { data?: unknown }).data).toBeUndefined();
+  });
+
+  test('restores encoded entity in code-node `meta` field (fenced-code info string)', () => {
+    const encoded = encodeEntityRefs('title=&quot;x&quot;');
+    const tree: Root = {
+      type: 'root',
+      children: [{ type: 'code', lang: 'js', meta: encoded, value: 'code' }],
+    };
+    runPlugin(tree);
+    const code = tree.children[0];
+    if (code?.type !== 'code') throw new Error('expected code');
+    expect(code.meta).toBe('title=&quot;x&quot;');
+    expect(code.lang).toBe('js');
+  });
+
   test('does NOT tag entityRefSpans on non-text nodes (e.g. inlineCode value)', () => {
     const encoded = encodeEntityRefs('foo &amp; bar');
     const tree: Root = {
@@ -288,6 +314,47 @@ describe('restoreEntityRefsPlugin — mdast walk', () => {
       .children[0];
     expect(text?.value).toBe('plain text without entities');
     expect(text?.data).toBeUndefined();
+  });
+});
+
+describe('fenced-code info-string entity refs — real-engine round-trip', () => {
+  const mgr = new MarkdownManager({ extensions: sharedExtensions });
+  const roundTrip = (src: string) => mgr.serialize(mgr.parse(src));
+
+  test('named entity in lang round-trips byte-exact', () => {
+    const src = '```f&ouml;&ouml;\ncode\n```\n';
+    expect(roundTrip(src)).toBe(src);
+  });
+
+  test('round-trip is idempotent (second pass emits identical bytes)', () => {
+    const src = '```f&ouml;&ouml;\ncode\n```\n';
+    const once = roundTrip(src);
+    expect(roundTrip(once)).toBe(once);
+  });
+
+  test('named entity in meta round-trips byte-exact', () => {
+    const src = '```js meta&amp;stuff\ncode\n```\n';
+    expect(roundTrip(src)).toBe(src);
+  });
+
+  test('entities in both lang and meta round-trip byte-exact', () => {
+    const src = '```f&ouml;&ouml; title=&quot;x&quot;\ncode\n```\n';
+    expect(roundTrip(src)).toBe(src);
+  });
+
+  test('numeric hex entity in lang round-trips byte-exact', () => {
+    const src = '```f&#xF6;&#xF6;\ncode\n```\n';
+    expect(roundTrip(src)).toBe(src);
+  });
+
+  test('tilde-fence info-string entity round-trips byte-exact', () => {
+    const src = '~~~f&ouml;&ouml;\ncode\n~~~\n';
+    expect(roundTrip(src)).toBe(src);
+  });
+
+  test('plain info strings stay byte-identical (no encode/restore detour)', () => {
+    const src = '```typescript title="x"\ncode\n```\n';
+    expect(roundTrip(src)).toBe(src);
   });
 });
 

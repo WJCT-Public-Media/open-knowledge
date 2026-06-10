@@ -1,7 +1,9 @@
 import type { Nodes, Parent, PhrasingContent, Root, Text } from 'mdast';
 import type { MdxJsxTextElement } from 'mdast-util-mdx';
 import { SKIP, visit } from 'unist-util-visit';
+import type { VFile } from 'vfile';
 import type { MarkMdast } from './mdast-augmentation.ts';
+import { deriveFragmentPosition } from './promoter-position.ts';
 
 const HIGHLIGHT_RE = /(?<!=)==(?=\S)([^\n]*?[^\s=])==(?!=)/g;
 
@@ -178,7 +180,8 @@ function walkPromote(node: Nodes): void {
 }
 
 export function highlightPromoterPlugin() {
-  return (tree: Root) => {
+  return (tree: Root, file: VFile) => {
+    const source = typeof file.value === 'string' ? file.value : '';
     visit(tree, 'text', (node: Text, index, parent) => {
       if (parent === undefined || index === undefined || index === null) return;
 
@@ -201,17 +204,26 @@ export function highlightPromoterPlugin() {
         const end = start + match[0].length;
         if (start > cursor) {
           const lead: Text = { type: 'text', value: value.slice(cursor, start) };
+          const pos = deriveFragmentPosition(source, node, cursor, start);
+          if (pos) lead.position = pos;
           replacements.push(lead);
         }
+        const innerText: Text = { type: 'text', value: match[1] };
+        const innerPos = deriveFragmentPosition(source, node, start + 2, end - 2);
+        if (innerPos) innerText.position = innerPos;
         const markNode: MarkMdast = {
           type: 'mark',
-          children: [{ type: 'text', value: match[1] }],
+          children: [innerText],
         };
+        const markPos = deriveFragmentPosition(source, node, start, end);
+        if (markPos) markNode.position = markPos;
         replacements.push(markNode as unknown as PhrasingContent);
         cursor = end;
       }
       if (cursor < value.length) {
         const tail: Text = { type: 'text', value: value.slice(cursor) };
+        const pos = deriveFragmentPosition(source, node, cursor, value.length);
+        if (pos) tail.position = pos;
         replacements.push(tail);
       }
 

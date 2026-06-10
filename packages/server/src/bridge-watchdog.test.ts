@@ -101,6 +101,25 @@ describe('assertBridgeInvariant — no-op for tolerance-equivalent inputs', () =
     }).not.toThrow();
     expect(getMetrics().bridgeInvariantViolations).toBe(0);
   });
+
+  test('table-row trailing-pipe divergence tolerated (row-no-trailing-pipe)', () => {
+    expect(() => {
+      assertBridgeInvariant('| a | b\n| - | -\n| 1 | 2\n', '| a | b|\n| - | -|\n| 1 | 2|\n', {
+        site: 'observer-b',
+      });
+    }).not.toThrow();
+    expect(getMetrics().bridgeInvariantViolations).toBe(0);
+  });
+
+  test('touched-cell table divergence is NOT absorbed by the trailing-pipe tolerance', () => {
+    expect(() => {
+      assertBridgeInvariant(
+        '| a | b |\n| - | - |\n| 1 | 2 |\n',
+        '| a | b |\n| - | - |\n| 1 | 99 |\n',
+        { site: 'observer-b' },
+      );
+    }).toThrow(BridgeInvariantViolationError);
+  });
 });
 
 describe('assertBridgeInvariant — throws under NODE_ENV=test (default for bun test)', () => {

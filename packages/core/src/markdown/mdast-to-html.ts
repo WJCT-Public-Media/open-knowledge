@@ -1,5 +1,6 @@
 import type { Element, Root as HastRoot } from 'hast';
 import type { Root as MdastRoot } from 'mdast';
+import { normalizeUri } from 'micromark-util-sanitize-uri';
 import rehypeStringify from 'rehype-stringify';
 import remarkFrontmatter from 'remark-frontmatter';
 import remarkGfm from 'remark-gfm';
@@ -7,6 +8,7 @@ import remarkParse from 'remark-parse';
 import remarkRehype from 'remark-rehype';
 import { type Plugin, unified } from 'unified';
 import { visit } from 'unist-util-visit';
+import { decodeEntityRefs } from './entity-ref-guard.ts';
 import { customNodeHandlers } from './mdast-to-hast-handlers.ts';
 import { remarkMdxAgnostic } from './remark-mdx-agnostic.ts';
 import { isSafeUrl } from './safe-url.ts';
@@ -32,6 +34,53 @@ function isSrcsetValueSafe(srcset: string): boolean {
   }
   return true;
 }
+
+const DECODE_ATTRS_BY_TAG: Record<string, readonly string[]> = {
+  a: ['href', 'title'],
+  img: ['src', 'alt', 'title'],
+  video: ['src', 'title'],
+  audio: ['src', 'title'],
+  code: ['className'],
+};
+
+const URL_ATTRS = new Set(['href', 'src']);
+
+const NORMALIZED_EMPTY_ANGLE_DEST = normalizeUri('<>');
+
+const rehypeDecodeSourcePreservedAttrs: Plugin<[], HastRoot> = () => {
+  return (tree) => {
+    visit(tree, 'element', (node: Element) => {
+      const attrs = DECODE_ATTRS_BY_TAG[node.tagName.toLowerCase()];
+      const props = node.properties;
+      if (!attrs || !props) return;
+      for (const key of attrs) {
+        const value = props[key];
+        if (Array.isArray(value)) {
+          const decodedItems = value.map((item) =>
+            typeof item === 'string' ? decodeEntityRefs(item) : item,
+          );
+          if (decodedItems.some((item, i) => item !== value[i])) {
+            props[key] = decodedItems;
+          }
+          continue;
+        }
+        if (typeof value !== 'string') continue;
+        let decoded: string;
+        if (URL_ATTRS.has(key)) {
+          if (value === '<>' || value === NORMALIZED_EMPTY_ANGLE_DEST) {
+            decoded = '';
+          } else {
+            const chars = decodeEntityRefs(value);
+            decoded = chars === value ? value : normalizeUri(chars);
+          }
+        } else {
+          decoded = decodeEntityRefs(value);
+        }
+        if (decoded !== value) props[key] = decoded;
+      }
+    });
+  };
+};
 
 const rehypeSanitizeUrls: Plugin<[], HastRoot> = () => {
   return (tree) => {
@@ -93,6 +142,7 @@ const rehypeSanitizeUrls: Plugin<[], HastRoot> = () => {
 export function mdastToHtml(tree: MdastRoot): string {
   const processor = unified()
     .use(remarkRehype, { handlers: customNodeHandlers })
+    .use(rehypeDecodeSourcePreservedAttrs)
     .use(rehypeSanitizeUrls)
     .use(rehypeStringify);
   const hast = processor.runSync(tree) as unknown as HastRoot;
@@ -107,6 +157,7 @@ export function markdownToHtml(md: string): string {
     .use(remarkGfm)
     .use(remarkWikiLink)
     .use(remarkRehype, { handlers: customNodeHandlers })
+    .use(rehypeDecodeSourcePreservedAttrs)
     .use(rehypeSanitizeUrls)
     .use(rehypeStringify);
   return String(processor.processSync(md));

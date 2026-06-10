@@ -13,8 +13,45 @@ const ORDERED_LIST_MARKER_CANONICAL = '1';
 
 const EMPHASIS_AROUND_CODE_RE = /\*\*\s*(`[^`]+`)\s*\*\*/g;
 
+const FENCE_LINE_RE = /^(`{3,}|~{3,})/;
+
+function findTableRowLines(lines: readonly string[]): Set<number> {
+  const rows = new Set<number>();
+  let fenceOpener: '`' | '~' | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trimEnd();
+    const fence = FENCE_LINE_RE.exec(trimmed);
+    if (fence) {
+      const char = fence[1][0] as '`' | '~';
+      if (fenceOpener === null) {
+        fenceOpener = char;
+        continue;
+      }
+      if (fenceOpener === char) {
+        fenceOpener = null;
+        continue;
+      }
+    }
+    if (fenceOpener !== null || i === 0) continue;
+    if (!TABLE_ALIGN_ROW_RE.test(trimmed)) continue;
+    const prev = lines[i - 1].trimEnd();
+    if (!prev.startsWith('|') || TABLE_ALIGN_ROW_RE.test(prev)) continue;
+    rows.add(i - 1);
+    rows.add(i);
+    for (let j = i + 1; j < lines.length; j++) {
+      if (!lines[j].trimEnd().startsWith('|')) break;
+      rows.add(j);
+    }
+  }
+  return rows;
+}
+
+function stripTrailingPipe(line: string): string {
+  return line.slice(0, -1).trimEnd();
+}
+
 export function normalizeBridge(s: string): string {
-  return s
+  const lines = s
     .replace(/^﻿/, '')
     .replace(/\r/g, '')
     .replace(COMMONMARK_ESCAPE_RE, '$1')
@@ -23,16 +60,25 @@ export function normalizeBridge(s: string): string {
     .replace(/^[*-]{3,}(?=\n|$)/, '---')
     .replace(/(\n)([#>+-]|\d+[.)]|`{3,}|~{3,})/g, '\n\n$2')
     .replace(/^([#>+-].*|\d+[.)].*|`{3,}.*|~{3,}.*)\n([^\n])/gm, '$1\n\n$2')
-    .split('\n')
-    .map((l) => {
+    .split('\n');
+  const tableRowLines = findTableRowLines(lines);
+  return lines
+    .map((l, i) => {
       const trimmed = l.trimEnd();
       if (TABLE_ALIGN_ROW_RE.test(trimmed)) {
-        return trimmed.replace(/\s+/g, '');
+        const collapsed = trimmed.replace(/\s+/g, '');
+        return tableRowLines.has(i) &&
+          collapsed.length > 1 &&
+          collapsed.startsWith('|') &&
+          collapsed.endsWith('|')
+          ? stripTrailingPipe(collapsed)
+          : collapsed;
       }
-      const deindented = LIST_ITEM_INDENT_RE.test(trimmed)
-        ? trimmed.replace(/^[ \t]+/, '')
-        : trimmed;
-      return deindented.replace(ORDERED_LIST_MARKER_RE, `${ORDERED_LIST_MARKER_CANONICAL}$1`);
+      let line = LIST_ITEM_INDENT_RE.test(trimmed) ? trimmed.replace(/^[ \t]+/, '') : trimmed;
+      if (tableRowLines.has(i) && line.length > 1 && line.startsWith('|') && line.endsWith('|')) {
+        line = stripTrailingPipe(line);
+      }
+      return line.replace(ORDERED_LIST_MARKER_RE, `${ORDERED_LIST_MARKER_CANONICAL}$1`);
     })
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
@@ -48,6 +94,7 @@ export const BRIDGE_TOLERANCE_CLASSES = [
   'doc-start-thematic',
   'block-separator-collapse',
   'table-align-row-spacing',
+  'row-no-trailing-pipe',
   'list-indent-canonical',
   'ordered-list-marker-number',
   'trailing-whitespace',
@@ -110,6 +157,12 @@ export function detectAppliedToleranceClasses(left: string, right: string): Brid
   const tableAlignRowMultiline = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/m;
   if (tableAlignRowMultiline.test(leftLf) || tableAlignRowMultiline.test(rightLf)) {
     classes.push('table-align-row-spacing');
+  }
+
+  const hasUnterminatedPipeRow = (s: string): boolean =>
+    tableAlignRowMultiline.test(s) && /^\|[^\n]*[^|\s][ \t]*$/m.test(s);
+  if (hasUnterminatedPipeRow(leftLf) !== hasUnterminatedPipeRow(rightLf)) {
+    classes.push('row-no-trailing-pipe');
   }
 
   const listIndentMultiline = /^[ \t]+([-+*]|\d+[.)]|[a-zA-Z][.)])\s/m;

@@ -7,6 +7,8 @@ export const TableFidelity = Table.extend({
     return {
       ...this.parent?.(),
       sourceDashCounts: { default: null },
+      sourceOuterPipes: { default: null, rendered: false },
+      sourceAlignmentPadding: { default: null, rendered: false },
     };
   },
 });

@@ -10,6 +10,8 @@ export const HeadingFidelity = Heading.extend({
       sourceTrailingHashes: { default: null },
       sourceUnderlineLength: { default: null },
       sourceContiguousNext: { default: false },
+      sourceLeadingIndent: { default: null, rendered: false },
+      sourceInteriorSpacing: { default: null, rendered: false },
     };
   },
 });

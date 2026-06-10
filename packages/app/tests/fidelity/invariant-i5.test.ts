@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { MarkdownManager, sharedExtensions } from '@inkeep/open-knowledge-core';
+import type { JSONContent } from '@tiptap/core';
 import { getSchema } from '@tiptap/core';
 import { updateYFragment, yXmlFragmentToProseMirrorRootNode } from '@tiptap/y-tiptap';
 import * as fc from 'fast-check';
@@ -10,14 +11,21 @@ import { NUM_RUNS, normalize } from './helpers';
 const mdManager = new MarkdownManager({ extensions: sharedExtensions });
 const schema = getSchema(sharedExtensions);
 
+/** Drop the doc-boundary snapshot so both layers consume the identical
+ *  fragment-representable doc (the Y path cannot carry doc attrs). */
+function stripDocBoundary(json: JSONContent): JSONContent {
+  const { sourceDocBoundary: _dropped, ...attrs } = (json.attrs ?? {}) as Record<string, unknown>;
+  return { ...json, attrs };
+}
+
 function layerA(md: string): string {
-  return mdManager.serialize(mdManager.parse(md));
+  return mdManager.serialize(stripDocBoundary(mdManager.parse(md)));
 }
 
 function layerB(md: string): string {
   const doc = new Y.Doc();
   const fragment = doc.getXmlFragment('default');
-  const json = mdManager.parse(md);
+  const json = stripDocBoundary(mdManager.parse(md));
   const pmNode = schema.nodeFromJSON(json);
   const meta = { mapping: new Map(), isOMark: new Map() };
   updateYFragment(doc, fragment, pmNode, meta);

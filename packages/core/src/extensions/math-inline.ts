@@ -21,6 +21,7 @@ export const MathInline = Node.create({
       formula: { default: '' },
       id: { default: null },
       language: { default: 'latex' },
+      sourceDelimiter: { default: null, rendered: false },
     };
   },
 

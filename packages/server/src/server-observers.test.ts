@@ -890,7 +890,7 @@ describe('Server Observer B — error recovery paths', () => {
     resetMetrics();
 
     const ngRaw =
-      '---\ntitle: NG recovery fixture\n---\n\n# Hello\n\nInline math: $a + b$ stays.\n\nBody text stays.\n';
+      '---\ntitle: NG recovery fixture\n---\n\n# Hello\n\n> Lazy quote\nstays lazy.\n\nBody text stays.\n';
     const doc = new Y.Doc();
     const xmlFragment = doc.getXmlFragment('default');
     const ytext = doc.getText('source');
@@ -1039,7 +1039,7 @@ describe('Server Observer B — Y.Text-is-truth contract (FR-31)', () => {
 });
 
 describe('Observer A routing — Path B fires iff Y.Text holds unabsorbed changes (FR-3)', () => {
-  const RESIDUAL_RAW = '---\ntitle: Routing fixture\n---\n\n# Hello\n\nBody text stays.\n';
+  const RESIDUAL_RAW = '---\ntitle: Routing fixture\n---\n\n# Hello   \n\nBody text stays.\n';
 
   function canonicalOf(raw: string): string {
     const { frontmatter, body } = stripFrontmatter(raw);
@@ -1283,7 +1283,7 @@ describe('Observer A routing — Path B fires iff Y.Text holds unabsorbed change
   });
 
   const NG_RAW =
-    '---\ntitle: NG routing fixture\n---\n\n# Hello\n\nInline math: $a + b$ stays.\n\nBody text stays.\n';
+    '---\ntitle: NG routing fixture\n---\n\n# Hello\n\n> Lazy quote\nstays lazy.\n\nBody text stays.\n';
 
   test('in-sync doc with beyond-tolerance residual: fragment change preserves NG bytes without a Path B fire', () => {
     __resetBridgeWatchdogForTests();
@@ -1310,8 +1310,8 @@ describe('Observer A routing — Path B fires iff Y.Text holds unabsorbed change
 
     const finalText = ytext.toString();
     expect(finalText).toContain('User WYSIWYG edit.');
-    expect(finalText).toContain('Inline math: $a + b$ stays.');
-    expect(finalText).not.toContain('$$a + b$$');
+    expect(finalText).toContain('> Lazy quote\nstays lazy.');
+    expect(finalText).not.toContain('> stays lazy.');
     expect(finalText).toContain('Body text stays.');
 
     cleanup();
@@ -1364,8 +1364,8 @@ describe('Observer A routing — Path B fires iff Y.Text holds unabsorbed change
     });
     expect(events1).toHaveLength(0);
     expect(getMetrics().observerAResidualMergeRuns).toBe(1);
-    expect(ytext.toString()).toContain('Inline math: $a + b$ stays.');
-    expect(ytext.toString()).not.toContain('$$a + b$$');
+    expect(ytext.toString()).toContain('> Lazy quote\nstays lazy.');
+    expect(ytext.toString()).not.toContain('> stays lazy.');
 
     const events2 = capturePathBEvents(() => {
       populateFragment(doc, xmlFragment, `${serializeFragmentBody(xmlFragment)}\nSecond edit.\n`);
@@ -1377,8 +1377,8 @@ describe('Observer A routing — Path B fires iff Y.Text holds unabsorbed change
     const finalText = ytext.toString();
     expect(finalText).toContain('First edit.');
     expect(finalText).toContain('Second edit.');
-    expect(finalText).toContain('Inline math: $a + b$ stays.');
-    expect(finalText).not.toContain('$$a + b$$');
+    expect(finalText).toContain('> Lazy quote\nstays lazy.');
+    expect(finalText).not.toContain('> stays lazy.');
 
     cleanup();
   });
@@ -1394,7 +1394,7 @@ describe('Observer A routing — Path B fires iff Y.Text holds unabsorbed change
     expect(ytext.toString()).toBe(NG_RAW);
 
     const pairedRaw =
-      '---\ntitle: NG routing fixture\n---\n\n# Hello\n\nInline math: $a + b$ stays.\n\nPaired body.\n';
+      '---\ntitle: NG routing fixture\n---\n\n# Hello\n\n> Lazy quote\nstays lazy.\n\nPaired body.\n';
     expect(normalizeBridge(canonicalOf(pairedRaw))).not.toBe(normalizeBridge(pairedRaw));
     const pairedJson = mdManager.parse(stripFrontmatter(pairedRaw).body);
     const pairedNode = schema.nodeFromJSON(pairedJson);

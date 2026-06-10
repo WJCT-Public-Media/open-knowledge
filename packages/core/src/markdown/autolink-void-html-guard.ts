@@ -7,6 +7,27 @@ const GUARD_COLON = '\uE002';
 const GUARD_AT = '\uE003';
 const GUARD_OPEN_BRACE = '\uE004';
 
+const LITERAL_SENTINEL_ESCAPES: ReadonlyArray<readonly [string, string]> = [
+  [GUARD_OPEN, '\uE005'],
+  [GUARD_CLOSE, '\uE006'],
+  [GUARD_COLON, '\uE007'],
+  [GUARD_AT, '\uE008'],
+  [GUARD_OPEN_BRACE, '\uE009'],
+];
+const HAS_LITERAL_SENTINEL_RE = /[\uE000-\uE004]/;
+const HAS_ESCAPED_LITERAL_SENTINEL_RE = /[\uE005-\uE009]/;
+
+export const R23_GUARD_SUBSTITUTIONS: ReadonlyArray<{ from: string; to: string }> = [
+  { from: '<', to: GUARD_OPEN },
+  { from: '>', to: GUARD_CLOSE },
+  { from: ':', to: GUARD_COLON },
+  { from: '@', to: GUARD_AT },
+  { from: '{', to: GUARD_OPEN_BRACE },
+];
+
+export const R23_SENTINEL_ESCAPE_SUBSTITUTIONS: ReadonlyArray<{ from: string; to: string }> =
+  LITERAL_SENTINEL_ESCAPES.map(([from, to]) => ({ from, to }));
+
 const AUTOLINK_RE = /<([a-zA-Z][a-zA-Z0-9+.-]*:[^\s<>]+)>/g;
 
 const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
@@ -76,6 +97,57 @@ function indexGreaterThan(source: string): number[] {
   return positions;
 }
 
+const ANGLE_DEST_SCAN_CAP = 1024;
+
+function isAngleBracketDestinationOpen(offset: number, result: string): boolean {
+  if (result[offset - 1] !== '(' || result[offset - 2] !== ']') return false;
+  const labelEnd = offset - 2;
+  let bs = 0;
+  for (let j = labelEnd - 1; j >= 0 && result[j] === '\\'; j--) bs++;
+  if (bs % 2 === 1) return false;
+
+  let foundLabelStart = false;
+  const scanFloor = Math.max(0, labelEnd - ANGLE_DEST_SCAN_CAP);
+  for (let j = labelEnd - 1; j >= scanFloor; j--) {
+    const ch = result[j];
+    if (ch === '\n' || ch === '\r' || ch === '`') return false;
+    if (ch !== '[' && ch !== ']') continue;
+    let k = 0;
+    for (let m = j - 1; m >= 0 && result[m] === '\\'; m--) k++;
+    if (k % 2 === 1) continue;
+    if (ch === ']') return false;
+    if (result[j + 1] === '^') return false;
+    if (result[j - 1] === ']') return false;
+    foundLabelStart = true;
+    break;
+  }
+  if (!foundLabelStart) return false;
+
+  let sawWhitespace = false;
+  let destClose = -1;
+  const scanCeil = Math.min(result.length, offset + 1 + ANGLE_DEST_SCAN_CAP);
+  for (let j = offset + 1; j < scanCeil; j++) {
+    const ch = result[j];
+    if (ch === '>') {
+      destClose = j;
+      break;
+    }
+    if (ch === '<' || ch === '\\' || ch === '\n' || ch === '\r') return false;
+    if (
+      ch === GUARD_OPEN ||
+      ch === GUARD_CLOSE ||
+      ch === GUARD_COLON ||
+      ch === GUARD_AT ||
+      ch === GUARD_OPEN_BRACE
+    ) {
+      return false;
+    }
+    if (ch === ' ' || ch === '\t') sawWhitespace = true;
+  }
+  if (destClose === -1 || !sawWhitespace) return false;
+  return result[destClose + 1] === ')';
+}
+
 function isSelfClosingTagAt(
   offset: number,
   result: string,
@@ -93,6 +165,12 @@ function isSelfClosingTagAt(
 
 export function protectFromMdx(source: string): string {
   let result = source;
+
+  if (HAS_LITERAL_SENTINEL_RE.test(result)) {
+    for (const [sentinel, escapeChar] of LITERAL_SENTINEL_ESCAPES) {
+      result = result.replaceAll(sentinel, escapeChar);
+    }
+  }
 
   result = result.replace(HTML_COMMENT_RE, (match) => {
     return match.replace(/</g, GUARD_OPEN).replace(/>/g, GUARD_CLOSE);
@@ -129,6 +207,8 @@ export function protectFromMdx(source: string): string {
   const greaterThanOffsets = indexGreaterThan(result);
 
   result = result.replace(/</g, (match, offset) => {
+    if (isAngleBracketDestinationOpen(offset, result)) return match;
+
     const lookahead = result.slice(offset, offset + 256);
 
     if (lookahead[1] === '/') {
@@ -229,13 +309,7 @@ export function protectFromMdx(source: string): string {
 }
 
 function hasSentinels(s: string): boolean {
-  return (
-    s.includes('\uE000') ||
-    s.includes('\uE001') ||
-    s.includes('\uE002') ||
-    s.includes('\uE003') ||
-    s.includes('\uE004')
-  );
+  return HAS_LITERAL_SENTINEL_RE.test(s) || HAS_ESCAPED_LITERAL_SENTINEL_RE.test(s);
 }
 
 export function restoreFromMdx() {
@@ -254,15 +328,27 @@ export function restoreFromMdx() {
       if (typeof rec.alt === 'string' && hasSentinels(rec.alt)) {
         rec.alt = restoreString(rec.alt);
       }
+      if (typeof rec.lang === 'string' && hasSentinels(rec.lang)) {
+        rec.lang = restoreString(rec.lang);
+      }
+      if (typeof rec.meta === 'string' && hasSentinels(rec.meta)) {
+        rec.meta = restoreString(rec.meta);
+      }
     });
   };
 }
 
 function restoreString(s: string): string {
-  return s
+  let out = s
     .replaceAll(GUARD_OPEN, '<')
     .replaceAll(GUARD_CLOSE, '>')
     .replaceAll(GUARD_COLON, ':')
     .replaceAll(GUARD_AT, '@')
     .replaceAll(GUARD_OPEN_BRACE, '{');
+  if (HAS_ESCAPED_LITERAL_SENTINEL_RE.test(out)) {
+    for (const [sentinel, escapeChar] of LITERAL_SENTINEL_ESCAPES) {
+      out = out.replaceAll(escapeChar, sentinel);
+    }
+  }
+  return out;
 }

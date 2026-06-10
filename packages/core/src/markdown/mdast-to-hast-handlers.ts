@@ -2,6 +2,8 @@ import type { Comment, Element, ElementContent, Properties } from 'hast';
 import type { FootnoteDefinition, FootnoteReference } from 'mdast';
 import type { MdxJsxFlowElement, MdxJsxTextElement } from 'mdast-util-mdx';
 import type { Handler, Handlers } from 'mdast-util-to-hast';
+import { builtInComponents } from '../registry/built-ins.ts';
+import type { CompatMeta } from '../registry/types.ts';
 import { wikiLinkHref } from '../utils/slug.ts';
 import type {
   MarkMdast,
@@ -14,23 +16,56 @@ import type {
 
 const HTML_PRIMITIVE_TAGS = new Set(['img', 'video', 'audio', 'mark']);
 
-function tryNativeHtmlPrimitive(node: MdxJsxFlowElement | MdxJsxTextElement): Element | null {
-  const name = node.name;
-  if (!name || !HTML_PRIMITIVE_TAGS.has(name)) return null;
-  const properties: Properties = {};
+const compatPrimitiveByName: ReadonlyMap<string, CompatMeta> = new Map(
+  builtInComponents.flatMap((meta) =>
+    meta.surface === 'compat' && HTML_PRIMITIVE_TAGS.has(meta.rendersAs)
+      ? [[meta.name, meta] as const]
+      : [],
+  ),
+);
+
+function collectStaticJsxAttributes(
+  node: MdxJsxFlowElement | MdxJsxTextElement,
+): Record<string, string | true> | null {
+  const bag: Record<string, string | true> = {};
   for (const attr of node.attributes) {
     if (attr.type !== 'mdxJsxAttribute') return null;
     const lowerName = attr.name.toLowerCase();
     if (lowerName.length >= 3 && lowerName.startsWith('on')) continue;
     if (attr.value === null) {
-      properties[attr.name] = true;
+      bag[attr.name] = true;
     } else if (typeof attr.value === 'string') {
-      properties[attr.name] = attr.value;
+      bag[attr.name] = attr.value;
     } else {
       return null;
     }
   }
+  return bag;
+}
+
+function tryNativeHtmlPrimitive(node: MdxJsxFlowElement | MdxJsxTextElement): Element | null {
+  const name = node.name;
+  if (!name || !HTML_PRIMITIVE_TAGS.has(name)) return null;
+  const properties = collectStaticJsxAttributes(node);
+  if (properties === null) return null;
   return { type: 'element', tagName: name, properties, children: [] };
+}
+
+function tryCompatPrimitive(node: MdxJsxFlowElement | MdxJsxTextElement): Element | null {
+  const name = node.name;
+  if (!name) return null;
+  const meta = compatPrimitiveByName.get(name);
+  if (!meta) return null;
+  const bag = collectStaticJsxAttributes(node);
+  if (bag === null) return null;
+  const translated = meta.translateProps(bag);
+  const properties: Properties = {};
+  for (const [key, value] of Object.entries(translated)) {
+    if (typeof value === 'string' || typeof value === 'boolean') {
+      properties[key] = value;
+    }
+  }
+  return { type: 'element', tagName: meta.rendersAs, properties, children: [] };
 }
 
 const wikiLinkHandler: Handler = (state, node) => {
@@ -81,6 +116,15 @@ const mdxJsxFlowHandler: Handler = (state, node) => {
     state.patch(node, native);
     return state.applyData(node, native);
   }
+  const compat = tryCompatPrimitive(jsx);
+  if (compat) {
+    state.patch(node, compat);
+    const resolved = state.applyData(node, compat) as Element;
+    if (resolved.tagName === 'img') {
+      return { type: 'element', tagName: 'p', properties: {}, children: [resolved] };
+    }
+    return resolved;
+  }
   const raw = typeof jsx.data?.sourceRaw === 'string' ? jsx.data.sourceRaw : '';
   const code: Element = {
     type: 'element',
@@ -107,6 +151,11 @@ const mdxJsxTextHandler: Handler = (state, node) => {
     }
     state.patch(node, native);
     return state.applyData(node, native);
+  }
+  const compat = tryCompatPrimitive(jsx);
+  if (compat) {
+    state.patch(node, compat);
+    return state.applyData(node, compat);
   }
   const raw = typeof jsx.data?.sourceRaw === 'string' ? jsx.data.sourceRaw : '';
   const span: Element = {

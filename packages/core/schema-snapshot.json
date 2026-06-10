@@ -35,6 +35,22 @@
           "hasDefault": true,
           "default": null
         },
+        "sourceClosingFenceLength": {
+          "hasDefault": true,
+          "default": null
+        },
+        "sourceFenceIndent": {
+          "hasDefault": true,
+          "default": null
+        },
+        "sourceIndents": {
+          "hasDefault": true,
+          "default": null
+        },
+        "sourceInfoPadding": {
+          "hasDefault": true,
+          "default": null
+        },
         "sourceStyle": {
           "hasDefault": true,
           "default": "fenced"
@@ -68,7 +84,12 @@
       "isolating": false
     },
     "doc": {
-      "attrs": {},
+      "attrs": {
+        "sourceDocBoundary": {
+          "hasDefault": true,
+          "default": null
+        }
+      },
       "content": "block+",
       "marks": "",
       "group": "",
@@ -143,6 +164,14 @@
         "sourceContiguousNext": {
           "hasDefault": true,
           "default": false
+        },
+        "sourceInteriorSpacing": {
+          "hasDefault": true,
+          "default": null
+        },
+        "sourceLeadingIndent": {
+          "hasDefault": true,
+          "default": null
         },
         "sourceTrailingHashes": {
           "hasDefault": true,
@@ -351,6 +380,22 @@
           "hasDefault": true,
           "default": null
         },
+        "sourceCheckboxChar": {
+          "hasDefault": true,
+          "default": null
+        },
+        "sourceContinuationIndent": {
+          "hasDefault": true,
+          "default": null
+        },
+        "sourceMarkerSpacing": {
+          "hasDefault": true,
+          "default": null
+        },
+        "sourceOrdinal": {
+          "hasDefault": true,
+          "default": null
+        },
         "spread": {
           "hasDefault": true,
           "default": false
@@ -377,6 +422,10 @@
         "language": {
           "hasDefault": true,
           "default": "latex"
+        },
+        "sourceDelimiter": {
+          "hasDefault": true,
+          "default": null
         }
       },
       "content": "",
@@ -421,7 +470,15 @@
     },
     "table": {
       "attrs": {
+        "sourceAlignmentPadding": {
+          "hasDefault": true,
+          "default": null
+        },
         "sourceDashCounts": {
+          "hasDefault": true,
+          "default": null
+        },
+        "sourceOuterPipes": {
           "hasDefault": true,
           "default": null
         }
@@ -560,6 +617,18 @@
           "hasDefault": true,
           "default": false
         },
+        "sourceAlias": {
+          "hasDefault": true,
+          "default": null
+        },
+        "sourceAnchor": {
+          "hasDefault": true,
+          "default": null
+        },
+        "sourceTarget": {
+          "hasDefault": true,
+          "default": null
+        },
         "target": {
           "hasDefault": true,
           "default": ""
@@ -611,6 +680,10 @@
         "sourceFenceLength": {
           "hasDefault": true,
           "default": 1
+        },
+        "sourcePadded": {
+          "hasDefault": true,
+          "default": false
         }
       },
       "excludes": "",
@@ -726,7 +799,12 @@
       "spanning": true
     },
     "strike": {
-      "attrs": {},
+      "attrs": {
+        "sourceDelimiter": {
+          "hasDefault": true,
+          "default": "~~"
+        }
+      },
       "excludes": "strike",
       "group": "",
       "inclusive": true,
@@ -757,11 +835,6 @@
       "name": "remark-parse",
       "version": "11.0.0",
       "hasOptions": false
-    },
-    {
-      "name": "remark-frontmatter",
-      "version": "5.0.0",
-      "hasOptions": true
     },
     {
       "name": "remark-mdx-agnostic",

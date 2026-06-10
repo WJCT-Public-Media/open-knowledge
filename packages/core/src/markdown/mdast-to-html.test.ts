@@ -1,5 +1,13 @@
 import { describe, expect, test } from 'bun:test';
+import { sharedExtensions } from '../extensions/shared.ts';
+import { MarkdownManager } from './index.ts';
 import { markdownToHtml, mdastToHtml } from './mdast-to-html.ts';
+
+const mdManager = new MarkdownManager({ extensions: sharedExtensions });
+
+function renderFaithful(md: string): string {
+  return mdastToHtml(mdManager.parseToMdast(md));
+}
 
 describe('markdownToHtml — markdown string → HTML', () => {
   test('paragraph', () => {
@@ -256,5 +264,98 @@ describe('URL scheme filter — outbound clipboard HTML sanitization', () => {
     const html2 = markdownToHtml('[b](DATA:text/html,x)');
     expect(html1).not.toMatch(/javascript:/i);
     expect(html2).not.toMatch(/data:/i);
+  });
+});
+
+describe('faithful render path — compat media descriptors resolve to native elements', () => {
+  test('CommonMarkImage emits <p><img></p>, not the mdx-component placeholder', () => {
+    expect(renderFaithful('![foo](/url "title")')).toBe(
+      '<p><img src="/url" alt="foo" title="title"></p>',
+    );
+  });
+
+  test('empty alt is preserved as alt="" (decorative opt-in), not dropped', () => {
+    expect(renderFaithful('![](/url)')).toBe('<p><img src="/url" alt=""></p>');
+  });
+
+  test('nested image description flattens to plain-text alt', () => {
+    expect(renderFaithful('![foo ![bar](/url)](/url2)')).toBe(
+      '<p><img src="/url2" alt="foo bar"></p>',
+    );
+  });
+
+  test('inline image inside prose stays a native inline <img>', () => {
+    expect(renderFaithful('before ![pic](/i.png) after')).toBe(
+      '<p>before <img src="/i.png" alt="pic"> after</p>',
+    );
+  });
+
+  test('lowercase MDX <img> keeps its bare flow shape (no paragraph wrap)', () => {
+    expect(renderFaithful('<img src="/x.png" alt="y" />')).toBe('<img src="/x.png" alt="y">');
+  });
+
+  test('Callout component descriptor keeps the mdx-component placeholder', () => {
+    const html = renderFaithful('> [!NOTE]\n> body');
+    expect(html).toContain('mdx-component');
+    expect(html).not.toContain('<img');
+  });
+
+  test('event-handler attributes are skipped on the compat path', () => {
+    const html = renderFaithful('<CommonMarkImage src="/x.png" alt="y" onerror="alert(1)" />');
+    expect(html).toContain('<img');
+    expect(html).not.toContain('onerror');
+  });
+});
+
+describe('faithful render path — source-preserved url/title attrs decode at render', () => {
+  test('empty angle-bracket destination renders href=""', () => {
+    expect(renderFaithful('[link](<>)')).toBe('<p><a href="">link</a></p>');
+  });
+
+  test('empty angle-bracket destination via reference definition renders href=""', () => {
+    expect(renderFaithful('[foo]: <>\n\n[foo]')).toBe('<p><a href="">foo</a></p>');
+  });
+
+  test('entity refs in a link title decode to their characters', () => {
+    expect(renderFaithful('[link](/url "title \\"&quot;")')).toBe(
+      '<p><a href="/url" title="title &#x22;&#x22;">link</a></p>',
+    );
+  });
+
+  test('entity refs in a destination decode then percent-encode like the spec', () => {
+    expect(renderFaithful('[foo](/f&ouml;&ouml; "f&ouml;&ouml;")')).toBe(
+      '<p><a href="/f%C3%B6%C3%B6" title="föö">foo</a></p>',
+    );
+  });
+
+  test('entity-SHAPED-but-invalid references stay literal', () => {
+    const html = renderFaithful('[x](/a "t&hl;t")');
+    expect(html).toContain('t&#x26;hl;t');
+  });
+
+  test('entity refs in a fenced-code info string decode in the language- class', () => {
+    expect(renderFaithful('```f&ouml;&ouml;\ncode\n```')).toBe(
+      '<pre><code class="language-föö">code\n</code></pre>',
+    );
+  });
+
+  test('entity-SHAPED-but-invalid info-string reference stays literal in the class', () => {
+    const html = renderFaithful('```f&hl;\ncode\n```');
+    expect(html).toContain('language-f&#x26;hl;');
+  });
+
+  test('body-text entity refs are NOT decoded (storage-fidelity dialect untouched)', () => {
+    const html = renderFaithful('&amp; in prose');
+    expect(html).toContain('&#x26;amp; in prose');
+  });
+
+  test('entity-obfuscated javascript: scheme is still stripped', () => {
+    const html = renderFaithful('[x](java&#x73;cript:alert(1))');
+    expect(html).not.toMatch(/javascript:/i);
+  });
+
+  test('entity-obfuscated scheme on an image src is still stripped', () => {
+    const html = renderFaithful('![x](java&#x73;cript:alert(1))');
+    expect(html).not.toMatch(/javascript:/i);
   });
 });

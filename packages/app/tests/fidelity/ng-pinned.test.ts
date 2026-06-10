@@ -4,18 +4,17 @@ import { loadNgPinnedCases } from '../../../core/src/markdown/fixtures/index.ts'
 
 const mdManager = new MarkdownManager({ extensions: sharedExtensions });
 
-describe('NG1 — blank-line count normalization (byte-identity)', () => {
-  test('four newlines between blocks collapse to one blank line', () => {
+describe('NG1 — blank-line count between blocks (byte-identity)', () => {
+  test('four newlines between blocks round-trip byte-identical', () => {
     const input = '# H\n\n\n\nP\n';
     const output = mdManager.serialize(mdManager.parse(input));
-    expect(output).toBe('# H\n\nP\n');
+    expect(output).toBe('# H\n\n\n\nP\n');
   });
 });
 
-describe('NG11 — ignore-typed-only doc triggers ensureNonEmptyDoc synthesis (byte-identity)', () => {
-  test('yaml frontmatter alone → PM doc has one empty paragraph; serializes to empty string', () => {
-    const input = '---\ntitle: X\n---\n';
-    const pm = mdManager.parse(input);
+describe('NG11 — empty doc triggers ensureNonEmptyDoc synthesis (byte-identity)', () => {
+  test('empty input → PM doc has one empty paragraph; serializes to empty string', () => {
+    const pm = mdManager.parse('');
 
     expect(pm).toMatchObject({
       type: 'doc',
@@ -27,6 +26,12 @@ describe('NG11 — ignore-typed-only doc triggers ensureNonEmptyDoc synthesis (b
 
     const output = mdManager.serialize(pm);
     expect(output).toBe('');
+  });
+
+  test('frontmatter-shaped input no longer empties the doc (content stays visible)', () => {
+    const pm = mdManager.parse('---\ntitle: X\n---\n');
+    const output = mdManager.serialize(pm);
+    expect(output).toBe('---\n\ntitle: X\n---\n');
   });
 });
 

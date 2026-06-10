@@ -1,9 +1,16 @@
+import { decodeNamedCharacterReference } from 'decode-named-character-reference';
 import type { Nodes, Root } from 'mdast';
+import { decodeNumericCharacterReference } from 'micromark-util-decode-numeric-character-reference';
 import type { Plugin } from 'unified';
 import { visit } from 'unist-util-visit';
 
 const ENTITY_REF_PUA_OPEN = '';
 const ENTITY_REF_PUA_CLOSE = '';
+
+export const ENTITY_REF_GUARD_SUBSTITUTIONS: ReadonlyArray<{ from: string; to: string }> = [
+  { from: '&', to: ENTITY_REF_PUA_OPEN },
+  { from: ';', to: ENTITY_REF_PUA_CLOSE },
+];
 
 const ENTITY_REF_RE = /&(?:[A-Za-z][A-Za-z0-9]*|#[0-9]+|#[xX][0-9A-Fa-f]+);/g;
 
@@ -23,6 +30,19 @@ export function protectPattern(
     if (typeof offset !== 'number') return match;
     if (countPrecedingBackslashes(source, offset) % 2 === 1) return match;
     return replace(match);
+  });
+}
+
+export function decodeEntityRefs(value: string): string {
+  ENTITY_REF_RE.lastIndex = 0;
+  return value.replace(ENTITY_REF_RE, (match) => {
+    const body = match.slice(1, -1);
+    if (body.startsWith('#')) {
+      const hex = body[1] === 'x' || body[1] === 'X';
+      return decodeNumericCharacterReference(body.slice(hex ? 2 : 1), hex ? 16 : 10);
+    }
+    const decoded = decodeNamedCharacterReference(body);
+    return decoded === false ? match : decoded;
   });
 }
 
@@ -84,7 +104,7 @@ export function restoreEntityRefsPlugin(): ReturnType<Plugin<[], Root>> {
           textNode.data.entityRefSpans = spans;
         }
       }
-      for (const key of ['url', 'title', 'alt'] as const) {
+      for (const key of ['url', 'title', 'alt', 'lang', 'meta'] as const) {
         const v = rec[key];
         if (typeof v === 'string' && v.includes(ENTITY_REF_PUA_OPEN)) {
           rec[key] = restoreEntityRefsInString(v).value;

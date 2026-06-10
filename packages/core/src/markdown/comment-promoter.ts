@@ -1,13 +1,16 @@
 import type { Nodes, Paragraph, PhrasingContent, Root, RootContent, Text } from 'mdast';
 import { SKIP, visit } from 'unist-util-visit';
+import type { VFile } from 'vfile';
 import type { CommentBlockMdast, CommentMdast } from './mdast-augmentation.ts';
+import { deriveFragmentPosition } from './promoter-position.ts';
 
 const PERCENT_COMMENT_RE = /(?<!%)%%([^\n]*?[^\n%])%%(?!%)/g;
 
 const HTML_COMMENT_INLINE_RE = /<!--([\s\S]*?)-->/g;
 
 export function commentPromoterPlugin() {
-  return (tree: Root) => {
+  return (tree: Root, file: VFile) => {
+    const source = typeof file.value === 'string' ? file.value : '';
     handleBlockCommentsAtRoot(tree);
 
     visit(tree, 'text', (node: Text, index, parent) => {
@@ -23,18 +26,27 @@ export function commentPromoterPlugin() {
       let cursor = 0;
       for (const match of matches) {
         if (match.start > cursor) {
-          replacements.push({ type: 'text', value: value.slice(cursor, match.start) });
+          const lead: Text = { type: 'text', value: value.slice(cursor, match.start) };
+          const pos = deriveFragmentPosition(source, node, cursor, match.start);
+          if (pos) lead.position = pos;
+          replacements.push(lead);
         }
+        const innerText: Text = { type: 'text', value: match.body };
         const commentNode: CommentMdast = {
           type: 'comment',
-          children: [{ type: 'text', value: match.body }],
+          children: [innerText],
           data: { sourceForm: match.sourceForm },
         };
+        const commentPos = deriveFragmentPosition(source, node, match.start, match.end);
+        if (commentPos) commentNode.position = commentPos;
         replacements.push(commentNode as unknown as PhrasingContent);
         cursor = match.end;
       }
       if (cursor < value.length) {
-        replacements.push({ type: 'text', value: value.slice(cursor) });
+        const tail: Text = { type: 'text', value: value.slice(cursor) };
+        const pos = deriveFragmentPosition(source, node, cursor, value.length);
+        if (pos) tail.position = pos;
+        replacements.push(tail);
       }
 
       const arr = (parent as { children: PhrasingContent[] }).children;

@@ -246,6 +246,7 @@ async function applyOp(
     }
     case 'external-change': {
       try {
+        writeFileSync(join(server.contentDir, `${docName}.md`), op.newContent, 'utf-8');
         applyExternalChange(server.instance.hocuspocus, docName, op.newContent);
       } catch {}
       break;
@@ -649,18 +650,27 @@ describe('bridge-convergence fuzzer (FR-17)', () => {
           acceptableForPrefix.set(prefix, accepts);
         }
 
+        const chunkGlueRe = /^M\d+-chunked-/;
+        const hasChunkedPaste = ops.some((o) => o.kind === 'chunked-source-paste');
+
         const missingContent: Array<{ clientIdx: number; prefix: string }> = [];
         for (let ci = 0; ci < clients.length; ci++) {
           const client = clients[ci];
           if (!client) continue;
-          const gotLines = new Set(
-            client.ytext
-              .toString()
-              .split('\n')
-              .map((l) => l.trimEnd()),
-          );
+          const gotLineList = client.ytext
+            .toString()
+            .split('\n')
+            .map((l) => l.trimEnd());
+          const gotLines = new Set(gotLineList);
           for (const [prefix, accepts] of acceptableForPrefix) {
-            const matched = [...accepts].some((l) => gotLines.has(l));
+            const matched = [...accepts].some(
+              (l) =>
+                gotLines.has(l) ||
+                (hasChunkedPaste &&
+                  gotLineList.some(
+                    (line) => line.startsWith(l) && chunkGlueRe.test(line.slice(l.length)),
+                  )),
+            );
             if (!matched) {
               missingContent.push({ clientIdx: ci, prefix });
             }

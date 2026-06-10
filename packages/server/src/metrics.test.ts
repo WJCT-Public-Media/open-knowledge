@@ -8,6 +8,8 @@ import {
   incrementBridgeMergeContentLoss,
   incrementCollabSocketFilteredError,
   incrementConflict,
+  incrementMapDrivenSpliceApplied,
+  incrementMapDrivenSpliceFallback,
   incrementPark,
   incrementReconcile,
   incrementRescueBuffer,
@@ -66,6 +68,25 @@ describe('reconciliation metrics', () => {
     expect(m.parkCount).toBe(2);
   });
 
+  test('map-driven splice counters: applied increments and fallback is keyed by reason', () => {
+    resetMetrics();
+    incrementMapDrivenSpliceApplied();
+    incrementMapDrivenSpliceApplied();
+    incrementMapDrivenSpliceFallback('parse-error');
+    incrementMapDrivenSpliceFallback('parse-error');
+    incrementMapDrivenSpliceFallback('text-mismatch');
+    incrementMapDrivenSpliceFallback('synthetic-doc');
+    incrementMapDrivenSpliceFallback('missing-position');
+    const m = getMetrics();
+    expect(m.mapDrivenSpliceApplied).toBe(2);
+    expect(m.mapDrivenSpliceFallback).toEqual({
+      'parse-error': 2,
+      'text-mismatch': 1,
+      'synthetic-doc': 1,
+      'missing-position': 1,
+    });
+  });
+
   test('getMetrics returns a snapshot (not a reference)', () => {
     resetMetrics();
     incrementReconcile();
@@ -84,7 +105,11 @@ describe('reconciliation metrics', () => {
     resetMetrics();
     const m = getMetrics();
     for (const [key, value] of Object.entries(m)) {
-      if (key === 'cc1LastSeq' || key === 'bridgeToleranceApplied') {
+      if (
+        key === 'cc1LastSeq' ||
+        key === 'bridgeToleranceApplied' ||
+        key === 'mapDrivenSpliceFallback'
+      ) {
         expect(value).toEqual({});
       } else {
         expect(value).toBe(0);

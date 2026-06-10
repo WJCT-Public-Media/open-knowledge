@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test';
+import { sharedExtensions } from '../extensions/shared.ts';
+import { MarkdownManager } from '../markdown/index.ts';
 import {
   BRIDGE_TOLERANCE_CLASSES,
   detectAppliedToleranceClasses,
@@ -23,7 +25,7 @@ describe('per-line trailing whitespace strip', () => {
   });
 });
 
-describe('3+ newline collapse to 2 (NG1 floor)', () => {
+describe('3+ newline collapse to 2 (NG1 comparison-only tolerance)', () => {
   test('three newlines collapse to two', () => {
     expect(normalizeBridge('P1\n\n\nP2')).toBe(normalizeBridge('P1\n\nP2'));
   });
@@ -63,7 +65,7 @@ describe('trailing newline policy', () => {
   });
 });
 
-describe('leading newline policy (NG1 architectural floor at doc-start)', () => {
+describe('leading newline policy (NG1 comparison-only tolerance at doc-start)', () => {
   test('no leading newline', () => {
     expect(normalizeBridge('P')).toBe(normalizeBridge('P'));
   });
@@ -507,6 +509,7 @@ describe('detectAppliedToleranceClasses (FR-41)', () => {
       'doc-start-thematic',
       'block-separator-collapse',
       'table-align-row-spacing',
+      'row-no-trailing-pipe',
       'list-indent-canonical',
       'ordered-list-marker-number',
       'trailing-whitespace',
@@ -677,5 +680,165 @@ describe('detectAppliedToleranceClasses (FR-41)', () => {
     for (const cls of classes) {
       expect(BRIDGE_TOLERANCE_CLASSES).toContain(cls);
     }
+  });
+});
+
+describe('fence-opener tracking (CommonMark 4.5: closer must match opener char)', () => {
+  const FENCED_A = '```ts\n~~~\n| a | b |\n| - | - |\n| 1 | 2\n```\n';
+  const FENCED_B = '```ts\n~~~\n| a | b |\n| - | - |\n| 1 | 2 |\n```\n';
+
+  test('does not absorb a trailing-pipe divergence inside an interleaved fence', () => {
+    expect(normalizeBridge(FENCED_A)).not.toBe(normalizeBridge(FENCED_B));
+  });
+
+  test('still tolerates the divergence outside any fence (control)', () => {
+    const a = '| a | b |\n| - | - |\n| 1 | 2\n';
+    const b = '| a | b |\n| - | - |\n| 1 | 2 |\n';
+    expect(normalizeBridge(a)).toBe(normalizeBridge(b));
+  });
+
+  test('matching-char closers still close the fence (control)', () => {
+    const a = '```ts\ncode\n```\n\n| a | b |\n| - | - |\n| 1 | 2\n';
+    const b = '```ts\ncode\n```\n\n| a | b |\n| - | - |\n| 1 | 2 |\n';
+    expect(normalizeBridge(a)).toBe(normalizeBridge(b));
+  });
+});
+
+describe('table-row trailing-pipe tolerance (row-no-trailing-pipe)', () => {
+  const mm = new MarkdownManager({ extensions: sharedExtensions });
+
+  const NON_UNIFORM = '# Notes\n\n| a | b |\n| - | - |\n| 1 | 2\n';
+  const UNIFORM = '# Notes\n\n| a | b\n| - | -\n| 1 | 2\n';
+
+  function semanticTree(md: string): unknown {
+    const strip = (node: unknown): unknown => {
+      if (Array.isArray(node)) return node.map(strip);
+      if (!node || typeof node !== 'object') return node;
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+        if (k === 'position' || k === 'data') continue;
+        out[k] = strip(v);
+      }
+      return out;
+    };
+    return strip(mm.parseToMdast(md));
+  }
+
+  function stripTableCaptureAttrs(json: unknown): void {
+    if (!json || typeof json !== 'object') return;
+    const node = json as { type?: string; attrs?: Record<string, unknown>; content?: unknown[] };
+    if (node.type === 'table' && node.attrs) {
+      node.attrs.sourceOuterPipes = null;
+    }
+    for (const child of node.content ?? []) stripTableCaptureAttrs(child);
+  }
+
+  test('non-uniform witness ≡ its real serialize(parse) twin (β-proof: bytes differ, comparator equal, parses structurally equal)', () => {
+    const canon = mm.serialize(mm.parse(NON_UNIFORM));
+    expect(canon).not.toBe(NON_UNIFORM);
+    expect(normalizeBridge(NON_UNIFORM)).toBe(normalizeBridge(canon));
+    expect(semanticTree(NON_UNIFORM)).toEqual(semanticTree(canon));
+  });
+
+  test('uniform witness ≡ the capture-attr-loss canonical twin (every row gains a bare trailing pipe)', () => {
+    const stripped = mm.parse(UNIFORM) as unknown as Record<string, unknown>;
+    stripTableCaptureAttrs(stripped);
+    const canon = mm.serialize(stripped);
+    expect(canon).toBe('# Notes\n\n| a | b|\n| - | -|\n| 1 | 2|\n');
+    expect(normalizeBridge(UNIFORM)).toBe(normalizeBridge(canon));
+    expect(semanticTree(UNIFORM)).toEqual(semanticTree(canon));
+  });
+
+  test('padded trailing pipe on a data row tolerated in table context', () => {
+    expect(normalizeBridge('| a | b |\n| - | - |\n| 1 | 2 |')).toBe(
+      normalizeBridge('| a | b |\n| - | - |\n| 1 | 2'),
+    );
+  });
+
+  test('delimiter-row trailing pipe tolerated in table context', () => {
+    expect(normalizeBridge('| a | b\n| - | -|\n| 1 | 2')).toBe(
+      normalizeBridge('| a | b\n| - | -\n| 1 | 2'),
+    );
+  });
+
+  test('fully piped table ≡ uniformly unpiped-trailing table (per-row class application)', () => {
+    expect(normalizeBridge('| a | b |\n| - | - |\n| 1 | 2 |\n| 3 | 4 |')).toBe(
+      normalizeBridge('| a | b\n| - | -\n| 1 | 2\n| 3 | 4'),
+    );
+  });
+
+  test('normalizeBridge stays idempotent with the class active', () => {
+    for (const input of [
+      NON_UNIFORM,
+      UNIFORM,
+      mm.serialize(mm.parse(NON_UNIFORM)),
+      '| a | b |\n| - | - |\n| 1 | 2 |',
+    ]) {
+      const once = normalizeBridge(input);
+      expect(normalizeBridge(once)).toBe(once);
+    }
+  });
+
+  test('detectAppliedToleranceClasses reports the class on the witness pair', () => {
+    const canon = mm.serialize(mm.parse(NON_UNIFORM));
+    expect(detectAppliedToleranceClasses(NON_UNIFORM, canon)).toContain('row-no-trailing-pipe');
+  });
+
+  test('detectAppliedToleranceClasses does not report the class on a tableless pair', () => {
+    expect(detectAppliedToleranceClasses('plain paragraph', 'plain paragraph\n')).not.toContain(
+      'row-no-trailing-pipe',
+    );
+  });
+
+  test('BRIDGE_TOLERANCE_CLASSES carries the class label', () => {
+    expect(BRIDGE_TOLERANCE_CLASSES).toContain('row-no-trailing-pipe');
+  });
+
+  describe('context gating — pipe-leading lines outside a table are untouched', () => {
+    test('paragraph with vs without trailing pipe is a genuine divergence', () => {
+      expect(normalizeBridge('| foo')).not.toBe(normalizeBridge('| foo |'));
+    });
+
+    test('pipe-leading paragraph elsewhere in a table-bearing doc keeps its trailing pipe', () => {
+      const withPipe = '| p | q |\n\n| a | b |\n| - | - |\n| 1 | 2 |';
+      const withoutPipe = '| p | q\n\n| a | b |\n| - | - |\n| 1 | 2 |';
+      expect(normalizeBridge(withPipe)).not.toBe(normalizeBridge(withoutPipe));
+    });
+
+    test('table-shaped lines inside a fenced code block are untouched', () => {
+      const piped = '```\n| a | b |\n| - | - |\n| 1 | 2 |\n```';
+      const unpiped = '```\n| a | b |\n| - | - |\n| 1 | 2\n```';
+      expect(normalizeBridge(piped)).not.toBe(normalizeBridge(unpiped));
+    });
+  });
+
+  describe('guards — genuine non-β-safe divergence is NOT absorbed by the tolerance set', () => {
+    test('embed downcast is a genuine divergence', () => {
+      expect(normalizeBridge('![[note]]')).not.toBe(normalizeBridge('[note](note)'));
+    });
+
+    test('touched-cell edit is a genuine divergence', () => {
+      expect(normalizeBridge('| a | b |\n| - | - |\n| 1 | 2 |')).not.toBe(
+        normalizeBridge('| a | b |\n| - | - |\n| 1 | 99 |'),
+      );
+    });
+
+    test('trailing EMPTY cell is a genuine divergence (single strip, not fixpoint)', () => {
+      expect(normalizeBridge('| a | b |\n| - | - |\n| 1 | 2 | |')).not.toBe(
+        normalizeBridge('| a | b |\n| - | - |\n| 1 | 2 |'),
+      );
+    });
+
+    test('unescaped content pipe at cell end is a genuine divergence', () => {
+      expect(normalizeBridge('| a | b |\n| - | - |\n| 1 | 2| |')).not.toBe(
+        normalizeBridge('| a | b |\n| - | - |\n| 1 | 2 |'),
+      );
+    });
+
+    test('missing LEADING pipe is out of class (genuine divergence)', () => {
+      expect(normalizeBridge('| a | b |\n| - | - |\n1 | 2')).not.toBe(
+        normalizeBridge('| a | b |\n| - | - |\n| 1 | 2 |'),
+      );
+    });
   });
 });

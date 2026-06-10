@@ -4,6 +4,7 @@ import {
   BridgeInvariantViolationError,
   type BridgeToleranceClass,
   detectAppliedToleranceClasses,
+  emitToleranceFire,
   normalizeBridge,
   toBridgeInvariantLog,
 } from '@inkeep/open-knowledge-core';
@@ -238,6 +239,7 @@ export function assertBridgeInvariant(
   if (ytextNorm === fragNorm) {
     if (ytextSnapshot !== fragmentMdSnapshot) {
       const classes = detectAppliedToleranceClasses(ytextSnapshot, fragmentMdSnapshot);
+      emitToleranceFire(classes, ytextSnapshot, fragmentMdSnapshot, opts.docName);
       for (const cls of classes) {
         if (shouldEmitBridgeToleranceApplied(opts.site, cls, opts.nowMs)) {
           incrementBridgeToleranceApplied(cls);

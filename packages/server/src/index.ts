@@ -482,6 +482,11 @@ export {
   spansPreviousPath,
 } from './telemetry-file-sink.ts';
 export {
+  initToleranceTelemetryWriter,
+  isToleranceTelemetryEnabled,
+  teardownToleranceTelemetryWriter,
+} from './tolerance-telemetry-writer.ts';
+export {
   acquireUiLock,
   readUiLock,
   releaseUiLock,

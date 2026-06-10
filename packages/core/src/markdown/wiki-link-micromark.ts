@@ -290,19 +290,31 @@ function topNode<T>(ctx: CompileContext): T {
 
 function exitTarget(this: CompileContext, token: Token) {
   const node = topNode<WikiLinkMdast | WikiLinkEmbedMdast>(this);
-  node.data.target = this.sliceSerialize(token).trim();
+  const raw = this.sliceSerialize(token);
+  node.data.target = raw.trim();
+  if (raw !== node.data.target) {
+    node.data.sourceTarget = raw;
+  }
 }
 
 function exitAnchor(this: CompileContext, token: Token) {
   const node = topNode<WikiLinkMdast | WikiLinkEmbedMdast>(this);
-  const raw = this.sliceSerialize(token).trim();
-  node.data.anchor = raw.length ? raw : null;
+  const raw = this.sliceSerialize(token);
+  const trimmed = raw.trim();
+  node.data.anchor = trimmed.length ? trimmed : null;
+  if (node.data.anchor !== null && raw !== trimmed) {
+    node.data.sourceAnchor = raw;
+  }
 }
 
 function exitAlias(this: CompileContext, token: Token) {
   const node = topNode<WikiLinkMdast | WikiLinkEmbedMdast>(this);
-  const raw = this.sliceSerialize(token).trim();
-  node.data.alias = raw.length ? raw : null;
+  const raw = this.sliceSerialize(token);
+  const trimmed = raw.trim();
+  node.data.alias = trimmed.length ? trimmed : null;
+  if (node.data.alias !== null && raw !== trimmed) {
+    node.data.sourceAlias = raw;
+  }
 }
 
 function finalizeLabel(node: WikiLinkMdast | WikiLinkEmbedMdast): void {
@@ -336,14 +348,18 @@ export const wikiLinkFromMarkdown: FromMarkdownExtension = {
   },
 };
 
+function rawSegmentOr(raw: string | null | undefined, current: string): string {
+  return typeof raw === 'string' && raw.trim() === current ? raw : current;
+}
+
 const wikiLinkHandler: ToMarkdownHandle = (node) => {
   const wiki = node as unknown as WikiLinkMdast;
   const target = wiki.data?.target ?? '';
   const anchor = wiki.data?.anchor;
   const alias = wiki.data?.alias;
-  let out = `[[${target}`;
-  if (anchor) out += `#${anchor}`;
-  if (alias) out += `|${alias}`;
+  let out = `[[${rawSegmentOr(wiki.data?.sourceTarget, target)}`;
+  if (anchor) out += `#${rawSegmentOr(wiki.data?.sourceAnchor, anchor)}`;
+  if (alias) out += `|${rawSegmentOr(wiki.data?.sourceAlias, alias)}`;
   return `${out}]]`;
 };
 
