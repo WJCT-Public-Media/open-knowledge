@@ -20,7 +20,7 @@ const links: Array<{
   { label: msg`Documentation`, href: 'https://openknowledge.ai/docs', icon: BookOpen },
   { label: 'GitHub', href: 'https://github.com/inkeep/open-knowledge', icon: GithubIcon },
   { label: msg`Website`, href: 'https://openknowledge.ai/', icon: Globe },
-  { label: 'Discord', href: 'https://go.inkeep.com/ok-discord', icon: DiscordIcon },
+  { label: 'Discord', href: 'https://discord.com/invite/YujKpFN49', icon: DiscordIcon },
   { label: 'Twitter', href: 'https://x.com/inkeep', icon: XTwitterIcon },
 ];
 

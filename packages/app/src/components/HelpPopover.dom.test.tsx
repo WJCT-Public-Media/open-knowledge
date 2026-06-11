@@ -89,7 +89,7 @@ describe('HelpPopover runtime behavior', () => {
       },
       {
         label: 'Discord',
-        href: 'https://go.inkeep.com/ok-discord',
+        href: 'https://discord.com/invite/YujKpFN49',
         target: '_blank',
         rel: 'noopener noreferrer',
         hasIcon: true,
