@@ -166,6 +166,7 @@ import {
   recordCreateNewBannerShown,
   recordOnboardingFlow,
 } from './onboarding-telemetry.ts';
+import { type EnsureCliOnPathResult, ensureCliOnPath } from './path-install.ts';
 import { installStdioBrokenPipeGuard } from './process-safety-net.ts';
 import {
   checkAndRepairProjectMcpOnProjectOpen,
@@ -1271,21 +1272,35 @@ function armMcpWiring(opts: { forceShow?: boolean } = {}): RunMcpWiringHandle {
   return runMcpWiringOnFirstLaunch(createMcpWiringOpts(opts));
 }
 
-function dispatchStartupReclaimToastWhenReady(results: { mcp: McpStartupRepairResult }): void {
-  const { mcp } = results;
+function formatUnknownError(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function dispatchStartupReclaimToastWhenReady(results: {
+  mcp: McpStartupRepairResult;
+  path: EnsureCliOnPathResult;
+}): void {
+  const { mcp, path } = results;
+  const pathLeg =
+    path.status === 'installed'
+      ? ({ status: 'installed', summary: path.summary } as const)
+      : path.status === 'failed-all'
+        ? ({ status: 'failed', summary: path.error } as const)
+        : ({ status: 'none' } as const);
   if (mcp.status === 'failed') {
     dispatchToastWhenReady({
       kind: 'startup-reclaim',
       mcp: { status: 'failed', editors: mcp.failedEditors.map((f) => f.editor) },
-      path: { status: 'none' },
+      path: pathLeg,
     });
     return;
   }
-  if (mcp.status !== 'repaired') return;
+  const hasMcp = mcp.status === 'repaired';
+  if (!hasMcp && pathLeg.status === 'none') return;
   dispatchToastWhenReady({
     kind: 'startup-reclaim',
-    mcp: { status: 'repaired', editors: mcp.repairedEditors },
-    path: { status: 'none' },
+    mcp: hasMcp ? { status: 'repaired', editors: mcp.repairedEditors } : { status: 'none' },
+    path: pathLeg,
   });
 }
 
@@ -2345,9 +2360,42 @@ function bootPrimaryInstance(): void {
       });
 
       mcpWiringHandle = armMcpWiring();
-      void checkAndRepairMcpWiringOnStartup(createMcpWiringOpts()).then((mcp) => {
-        dispatchStartupReclaimToastWhenReady({ mcp });
-      });
+      void Promise.allSettled([
+        checkAndRepairMcpWiringOnStartup(createMcpWiringOpts()),
+        ensureCliOnPath({
+          executablePath: app.getPath('exe'),
+          isPackaged: app.isPackaged,
+          platform: process.platform,
+          forceEnv: process.env.OK_M6B_FORCE ?? null,
+          reclaimDisableEnv: process.env.OK_RECLAIM_DISABLE ?? null,
+          home: osHomedir(),
+          bundleVersion: app.getVersion(),
+          logger: {
+            event: (payload) => getLogger('path-install').info(payload, payload.event),
+          },
+        }),
+      ])
+        .then(([mcpSettled, pathSettled]) => {
+          if (mcpSettled.status === 'rejected') {
+            console.warn('[main] MCP startup repair threw', {
+              error: formatUnknownError(mcpSettled.reason),
+            });
+          }
+          const mcp: McpStartupRepairResult =
+            mcpSettled.status === 'fulfilled'
+              ? mcpSettled.value
+              : { status: 'failed', failedEditors: [] };
+          const path: EnsureCliOnPathResult =
+            pathSettled.status === 'fulfilled'
+              ? pathSettled.value
+              : { status: 'failed-all', error: formatUnknownError(pathSettled.reason) };
+          dispatchStartupReclaimToastWhenReady({ mcp, path });
+        })
+        .catch((err) => {
+          console.warn('[main] startup reclaim dispatch threw', {
+            error: formatUnknownError(err),
+          });
+        });
 
       const decision = bootRestoreDecision({
         pendingRestore: appState.pendingWindowRestore,

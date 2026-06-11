@@ -5,7 +5,9 @@ import { relativeToProject } from '@/lib/project-paths';
 
 const TOAST_DURATION_MS = 4000;
 /** "Sticky" toast — large finite duration in lieu of `Infinity`. Used for
- *  failure outcomes that surface an action item the user must see.
+ *  failure outcomes that surface an action item the user must see, and for
+ *  PATH/rc-file edit disclosures — the user must get a real chance to notice
+ *  that Open Knowledge touched their shell config (and how to undo it).
  *  24h is long enough to span typical user idle windows; the close button
  *  on the Toaster gives an immediate-dismiss escape hatch. */
 const STICKY_TOAST_DURATION_MS = 24 * 60 * 60 * 1000;
@@ -38,8 +40,9 @@ export function installOnboardingToastListener(opts: {
         parts.push(`PATH install failed: ${payload.path.summary}`);
       const message = parts.length > 0 ? parts.join('; ') : 'Open Knowledge integrations checked.';
       const hasFailure = payload.mcp.status === 'failed' || payload.path.status === 'failed';
+      const pathTouched = payload.path.status !== 'none';
       sonnerToast[hasFailure ? 'error' : 'success'](message, {
-        duration: hasFailure ? STICKY_TOAST_DURATION_MS : TOAST_DURATION_MS,
+        duration: hasFailure || pathTouched ? STICKY_TOAST_DURATION_MS : TOAST_DURATION_MS,
       });
       return;
     }
