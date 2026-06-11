@@ -77,6 +77,23 @@ test('hidden-editor wrapper does not intercept pointer events (both modes)', asy
   await expect(hiddenInSource).toHaveCSS('position', 'absolute');
 });
 
+test('table cell-handle layer does not shift document content', async ({ page, api }) => {
+  const docName = await openFreshDoc(api, page, 'table-handle-layer');
+  await api.replaceDoc(docName, '# Table layer\n\n| A | B |\n| - | - |\n| 1 | 2 |\n\nshort body\n');
+  const heading = page.locator('.ProseMirror h1');
+  await expect(heading).toHaveText('Table layer');
+  const before = await heading.boundingBox();
+  if (!before) throw new Error('heading has no bounding box');
+
+  await page.locator('.ProseMirror table td').first().click();
+  const layer = page.locator('.ok-table-cell-handle-layer');
+  await expect(layer).toBeAttached();
+  await expect(page.locator('[data-testid="table-cell-handle"]:visible')).toHaveCount(2);
+  const after = await heading.boundingBox();
+  if (!after) throw new Error('heading has no bounding box after focus');
+  expect(after.y).toBe(before.y);
+});
+
 test('WYSIWYG→Source: typing in ProseMirror appears in CodeMirror', async ({ page, api }) => {
   await openFreshDoc(api, page, 'wysiwyg-to-source');
   await page.locator('.ProseMirror').click();

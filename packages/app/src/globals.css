@@ -842,6 +842,11 @@
  */
 .tiptap-editor .tiptap-editor-portal-content {
   grid-column: content;
+  /* Explicit row: `.ok-table-cell-handle-layer` is pinned to row 1 to share
+     this row (see that rule for why); without an explicit row here,
+     auto-placement would skip the occupied content-column cell and bump the
+     editor body to row 2 whenever the cursor is in a table. */
+  grid-row: 1;
   position: relative;
 }
 
@@ -1724,8 +1729,14 @@
    scroll container (handles track scroll), and crucially NOT
    `view.dom.parentElement`, which TipTap vacuums on `<Activity>` recycle. A
    portal into that node desyncs React and throws `removeChild` on navigation
-   (see TableCellHandles.tsx). The host has no children of its own height, so it
-   adds a zero-height grid row — no layout shift.
+   (see TableCellHandles.tsx). The host is pinned into the content's grid row
+   (`grid-row: 1` here + on `.tiptap-editor-portal-content`) instead of
+   generating its own: `.tiptap-editor` is taller than short documents, and the
+   default `align-content: stretch` hands every in-flow auto row an equal share
+   of the leftover height — an own row for this host would balloon into a blank
+   band ABOVE the document the moment the cursor enters a table. `align-self:
+   start` keeps the host zero-height inside the shared row, so the absolute
+   handles position exactly as they would from an own top row.
 
    Visibility is gated here, not in JS: the layer is rendered whenever the
    cursor is in a cell (TableCellHandles owns that), but the pills only paint
@@ -1738,6 +1749,8 @@
    pills out of tab order. */
 .ok-table-cell-handle-layer {
   position: relative;
+  grid-row: 1;
+  align-self: start;
   visibility: hidden;
   /* Delay the falling edge (visible -> hidden) so Radix's focus-restoration on
      Escape / dismiss lands on the (still-focusable) pill BEFORE the layer goes
