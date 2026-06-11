@@ -98,7 +98,7 @@ describe('orphan-hint response shape — L1 integration (US-003)', () => {
     timestamp: string;
     hints?: Array<{ type: string; parentCandidates: string[]; message: string }>;
   }> {
-    const res = await fetch(`http://localhost:${server.port}/api/agent-write-md`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/agent-write-md`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ markdown: body, position: 'replace', docName }),
@@ -164,7 +164,7 @@ describe('systemSubscriberCount response field — L1 integration (FR7a)', () =>
     subscriberCount?: number;
     systemSubscriberCount?: number;
   }> {
-    const res = await fetch(`http://localhost:${server.port}/api/agent-write-md`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/agent-write-md`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ markdown: body, position: 'replace', docName }),

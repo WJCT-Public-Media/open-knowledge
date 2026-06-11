@@ -512,6 +512,7 @@ describe('detectAppliedToleranceClasses (FR-41)', () => {
       'row-no-trailing-pipe',
       'list-indent-canonical',
       'ordered-list-marker-number',
+      'paragraph-continuation-indent',
       'trailing-whitespace',
       'blank-line-collapse',
       'trailing-newline',
@@ -549,6 +550,24 @@ describe('detectAppliedToleranceClasses (FR-41)', () => {
 
   test('does not detect list-indent-canonical when neither input has indent', () => {
     expect(detectAppliedToleranceClasses('- foo', '- foo')).not.toContain('list-indent-canonical');
+  });
+
+  test('detects paragraph-continuation-indent when a lazy-continuation indent is present', () => {
+    expect(
+      detectAppliedToleranceClasses(
+        'para line\n    continuation text\n',
+        'para line\ncontinuation text\n',
+      ),
+    ).toContain('paragraph-continuation-indent');
+  });
+
+  test('does not detect paragraph-continuation-indent when no continuation indent is present', () => {
+    expect(
+      detectAppliedToleranceClasses(
+        'para line\ncontinuation text\n',
+        'para line\ncontinuation text\n',
+      ),
+    ).not.toContain('paragraph-continuation-indent');
   });
 
   test('detects commonmark-escape when present in either input', () => {
@@ -680,6 +699,60 @@ describe('detectAppliedToleranceClasses (FR-41)', () => {
     for (const cls of classes) {
       expect(BRIDGE_TOLERANCE_CLASSES).toContain(cls);
     }
+  });
+});
+
+describe('paragraph lazy-continuation indent (step 7f)', () => {
+  test('single leading space on a paragraph continuation line is tolerated', () => {
+    expect(normalizeBridge('para two\n continuation text\n')).toBe(
+      normalizeBridge('para two\ncontinuation text\n'),
+    );
+  });
+
+  test('multi-space and tab continuations are tolerated', () => {
+    expect(normalizeBridge('para two\n    continuation\n')).toBe(
+      normalizeBridge('para two\ncontinuation\n'),
+    );
+    expect(normalizeBridge('para two\n\tcontinuation\n')).toBe(
+      normalizeBridge('para two\ncontinuation\n'),
+    );
+  });
+
+  test('the observed fuzz construct: continuation born at a chunk boundary', () => {
+    const raw = 'lorem ipsum\n\nM2-foxtrot delta\n dolor sit amet lorem\n';
+    const canonical = 'lorem ipsum\n\nM2-foxtrot delta\ndolor sit amet lorem\n';
+    expect(normalizeBridge(raw)).toBe(normalizeBridge(canonical));
+  });
+
+  test('does NOT fire under a blank line (indented code is engine-preserved)', () => {
+    expect(normalizeBridge('para\n\n    indented code\n')).not.toBe(
+      normalizeBridge('para\n\nindented code\n'),
+    );
+  });
+
+  test('does NOT fire inside fenced-code interiors', () => {
+    expect(normalizeBridge('```\ncode\n indented in fence\n```\n')).not.toBe(
+      normalizeBridge('```\ncode\nindented in fence\n```\n'),
+    );
+  });
+
+  test('does NOT fire when de-indenting would mint a setext underline', () => {
+    expect(normalizeBridge('foo\n    ---\n')).not.toBe(normalizeBridge('foo\n---\n'));
+    expect(normalizeBridge('foo\n    ===\n')).not.toBe(normalizeBridge('foo\n===\n'));
+  });
+
+  test('does NOT fire when the previous line is an ATX heading (no paragraph to continue)', () => {
+    expect(normalizeBridge('# Heading\n    indented text\n')).not.toBe(
+      normalizeBridge('# Heading\nindented text\n'),
+    );
+  });
+
+  test('blockquote lazy continuation stays OUT of class (prefix-add, not strip)', () => {
+    expect(normalizeBridge('> a\n b\n')).not.toBe(normalizeBridge('> a\n> b\n'));
+  });
+
+  test('list-marker indents stay owned by step 7c, not stripped as continuations', () => {
+    expect(normalizeBridge('para\n - item\n')).toBe('para\n- item');
   });
 });
 

@@ -23,7 +23,7 @@ afterEach(async () => {
 });
 
 async function frontmatterPatch(port: number, docName: string, patch: Record<string, unknown>) {
-  return fetch(`http://localhost:${port}/api/frontmatter-patch`, {
+  return fetch(`http://127.0.0.1:${port}/api/frontmatter-patch`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ docName, patch }),
@@ -31,7 +31,7 @@ async function frontmatterPatch(port: number, docName: string, patch: Record<str
 }
 
 async function renamePath(port: number, fromPath: string, toPath: string) {
-  return fetch(`http://localhost:${port}/api/rename-path`, {
+  return fetch(`http://127.0.0.1:${port}/api/rename-path`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ kind: 'file', fromPath, toPath }),
@@ -50,7 +50,7 @@ describe('PRD-6832 β L1: agent write reconciles a newer out-of-band disk edit',
 
     writeFileSync(filePath, '# V2 NATIVE OUT-OF-BAND EDIT\n\nbody-v2-native\n', 'utf-8');
 
-    const res = await fetch(`http://localhost:${port}/api/agent-write-md`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/agent-write-md`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -131,7 +131,7 @@ describe('PRD-6832 β L1: agent write reconciles a newer out-of-band disk edit',
 
       writeFileSync(filePath, '# Doc\n\nseed-body\n\ndisk-oob-line\n', 'utf-8');
 
-      const res = await fetch(`http://localhost:${port}/api/agent-write-md`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/agent-write-md`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ docName, markdown: 'agent-line\n', position: 'append' }),

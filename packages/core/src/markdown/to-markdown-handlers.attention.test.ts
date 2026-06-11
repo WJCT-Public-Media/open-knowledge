@@ -3,6 +3,7 @@ import type { JSONContent } from '@tiptap/core';
 import type { Nodes } from 'mdast';
 import { sharedExtensions } from '../extensions/shared.ts';
 import { MarkdownManager } from './index.ts';
+import { assertRoundTripIdempotent } from './round-trip-asserts.test-helper.ts';
 
 const md = new MarkdownManager({ extensions: sharedExtensions });
 
@@ -36,9 +37,8 @@ function allNodeTypes(markdown: string): string[] {
   return out;
 }
 
-function expectByteStable(out: string): void {
-  expect(md.serialize(md.parse(out))).toBe(out);
-}
+const expectByteStable = (out: string): void =>
+  assertRoundTripIdempotent((s) => md.serialize(md.parse(s)), out);
 
 describe('boundary-whitespace attention encode (WYSIWYG-shaped marks)', () => {
   test('emphasis with trailing space re-parses as emphasis via char-ref', () => {

@@ -420,7 +420,7 @@ describe('initial sync and test isolation', () => {
     const seeded = '/keep-me-on-reset.md\n';
     writeFileSync(okignorePath, seeded, 'utf-8');
 
-    const res = await fetch(`http://localhost:${server.port}/api/test-reset?reset-okignore=false`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/test-reset?reset-okignore=false`, {
       method: 'POST',
     });
     expect(res.ok).toBe(true);

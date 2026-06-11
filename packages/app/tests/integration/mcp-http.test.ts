@@ -7,7 +7,7 @@ test('POST /mcp serves MCP JSON-RPC over Streamable HTTP', async () => {
   const server = await createTestServer();
 
   try {
-    const init = await fetch(`http://localhost:${server.port}/mcp`, {
+    const init = await fetch(`http://127.0.0.1:${server.port}/mcp`, {
       method: 'POST',
       headers: {
         accept: 'application/json, text/event-stream',
@@ -36,7 +36,7 @@ test('POST /mcp serves MCP JSON-RPC over Streamable HTTP', async () => {
     expect(initBody.result?.serverInfo?.name).toBe('open-knowledge');
     expect(initBody.result?.protocolVersion).toBeTruthy();
 
-    const initialized = await fetch(`http://localhost:${server.port}/mcp`, {
+    const initialized = await fetch(`http://127.0.0.1:${server.port}/mcp`, {
       method: 'POST',
       headers: {
         accept: 'application/json, text/event-stream',
@@ -48,7 +48,7 @@ test('POST /mcp serves MCP JSON-RPC over Streamable HTTP', async () => {
     });
     expect(initialized.status).toBe(202);
 
-    const tools = await fetch(`http://localhost:${server.port}/mcp`, {
+    const tools = await fetch(`http://127.0.0.1:${server.port}/mcp`, {
       method: 'POST',
       headers: {
         accept: 'application/json, text/event-stream',

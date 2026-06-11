@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { JSONContent } from '@tiptap/core';
 import { sharedExtensions } from '../extensions/shared.ts';
 import { MarkdownManager } from './index.ts';
+import { assertByteStable } from './round-trip-asserts.test-helper.ts';
 
 const mdManager = new MarkdownManager({ extensions: sharedExtensions });
 
@@ -9,11 +10,7 @@ function roundTrip(md: string): string {
   return mdManager.serialize(mdManager.parse(md));
 }
 
-function expectByteStable(md: string): void {
-  const once = roundTrip(md);
-  expect(once).toBe(md);
-  expect(roundTrip(once)).toBe(once);
-}
+const expectByteStable = (md: string): void => assertByteStable(roundTrip, md);
 
 function findNodes(json: JSONContent, type: string): JSONContent[] {
   const out: JSONContent[] = [];

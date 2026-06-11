@@ -48,7 +48,7 @@ describe('restart-with-embed-doc: server restart preserves single PM image with 
     let server = await createRestartableServer({ contentDir });
     cleanups.push(() => server.shutdown());
 
-    const pool = new ProviderPool(3, `ws://localhost:${server.port}/collab`);
+    const pool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`);
     cleanups.push(() => pool.dispose());
     await seedPoolServerInstanceId(server, pool);
 

@@ -61,7 +61,7 @@ describe('Cross-document stale cache (epoch-scoped IDB)', () => {
     writeFileSync(join(server.contentDir, `${DOC_A_NAME}.md`), DOC_A_FIXTURE, 'utf-8');
     writeFileSync(join(server.contentDir, `${DOC_B_NAME}.md`), DOC_B_FIXTURE, 'utf-8');
 
-    const firstPool = new ProviderPool(3, `ws://localhost:${server.port}/collab`);
+    const firstPool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`);
     cleanups.push(() => firstPool.dispose());
     const firstServerId = await seedPoolServerInstanceId(server, firstPool);
 
@@ -92,7 +92,7 @@ describe('Cross-document stale cache (epoch-scoped IDB)', () => {
     );
     cleanups.push(() => createSpy.mockRestore());
 
-    const secondPool = new ProviderPool(3, `ws://localhost:${server.port}/collab`);
+    const secondPool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`);
     cleanups.push(() => secondPool.dispose());
 
     const secondServerId = await seedPoolServerInstanceId(server, secondPool);

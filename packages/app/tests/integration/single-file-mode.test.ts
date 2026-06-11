@@ -70,7 +70,7 @@ describe('single-file mode — content scope (D3)', () => {
       expect(contentFilter.isExcluded('secret.md')).toBe(true);
       expect(contentFilter.isExcluded('journal.md')).toBe(true);
 
-      const res = await fetch(`http://localhost:${server.port}/api/documents`);
+      const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`);
       const json = (await res.json()) as { documents?: Array<{ docName: string }> };
       const docNames = (json.documents ?? []).map((d) => d.docName);
       expect(docNames).toContain('notes');
@@ -117,7 +117,7 @@ describe('single-file mode — no MCP (FR5)', () => {
       singleDocRelPath: 'notes.md',
     });
     try {
-      const res = await fetch(`http://localhost:${server.port}/mcp`, {
+      const res = await fetch(`http://127.0.0.1:${server.port}/mcp`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: '{}',
@@ -294,7 +294,7 @@ describe('single-file mode — content-tree writes refused (G4)', () => {
       singleDocRelPath: 'notes.md',
     });
     try {
-      const res = await fetch(`http://localhost:${server.port}/api/folder-config`, {
+      const res = await fetch(`http://127.0.0.1:${server.port}/api/folder-config`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ path: '.', frontmatter: { title: 'Nope' } }),
@@ -317,7 +317,7 @@ describe('single-file mode — content-tree writes refused (G4)', () => {
       singleDocRelPath: 'notes.md',
     });
     try {
-      const res = await fetch(`http://localhost:${server.port}/api/template`, {
+      const res = await fetch(`http://127.0.0.1:${server.port}/api/template`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ folder: '.', name: 'daily', body: '# {{title}}\n' }),

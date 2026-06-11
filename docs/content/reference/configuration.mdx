@@ -72,6 +72,7 @@ Most users never set these — the schema settings above cover the common cases.
 | --- | --- |
 | `OPEN_KNOWLEDGE_GITHUB_CLIENT_ID` | Override the GitHub OAuth App client ID |
 | `OK_SHOWALL_MAX_ENTRIES` | Max entries the **Show all files** disk walk returns before it stops and marks the list truncated (default `50000`) |
+| `OK_BRIDGE_TOLERANCE_TELEMETRY` | Set to `1` to record each bridge-tolerance-class fire as a JSONL line in `<project>/.ok/local/tolerance-telemetry.jsonl` (opt-in, local-only, off by default; unstable diagnostic for triaging markdown-fidelity incidents). **Records doc paths in cleartext** — independent of `telemetry.localSink`'s `attributeDenylist`, which redacts span/log attributes, not this file. Deliberately outside the `.ok/local/telemetry/` subtree `ok diagnose bundle` harvests, so the unredacted paths never ship in a bug bundle. |
 | `OTEL_SDK_DISABLED` | OpenTelemetry OTLP push gate. Inverted sense: set to `false` to **enable** push (it is off by default). |
 | `OK_EMBEDDINGS_API_KEY` | Fallback embeddings provider API key for [semantic search](#semantic-search), used when none is stored on disk. Prefer `ok embeddings set-key` (writes `~/.ok/secrets.yml`) for normal use; the env var is convenient for CI / scripted runs. |
 

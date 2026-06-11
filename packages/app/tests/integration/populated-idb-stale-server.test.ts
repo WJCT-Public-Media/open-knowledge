@@ -38,7 +38,7 @@ describe('T14: populated IDB meets stale server instance', () => {
 
     await seedClientPersistenceState('test-doc', [staleBytes], STALE_INSTANCE_ID);
 
-    const pool = new ProviderPool(3, `ws://localhost:${server.port}/collab`);
+    const pool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`);
     cleanups.push(() => pool.dispose());
     pool.setExpectedServerInstanceId(STALE_INSTANCE_ID);
 

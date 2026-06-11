@@ -58,13 +58,13 @@ test('closing spawning editor leaves sibling editor connected; idle-shutdown fir
   const yDocA = new Y.Doc();
   const yDocB = new Y.Doc();
   const providerA = new HocuspocusProvider({
-    url: `ws://localhost:${port}/collab`,
+    url: `ws://127.0.0.1:${port}/collab`,
     name: docA,
     document: yDocA,
     connect: true,
   });
   const providerB = new HocuspocusProvider({
-    url: `ws://localhost:${port}/collab`,
+    url: `ws://127.0.0.1:${port}/collab`,
     name: docB,
     document: yDocB,
     connect: true,

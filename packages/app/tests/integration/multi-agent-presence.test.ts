@@ -92,7 +92,7 @@ describe('multi-agent presence — Tier 1 regression gate (FR-8)', () => {
     const doc = `mp-simple-${crypto.randomUUID().slice(0, 8)}`;
     const uuid = `uuid-simple-${crypto.randomUUID().slice(0, 8)}`;
 
-    const res = await fetch(`http://localhost:${server.port}/api/agent-write`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/agent-write`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -126,7 +126,7 @@ describe('multi-agent presence — Tier 1 regression gate (FR-8)', () => {
       clientName: 'claude-code',
     });
 
-    const res = await fetch(`http://localhost:${server.port}/api/metrics/agent-presence`);
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/metrics/agent-presence`);
     expect(res.ok).toBe(true);
     const body = (await res.json()) as {
       presence: Record<

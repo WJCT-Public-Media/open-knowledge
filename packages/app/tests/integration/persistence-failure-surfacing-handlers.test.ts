@@ -25,7 +25,7 @@ describe('disk-persistence failure surfacing — edit_document (/api/agent-patch
     await agentWriteMd(server.port, '# Doc\n\nFINDME here\n', { docName, position: 'replace' });
 
     process.env.OK_TEST_STORE_FAULT = docName;
-    const res = await fetch(`http://localhost:${server.port}/api/agent-patch`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/agent-patch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ find: 'FINDME', replace: 'REPLACED', docName }),
@@ -48,7 +48,7 @@ describe('disk-persistence failure surfacing — edit_document (/api/agent-patch
 });
 
 async function frontmatterPatch(port: number, docName: string, patch: Record<string, unknown>) {
-  return fetch(`http://localhost:${port}/api/frontmatter-patch`, {
+  return fetch(`http://127.0.0.1:${port}/api/frontmatter-patch`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ docName, patch }),
@@ -82,7 +82,7 @@ describe('disk-persistence failure surfacing — edit_frontmatter (/api/frontmat
 
 async function getCheckpointShas(port: number, docName: string): Promise<string[]> {
   const r = await fetch(
-    `http://localhost:${port}/api/history?docName=${encodeURIComponent(docName)}`,
+    `http://127.0.0.1:${port}/api/history?docName=${encodeURIComponent(docName)}`,
   );
   if (!r.ok) return [];
   const body = (await r.json().catch(() => ({}))) as { entries?: Array<{ sha?: string }> };
@@ -104,7 +104,7 @@ describe('disk-persistence failure surfacing — version rollback (/api/rollback
     expect(priorSha).toMatch(/^[0-9a-f]{40}$/i);
 
     process.env.OK_TEST_STORE_FAULT = docName;
-    const res = await fetch(`http://localhost:${server.port}/api/rollback`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/rollback`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ docName, commitSha: priorSha }),

@@ -111,7 +111,7 @@ describe('DU (delete-modify) conflict — foundational contract', () => {
 
   test('GET /api/sync/conflict-content returns kind="delete-modify" when stage 2 is absent', async () => {
     await pollUntil(async () => {
-      const res = await fetch(`http://localhost:${server.port}/api/documents`).catch(() => null);
+      const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`).catch(() => null);
       if (!res?.ok) return false;
       const data = (await res.json()) as { documents?: Array<{ docName: string }> };
       return data.documents !== undefined;
@@ -166,7 +166,7 @@ describe('UD (modify-delete) conflict — foundational contract', () => {
 
   test('GET /api/sync/conflict-content returns kind="modify-delete" when stage 3 is absent', async () => {
     await pollUntil(async () => {
-      const res = await fetch(`http://localhost:${server.port}/api/documents`).catch(() => null);
+      const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`).catch(() => null);
       return res?.ok ?? false;
     });
 
@@ -266,7 +266,7 @@ describe('both-modified conflict — backward compatibility', () => {
 
   test('GET /api/sync/conflict-content returns kind="both-modified" when stages 2+3 are present', async () => {
     await pollUntil(async () => {
-      const res = await fetch(`http://localhost:${server.port}/api/documents`).catch(() => null);
+      const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`).catch(() => null);
       return res?.ok ?? false;
     });
 

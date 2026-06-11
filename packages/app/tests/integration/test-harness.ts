@@ -54,7 +54,7 @@ export const schema = getSchema(sharedExtensions);
 async function getFreePort(): Promise<number> {
   return new Promise((resolve) => {
     const s = createNetServer();
-    s.listen(0, () => {
+    s.listen(0, '127.0.0.1', () => {
       const port = (s.address() as AddressInfo).port;
       s.close(() => resolve(port));
     });
@@ -142,7 +142,7 @@ export async function createTestServer(options: CreateTestServerOptions = {}): P
         contentDir,
         projectDir: contentDir,
         config: ConfigSchema.parse({}),
-        getServerUrl: () => `http://localhost:${port}`,
+        getServerUrl: () => `http://127.0.0.1:${port}`,
       });
 
   const httpServer = createHttpServer();
@@ -158,7 +158,7 @@ export async function createTestServer(options: CreateTestServerOptions = {}): P
   });
 
   await new Promise<void>((resolve) => {
-    httpServer.listen(port, () => resolve());
+    httpServer.listen(port, '127.0.0.1', () => resolve());
   });
 
   return {
@@ -212,7 +212,7 @@ export async function createTestClient(
 
   let controllableWs: ControllableWebSocket | undefined;
   const providerOpts: Record<string, unknown> = {
-    url: `ws://localhost:${port}/collab`,
+    url: `ws://127.0.0.1:${port}/collab`,
     name: resolvedDocName,
     document: doc,
     connect: true,
@@ -428,6 +428,34 @@ export function assertBridgeInvariant(ytext: Y.Text, fragment: Y.XmlFragment): v
   }
 }
 
+export type FinalStateOutcome =
+  | { outcome: 'converged-late' }
+  | { outcome: 'stalled'; detail: string };
+
+export function classifyFinalState(
+  clients: ReadonlyArray<Pick<TestClient, 'ytext' | 'fragment'>>,
+): FinalStateOutcome {
+  const finalYtexts = clients.map((c) => c.ytext.toString());
+  const finalFragMds = clients.map((c) => serializeFragment(c.fragment));
+  const peersIdentical =
+    finalYtexts.every((t) => t === finalYtexts[0]) &&
+    finalFragMds.every((m) => m === finalFragMds[0]);
+  if (!peersIdentical) {
+    return { outcome: 'stalled', detail: 'peers diverged at budget exhaustion' };
+  }
+  for (const c of clients) {
+    try {
+      assertBridgeInvariant(c.ytext, c.fragment);
+    } catch (err) {
+      return {
+        outcome: 'stalled',
+        detail: `bridge invariant beyond tolerance at budget exhaustion: ${err instanceof Error ? err.message.slice(0, 200) : String(err)}`,
+      };
+    }
+  }
+  return { outcome: 'converged-late' };
+}
+
 export function readTestDoc(contentDir: string, docName = 'test-doc'): string {
   try {
     return readFileSync(join(contentDir, `${docName}.md`), 'utf-8');
@@ -451,7 +479,7 @@ export async function agentWriteMd(
     colorSeed?: string;
   },
 ): Promise<void> {
-  const res = await fetch(`http://localhost:${port}/api/agent-write-md`, {
+  const res = await fetch(`http://127.0.0.1:${port}/api/agent-write-md`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -481,7 +509,7 @@ export async function agentPatch(
   replace: string,
   docName?: string,
 ): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
-  const res = await fetch(`http://localhost:${port}/api/agent-patch`, {
+  const res = await fetch(`http://127.0.0.1:${port}/api/agent-patch`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ find, replace, docName }),
@@ -497,7 +525,7 @@ export async function agentUndo(
   port: number,
   opts: { docName?: string; connectionId: string; scope?: 'last' | 'session' },
 ): Promise<void> {
-  const res = await fetch(`http://localhost:${port}/api/agent-undo`, {
+  const res = await fetch(`http://127.0.0.1:${port}/api/agent-undo`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -511,8 +539,8 @@ export async function agentUndo(
 
 export async function testReset(port: number, docName?: string): Promise<void> {
   const url = docName
-    ? `http://localhost:${port}/api/test-reset?docName=${encodeURIComponent(docName)}`
-    : `http://localhost:${port}/api/test-reset`;
+    ? `http://127.0.0.1:${port}/api/test-reset?docName=${encodeURIComponent(docName)}`
+    : `http://127.0.0.1:${port}/api/test-reset`;
   const res = await fetch(url, { method: 'POST' });
   if (!res.ok) throw new Error(`test-reset failed: ${res.status}`);
 }
@@ -541,7 +569,7 @@ export async function awaitFileWatcherIndexed(
   let lastBodyPreview = '';
   let rescueTriggered = false;
   while (Date.now() - start < timeoutMs) {
-    const res = await fetch(`http://localhost:${server.port}/api/documents`).catch((err) => {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`).catch((err) => {
       lastStatus = -1;
       lastBodyPreview = `fetch error: ${String(err).slice(0, 80)}`;
       return null;
@@ -559,7 +587,7 @@ export async function awaitFileWatcherIndexed(
     }
     if (!rescueTriggered && Date.now() - start >= rescueAfterMs) {
       rescueTriggered = true;
-      await fetch(`http://localhost:${server.port}/api/test-rescan-files`, {
+      await fetch(`http://127.0.0.1:${server.port}/api/test-rescan-files`, {
         method: 'POST',
       }).catch(() => null);
     }
@@ -582,7 +610,7 @@ export async function awaitBacklinkIndexed(
   let rescueTriggered = false;
   while (Date.now() - start < timeoutMs) {
     const res = await fetch(
-      `http://localhost:${server.port}/api/backlinks?docName=${encodeURIComponent(targetDocName)}`,
+      `http://127.0.0.1:${server.port}/api/backlinks?docName=${encodeURIComponent(targetDocName)}`,
     ).catch(() => null);
     if (res?.ok) {
       lastStatus = res.status;
@@ -595,7 +623,7 @@ export async function awaitBacklinkIndexed(
     }
     if (!rescueTriggered && Date.now() - start >= rescueAfterMs) {
       rescueTriggered = true;
-      await fetch(`http://localhost:${server.port}/api/test-rescan-backlinks`, {
+      await fetch(`http://127.0.0.1:${server.port}/api/test-rescan-backlinks`, {
         method: 'POST',
       }).catch(() => null);
     }
@@ -1031,8 +1059,8 @@ export function attachSystemDocSubscriber(
   pool: ProviderPool,
   port: number,
 ): SystemDocSubscriberHandle {
-  const url = `ws://localhost:${port}/collab`;
-  const baseUrl = `http://localhost:${port}`;
+  const url = `ws://127.0.0.1:${port}/collab`;
+  const baseUrl = `http://127.0.0.1:${port}`;
   const doc = new Y.Doc();
   const provider = new HocuspocusProvider({
     url,
@@ -1141,7 +1169,7 @@ export async function createMultiClientContext(opts: {
   recycleDebounceMs?: number;
 }): Promise<MultiClientContext> {
   const { ProviderPool } = await import('../../src/editor/provider-pool');
-  const wsUrl = `ws://localhost:${opts.server.port}/collab`;
+  const wsUrl = `ws://127.0.0.1:${opts.server.port}/collab`;
   const pools: InstanceType<ProviderPoolCtor>[] = [];
   for (let i = 0; i < opts.clientCount; i++) {
     const pool = new ProviderPool(3, wsUrl, { recycleDebounceMs: opts.recycleDebounceMs });
@@ -1176,7 +1204,7 @@ export async function seedPoolServerInstanceId(
     setExpectedServerInstanceId: (id: string | null) => void;
   },
 ): Promise<string> {
-  const res = await fetch(`http://localhost:${server.port}/api/server-info`);
+  const res = await fetch(`http://127.0.0.1:${server.port}/api/server-info`);
   if (!res.ok) {
     throw new Error(`seedPoolServerInstanceId: /api/server-info returned ${res.status}`);
   }

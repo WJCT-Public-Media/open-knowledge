@@ -32,6 +32,6 @@ language js
     not $call <: `$_.transact($_, OBSERVER_SYNC_ORIGIN, $...)`,
     register_diagnostic(
         span = $call,
-        message = "Observer-side transact call missing sanctioned origin. Pass `OBSERVER_SYNC_ORIGIN` as the second argument: `doc.transact(fn, OBSERVER_SYNC_ORIGIN)`. Bare `doc.transact(fn)` (or a wrong origin) routes the write to `openknowledge-service` and breaks per-session UndoManager attribution. See https://github.com/inkeep/open-knowledge-legacy/blob/main/biome-plugins/README.md#path-conditional-map-driven-origingrit"
+        message = "Observer-side transact call missing sanctioned origin. Pass `OBSERVER_SYNC_ORIGIN` as the second argument: `doc.transact(fn, OBSERVER_SYNC_ORIGIN)`. Bare `doc.transact(fn)` (or a wrong origin) routes the write to `openknowledge-service` and breaks per-session UndoManager attribution. See https://github.com/inkeep/open-knowledge/blob/main/biome-plugins/README.md#path-conditional-map-driven-origingrit"
     )
 }

@@ -91,7 +91,7 @@ describe('client-persisted state meets a re-seeded doc lineage (deferred-attach 
     writeFileSync(filePath, FIXTURE_V1, 'utf-8');
     await awaitFileWatcherIndexed(server, docName);
 
-    const pool = new ProviderPool(3, `ws://localhost:${server.port}/collab`, {
+    const pool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`, {
       storage: makeStubStorage().stub,
     });
     cleanups.push(() => pool.dispose());
@@ -171,7 +171,7 @@ describe('client-persisted state meets a re-seeded doc lineage (fresh-pool rejoi
     writeFileSync(filePath, FIXTURE_V1, 'utf-8');
     await awaitFileWatcherIndexed(server, docName);
 
-    const wsUrl = `ws://localhost:${server.port}/collab`;
+    const wsUrl = `ws://127.0.0.1:${server.port}/collab`;
     const { stub: sharedStorage } = makeStubStorage();
 
     const poolA = new ProviderPool(3, wsUrl, { storage: sharedStorage });

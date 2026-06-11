@@ -12,7 +12,7 @@ export function computeMapDrivenBodySplice(
   oldBody: string,
   newPmJson: JSONContent,
   mdManager: MarkdownManager,
-  onFallback?: (reason: 'parse-error' | 'missing-position') => void,
+  onFallback?: (reason: 'parse-error' | 'missing-position', err?: unknown) => void,
 ): MapDrivenSplice | null {
   let oldChildren: readonly RootContent[];
   let newBody: string;
@@ -21,8 +21,8 @@ export function computeMapDrivenBodySplice(
     oldChildren = mdManager.parseToMdast(oldBody).children;
     newBody = mdManager.serialize(newPmJson);
     newChildren = mdManager.parseToMdast(newBody).children;
-  } catch {
-    onFallback?.('parse-error');
+  } catch (err) {
+    onFallback?.('parse-error', err);
     return null;
   }
 

@@ -13,7 +13,7 @@ afterEach(async () => {
 });
 
 async function writeMd(port: number, docName: string): Promise<Response> {
-  return fetch(`http://localhost:${port}/api/agent-write-md`, {
+  return fetch(`http://127.0.0.1:${port}/api/agent-write-md`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ docName, markdown: '# persisted content\n', position: 'replace' }),

@@ -27,7 +27,7 @@ async function writeMd(
   markdown: string,
   opts: { docName: string; position: 'append' | 'prepend' | 'replace' },
 ) {
-  return fetch(`http://localhost:${port}/api/agent-write-md`, {
+  return fetch(`http://127.0.0.1:${port}/api/agent-write-md`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ markdown, ...opts }),
@@ -38,7 +38,7 @@ async function agentUndoRaw(
   port: number,
   opts: { docName: string; connectionId: string; scope?: 'last' | 'session' },
 ) {
-  return fetch(`http://localhost:${port}/api/agent-undo`, {
+  return fetch(`http://127.0.0.1:${port}/api/agent-undo`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

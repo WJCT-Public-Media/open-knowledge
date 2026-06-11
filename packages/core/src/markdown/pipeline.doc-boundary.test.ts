@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { JSONContent } from '@tiptap/core';
 import { sharedExtensions } from '../extensions/shared.ts';
 import { MarkdownManager } from './index.ts';
+import { assertRoundTripIdempotent } from './round-trip-asserts.test-helper.ts';
 
 const md = new MarkdownManager({ extensions: sharedExtensions });
 
@@ -9,9 +10,7 @@ function rt(source: string): string {
   return md.serialize(md.parse(source));
 }
 
-function expectByteStable(out: string): void {
-  expect(rt(out)).toBe(out);
-}
+const expectByteStable = (out: string): void => assertRoundTripIdempotent(rt, out);
 
 describe('indented-code leading-indent capture (tab-expansion)', () => {
   test('a tab-indented code line round-trips byte-exact', () => {

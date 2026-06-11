@@ -23,13 +23,13 @@ afterAll(async () => {
 });
 
 async function fetchShowAll() {
-  const res = await fetch(`http://localhost:${server.port}/api/documents?showAll=true`);
+  const res = await fetch(`http://127.0.0.1:${server.port}/api/documents?showAll=true`);
   expect(res.ok).toBe(true);
   return DocumentListSuccessSchema.parse(await res.json());
 }
 
 async function fetchDefaultRaw(): Promise<Record<string, unknown>> {
-  const res = await fetch(`http://localhost:${server.port}/api/documents`);
+  const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`);
   expect(res.ok).toBe(true);
   return (await res.json()) as Record<string, unknown>;
 }

@@ -90,7 +90,7 @@ describe('ProviderPool reconnects', () => {
     const docName = 'reload-doc';
     writeFileSync(join(server.contentDir, `${docName}.md`), SMALL_FIXTURE, 'utf-8');
 
-    const firstPool = new ProviderPool(3, `ws://localhost:${server.port}/collab`);
+    const firstPool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`);
     await seedPoolServerInstanceId(server, firstPool);
     await seedAndSyncSingleClient(server, firstPool, docName);
     await wait(300);
@@ -106,7 +106,7 @@ describe('ProviderPool reconnects', () => {
 
     expect(server.instance.hocuspocus.documents.has(docName)).toBe(true);
 
-    const secondPool = new ProviderPool(3, `ws://localhost:${server.port}/collab`);
+    const secondPool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`);
     cleanups.push(() => secondPool.dispose());
     await seedPoolServerInstanceId(server, secondPool);
     secondPool.open(docName);
@@ -142,7 +142,7 @@ describe('ProviderPool reconnects', () => {
       },
     };
 
-    const firstPool = new ProviderPool(3, `ws://localhost:${server.port}/collab`, { storage });
+    const firstPool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`, { storage });
     const firstServerId = await seedPoolServerInstanceId(server, firstPool);
     await seedAndSyncSingleClient(server, firstPool, docName);
     await wait(300);
@@ -159,7 +159,7 @@ describe('ProviderPool reconnects', () => {
     server = await server.killAndRestartOnSamePort({ downtimeMs: 500 });
     cleanups.unshift(() => server.shutdown());
 
-    const secondPool = new ProviderPool(3, `ws://localhost:${server.port}/collab`, { storage });
+    const secondPool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`, { storage });
     cleanups.push(() => secondPool.dispose());
     const secondServerId = await seedPoolServerInstanceId(server, secondPool);
     expect(secondServerId).not.toBe(firstServerId);
@@ -182,7 +182,7 @@ describe('ProviderPool reconnects', () => {
     let server = await createRestartableServer();
     cleanups.push(() => server.shutdown());
 
-    const pool = new ProviderPool(3, `ws://localhost:${server.port}/collab`);
+    const pool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`);
     cleanups.push(() => pool.dispose());
     await seedPoolServerInstanceId(server, pool);
 
@@ -216,7 +216,7 @@ describe('ProviderPool reconnects', () => {
     let server = await createRestartableServer();
     cleanups.push(() => server.shutdown());
 
-    const pool = new ProviderPool(3, `ws://localhost:${server.port}/collab`);
+    const pool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`);
     cleanups.push(() => pool.dispose());
     await seedPoolServerInstanceId(server, pool);
 
@@ -300,7 +300,7 @@ describe('ProviderPool reconnects', () => {
     let server = await createRestartableServer();
     cleanups.push(() => server.shutdown());
 
-    const pool = new ProviderPool(3, `ws://localhost:${server.port}/collab`);
+    const pool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`);
     cleanups.push(() => pool.dispose());
     await seedPoolServerInstanceId(server, pool);
 

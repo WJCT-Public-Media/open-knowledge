@@ -60,7 +60,7 @@ describe('T8: Managed-rename with populated target', () => {
     const preText = preDoc.getText('source').toString();
     const preClientIdSize = preDoc.store.clients.size;
 
-    const res = await fetch(`http://localhost:${server.port}/api/rename-path`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/rename-path`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

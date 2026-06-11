@@ -48,7 +48,7 @@ describe('Managed rename — loaded-Y.Doc rewrite path (QA-040 / QA-008)', () =>
     expect(ytext.toString()).toContain('[[old]]');
     expect(ytext.toString()).not.toContain('[[new]]');
 
-    const res = await fetch(`http://localhost:${server.port}/api/rename-path`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/rename-path`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ kind: 'file', fromPath: 'old', toPath: 'new' }),

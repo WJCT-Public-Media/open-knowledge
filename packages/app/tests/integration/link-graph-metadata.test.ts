@@ -54,7 +54,7 @@ afterAll(async () => {
 });
 
 async function fetchLinkGraph(): Promise<LinkGraphResponse> {
-  const res = await fetch(`http://localhost:${server.port}/api/link-graph`);
+  const res = await fetch(`http://127.0.0.1:${server.port}/api/link-graph`);
   return res.json() as Promise<LinkGraphResponse>;
 }
 

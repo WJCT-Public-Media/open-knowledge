@@ -21,6 +21,7 @@ describe('classifySeverity', () => {
     'commonmark-escape',
     'leading-newline',
     'doc-start-thematic',
+    'paragraph-continuation-indent',
   ];
   const serializerCaused: BridgeToleranceClass[] = [
     'block-separator-collapse',

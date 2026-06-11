@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import type { Root } from 'mdast';
 import { sharedExtensions } from '../extensions/shared.ts';
-import { encodeEntityRefs, protectPattern, restoreEntityRefsPlugin } from './entity-ref-guard.ts';
+import {
+  decodeEntityRefs,
+  encodeEntityRefs,
+  protectPattern,
+  restoreEntityRefsPlugin,
+} from './entity-ref-guard.ts';
 import { MarkdownManager } from './index.ts';
 
 describe('protectPattern — length preservation', () => {
@@ -314,6 +319,24 @@ describe('restoreEntityRefsPlugin — mdast walk', () => {
       .children[0];
     expect(text?.value).toBe('plain text without entities');
     expect(text?.data).toBeUndefined();
+  });
+});
+
+describe('decodeEntityRefs — CommonMark §2.5 U+FFFD safety net', () => {
+  test('NUL numeric reference decodes to U+FFFD', () => {
+    expect(decodeEntityRefs('a&#0;b')).toBe('a\uFFFDb');
+  });
+
+  test('surrogate numeric reference decodes to U+FFFD, not a throw', () => {
+    expect(decodeEntityRefs('x&#xD800;y')).toBe('x\uFFFDy');
+  });
+
+  test('out-of-range numeric reference decodes to U+FFFD', () => {
+    expect(decodeEntityRefs('q&#x110000;r')).toBe('q\uFFFDr');
+  });
+
+  test('valid named and numeric refs still decode beside the net', () => {
+    expect(decodeEntityRefs('&quot;&#65;&#x42;')).toBe('"AB');
   });
 });
 

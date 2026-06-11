@@ -18,6 +18,7 @@ const SEVERITY_BY_CLASS = {
   crlf: 'parser-caused',
   'commonmark-escape': 'parser-caused',
   'leading-newline': 'parser-caused',
+  'paragraph-continuation-indent': 'parser-caused',
   'doc-start-thematic': 'parser-caused',
   'block-separator-collapse': 'serializer-caused',
   'table-align-row-spacing': 'serializer-caused',

@@ -23,7 +23,7 @@ afterAll(async () => {
 });
 
 const depth1 = (dir?: string): string => {
-  const base = `http://localhost:${server.port}/api/documents?showAll=true&depth=1`;
+  const base = `http://127.0.0.1:${server.port}/api/documents?showAll=true&depth=1`;
   return dir ? `${base}&dir=${encodeURIComponent(dir)}` : base;
 };
 
@@ -72,7 +72,7 @@ describe('GET /api/documents depth-1 lazy children', () => {
   });
 
   test('without depth=1, the recursive walk still returns descendants', async () => {
-    const res = await fetch(`http://localhost:${server.port}/api/documents?showAll=true`);
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/documents?showAll=true`);
     const body = DocumentListSuccessSchema.parse(await res.json());
     const paths = body.documents.map((e) => (e.kind === 'folder' ? e.path : (e.docName ?? e.path)));
     expect(paths).toContain('with-kids/grandchild/deep');

@@ -41,7 +41,7 @@ describe('T9: External disk edit during server restart', () => {
 
     writeFileSync(join(server.contentDir, 'test-doc.md'), CONTENT_A, 'utf-8');
 
-    const pool = new ProviderPool(3, `ws://localhost:${server.port}/collab`);
+    const pool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`);
     cleanups.push(() => pool.dispose());
     await seedPoolServerInstanceId(server, pool);
 

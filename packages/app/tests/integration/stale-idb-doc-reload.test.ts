@@ -74,7 +74,7 @@ describe('client-persisted state meets a re-seeded doc lineage (same server inst
     writeFileSync(filePath, FIXTURE_V1, 'utf-8');
     await awaitFileWatcherIndexed(server, docName);
 
-    const pool = new ProviderPool(3, `ws://localhost:${server.port}/collab`);
+    const pool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`);
     cleanups.push(() => pool.dispose());
     const serverInstanceId = await seedPoolServerInstanceId(server, pool);
 

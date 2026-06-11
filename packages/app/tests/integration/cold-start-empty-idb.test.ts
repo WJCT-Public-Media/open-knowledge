@@ -39,7 +39,7 @@ describe('T13: cold start with empty IDB after server restart', () => {
     server = await server.killAndRestartOnSamePort({ downtimeMs: 400 });
     cleanups.unshift(() => server.shutdown());
 
-    const pool = new ProviderPool(3, `ws://localhost:${server.port}/collab`);
+    const pool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`);
     cleanups.push(() => pool.dispose());
     const serverInstanceId = await seedPoolServerInstanceId(server, pool);
 

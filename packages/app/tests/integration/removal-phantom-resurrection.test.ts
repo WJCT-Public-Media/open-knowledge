@@ -54,7 +54,7 @@ async function renamePath(
   fromPath: string,
   toPath: string,
 ): Promise<{ status: number; body: { ok: boolean; renamed?: unknown[] } }> {
-  const res = await fetch(`http://localhost:${port}/api/rename-path`, {
+  const res = await fetch(`http://127.0.0.1:${port}/api/rename-path`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ kind: 'file', fromPath, toPath }),
@@ -68,7 +68,7 @@ async function deletePath(
   path: string,
   kind: 'file' | 'folder' = 'file',
 ): Promise<{ status: number; body: { ok: boolean; deletedDocNames?: string[] } }> {
-  const res = await fetch(`http://localhost:${port}/api/delete-path`, {
+  const res = await fetch(`http://127.0.0.1:${port}/api/delete-path`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ kind, path }),
@@ -81,7 +81,7 @@ async function createPage(
   port: number,
   path: string,
 ): Promise<{ status: number; body: { ok: boolean; docName?: string } }> {
-  const res = await fetch(`http://localhost:${port}/api/create-page`, {
+  const res = await fetch(`http://127.0.0.1:${port}/api/create-page`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ path }),
@@ -93,7 +93,7 @@ async function createPage(
 async function seedDoc(server: TestServer, docName: string, content = '# seed\n'): Promise<void> {
   writeFileSync(join(server.contentDir, `${docName}.md`), content, 'utf-8');
   await pollUntilAsync(async () => {
-    const res = await fetch(`http://localhost:${server.port}/api/documents`);
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`);
     if (!res.ok) return false;
     const data = (await res.json()) as { documents?: Array<{ docName: string }> };
     return data.documents?.some((d) => d.docName === docName) === true;
@@ -343,7 +343,7 @@ describe('RecentlyRemovedDocs — cache lifecycle', () => {
 
     const doc = new Y.Doc();
     const provider = new HocuspocusProvider({
-      url: `ws://localhost:${server.port}/collab`,
+      url: `ws://127.0.0.1:${server.port}/collab`,
       name: fromName,
       document: doc,
       connect: true,
@@ -393,7 +393,7 @@ describe('RecentlyRemovedDocs — cache lifecycle', () => {
 
     const doc = new Y.Doc();
     const provider = new HocuspocusProvider({
-      url: `ws://localhost:${server.port}/collab`,
+      url: `ws://127.0.0.1:${server.port}/collab`,
       name: docName,
       document: doc,
       connect: true,

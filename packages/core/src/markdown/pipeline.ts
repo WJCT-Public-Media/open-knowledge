@@ -142,6 +142,11 @@ function splitDocumentHeadBom(source: string): { source: string; hadBom: boolean
     : { source, hadBom: false };
 }
 
+const GAP_CAPTURE_MIN_NEWLINES = 3;
+
+const LEADING_BOUNDARY_SHAPE = /^\n+$/;
+const TRAILING_BOUNDARY_SHAPE = /^\n{2,}$/;
+
 function captureDocBoundary(
   root: MdastRoot,
   source: string,
@@ -156,12 +161,12 @@ function captureDocBoundary(
     const firstStart = children[0]?.position?.start?.offset;
     if (typeof firstStart === 'number' && firstStart > 0) {
       const gap = source.slice(0, firstStart);
-      if (/^\n+$/.test(gap)) leading = gap;
+      if (LEADING_BOUNDARY_SHAPE.test(gap)) leading = gap;
     }
     const lastEnd = children[children.length - 1]?.position?.end?.offset;
     if (typeof lastEnd === 'number' && lastEnd <= source.length) {
       const gap = source.slice(lastEnd);
-      if (/^\n{2,}$/.test(gap)) trailing = gap;
+      if (TRAILING_BOUNDARY_SHAPE.test(gap)) trailing = gap;
     }
     const gaps: Array<number | null> = [];
     let anyGap = false;
@@ -171,7 +176,7 @@ function captureDocBoundary(
       let blanks: number | null = null;
       if (typeof prevEnd === 'number' && typeof nextStart === 'number' && nextStart >= prevEnd) {
         const gap = source.slice(prevEnd, nextStart);
-        if (/^\n{3,}$/.test(gap)) {
+        if (new RegExp(`^\\n{${GAP_CAPTURE_MIN_NEWLINES},}$`).test(gap)) {
           blanks = gap.length - 1;
           anyGap = true;
         }
@@ -205,12 +210,18 @@ function readDocBoundary(value: unknown): SourceDocBoundary | undefined {
     gapBlankLines?: Array<number | null>;
   } = {};
   if (v.bom === true) out.bom = true;
-  if (typeof v.leading === 'string' && /^\n+$/.test(v.leading)) out.leading = v.leading;
-  if (typeof v.trailing === 'string' && /^\n{2,}$/.test(v.trailing)) out.trailing = v.trailing;
+  if (typeof v.leading === 'string' && LEADING_BOUNDARY_SHAPE.test(v.leading)) {
+    out.leading = v.leading;
+  }
+  if (typeof v.trailing === 'string' && TRAILING_BOUNDARY_SHAPE.test(v.trailing)) {
+    out.trailing = v.trailing;
+  }
   if (
     Array.isArray(v.gapBlankLines) &&
     v.gapBlankLines.every(
-      (g) => g === null || (typeof g === 'number' && Number.isInteger(g) && g >= 2),
+      (g) =>
+        g === null ||
+        (typeof g === 'number' && Number.isInteger(g) && g >= GAP_CAPTURE_MIN_NEWLINES - 1),
     )
   ) {
     out.gapBlankLines = v.gapBlankLines as Array<number | null>;

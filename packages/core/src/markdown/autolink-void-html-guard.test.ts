@@ -4,6 +4,7 @@ import { sharedExtensions } from '../extensions/shared.ts';
 import { protectFromMdx } from './autolink-void-html-guard.ts';
 import { MarkdownManager } from './index.ts';
 import { mdastToHtml } from './mdast-to-html.ts';
+import { assertByteStable } from './round-trip-asserts.test-helper.ts';
 
 const mdManager = new MarkdownManager({ extensions: sharedExtensions });
 
@@ -291,11 +292,7 @@ describe('R23 guard: angle-bracket link destinations', () => {
     return out;
   }
 
-  function expectByteStable(md: string): void {
-    const r1 = roundTrip(md);
-    expect(r1).toBe(md);
-    expect(roundTrip(r1)).toBe(r1);
-  }
+  const expectByteStable = (md: string): void => assertByteStable(roundTrip, md);
 
   test('[link](</my uri>) parses to a link node with the space-bearing url', () => {
     const tree = mdManager.parseToMdast('[link](</my uri>)\n');

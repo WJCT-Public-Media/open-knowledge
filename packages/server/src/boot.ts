@@ -35,6 +35,10 @@ import { MissingOkConfigError } from './missing-ok-config-error.ts';
 import { createServer, type ServerInstance, type ServerOptions } from './server-factory.ts';
 import { installServerMemoryGauge } from './server-memory-telemetry.ts';
 import { initTelemetry, shutdownTelemetry, withSpan } from './telemetry.ts';
+import {
+  initToleranceTelemetryWriter,
+  teardownToleranceTelemetryWriter,
+} from './tolerance-telemetry-writer.ts';
 import { acquireUiLock, releaseUiLock, UiLockCollisionError, updateUiLockPort } from './ui-lock.ts';
 
 const LEGACY_RUNTIME_FILENAMES = [
@@ -171,6 +175,7 @@ export async function bootServer(opts: BootServerOptions): Promise<BootedServer>
     });
   }
   initTelemetry({ localSink: localSinkConfig?.telemetry });
+  initToleranceTelemetryWriter(sinkProjectDir);
   installServerMemoryGauge();
 
   const { kind: worktreeKind, gitdir: worktreeGitdir } = computeWorktreeAttributes(
@@ -243,6 +248,10 @@ async function bootServerInner(opts: BootServerOptions): Promise<BootedServer> {
       process.stderr.write(`${err.message}\n`);
     }
     await shutdownTelemetry();
+    await Promise.race([
+      teardownToleranceTelemetryWriter(),
+      new Promise<void>((resolve) => setTimeout(resolve, DESTROY_STEP_TIMEOUT_MS)),
+    ]);
     throw err;
   }
 
@@ -501,6 +510,7 @@ async function bootServerInner(opts: BootServerOptions): Promise<BootedServer> {
       await runStep('releaseUiLock', async () => releaseUiLock(lockDir));
     }
     await runStep('shutdownTelemetry', () => shutdownTelemetry());
+    await runStep('teardownToleranceTelemetry', () => teardownToleranceTelemetryWriter());
     await runStep('flushLogFileSinks', () => loggerFactory.flushAllFileSinks());
 
     if (errors.length > 0) {

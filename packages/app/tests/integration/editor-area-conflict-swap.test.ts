@@ -20,7 +20,7 @@ async function setupServerWithDoc(docName: string, initial: string): Promise<Tes
   cleanups.push(() => server.cleanup());
   writeFileSync(join(server.contentDir, `${docName}.md`), initial, 'utf-8');
   await pollUntil(async () => {
-    const res = await fetch(`http://localhost:${server.port}/api/documents`).catch(() => null);
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`).catch(() => null);
     if (!res?.ok) return false;
     const data = (await res.json()) as { documents?: Array<{ docName: string }> };
     return data.documents?.some((d) => d.docName === docName) ?? false;

@@ -32,8 +32,8 @@ describe('T15: Missed disk-ack frame recovery via /api/server-info', () => {
     });
     cleanups.push(() => server.shutdown());
 
-    const baseUrl = `http://localhost:${server.port}`;
-    const pool = new ProviderPool(3, `ws://localhost:${server.port}/collab`);
+    const baseUrl = `http://127.0.0.1:${server.port}`;
+    const pool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`);
     cleanups.push(() => pool.dispose());
 
     await refreshServerInfo(pool, baseUrl);

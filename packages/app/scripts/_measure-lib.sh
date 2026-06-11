@@ -184,11 +184,22 @@ require_jq() {
 }
 
 resolve_repo_root() {
-  local root
-  root="$(git rev-parse --show-toplevel 2>/dev/null)"
-  if [[ -z "$root" ]]; then
-    echo "error: not inside a git repository" >&2
-    exit 4
-  fi
-  printf '%s\n' "$root"
+  # The OK WORKSPACE root, not the git toplevel: inside the agents-private
+  # monorepo `git rev-parse --show-toplevel` resolves two levels above
+  # public/open-knowledge/, which silently mislocates LOG_DIR/APP_DIR (JSONL
+  # records written outside the subtree; replay hints pointing at paths that
+  # don't exist). Walk up from this library's own location to the nearest
+  # directory carrying bun.lock — correct in both the standalone public repo
+  # and the monorepo, and independent of the caller's cwd.
+  local dir
+  dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  while [[ "$dir" != "/" ]]; do
+    if [[ -f "$dir/bun.lock" ]]; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+  echo "error: no bun.lock workspace root above ${BASH_SOURCE[0]}" >&2
+  exit 4
 }

@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { BridgeInvariantViolationError } from '@inkeep/open-knowledge-core';
+import {
+  BridgeInvariantViolationError,
+  setToleranceTelemetryHook,
+  type ToleranceFireRecord,
+} from '@inkeep/open-knowledge-core';
 import {
   __getSplitBrainRateTupleCountForTests,
   __getViolationRateTupleCountForTests,
@@ -666,6 +670,52 @@ describe('bridge-tolerance-applied event (FR-41)', () => {
     );
     expect(classes.has('bom')).toBe(true);
     expect(classes.has('crlf')).toBe(true);
+  });
+});
+
+describe('tolerance-telemetry file hook receives the full un-rate-limited list', () => {
+  let fires: ToleranceFireRecord[] = [];
+
+  beforeEach(() => {
+    fires = [];
+    setToleranceTelemetryHook((record) => {
+      fires.push(record);
+    });
+  });
+
+  afterEach(() => {
+    setToleranceTelemetryHook(null);
+  });
+
+  test('hook fires on both calls while console/metric emit once', () => {
+    const originalWarn = console.warn;
+    const warnings: string[] = [];
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args.map(String).join(' '));
+    };
+
+    try {
+      assertBridgeInvariant('# Hello\r\n', '# Hello\n', {
+        site: 'observer-b',
+        docName: 'doc-1',
+        nowMs: 1000,
+      });
+      assertBridgeInvariant('# Hello\r\n', '# Hello\n', {
+        site: 'observer-b',
+        docName: 'doc-1',
+        nowMs: 1500,
+      });
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    expect(fires.filter((f) => f.className === 'crlf')).toHaveLength(2);
+
+    const crlfWarnings = warnings
+      .map((w) => JSON.parse(w))
+      .filter((e) => e.event === 'bridge-tolerance-applied' && e.class === 'crlf');
+    expect(crlfWarnings).toHaveLength(1);
+    expect(getMetrics().bridgeToleranceApplied.crlf).toBe(1);
   });
 });
 

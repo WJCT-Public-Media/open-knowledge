@@ -3,12 +3,12 @@ import { describe as _bunDescribe, afterEach, beforeEach, expect, test } from 'b
 const describe = process.env.CI ? _bunDescribe.skip : _bunDescribe;
 
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { hostname, tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { OK_DIR } from '@inkeep/open-knowledge-core';
+import { emitToleranceFire, OK_DIR } from '@inkeep/open-knowledge-core';
 import { context, metrics, trace } from '@opentelemetry/api';
 import {
   BasicTracerProvider,
@@ -218,6 +218,42 @@ describe('bootServer — runtime state lives at projectDir, not contentDir', () 
     } finally {
       await booted.destroy();
     }
+  });
+});
+
+describe('bootServer — tolerance-telemetry writer wired through the real boot path', () => {
+  test('flag=1 boot produces tolerance-telemetry.jsonl from an emitToleranceFire', async () => {
+    const prevFlag = process.env.OK_BRIDGE_TOLERANCE_TELEMETRY;
+    process.env.OK_BRIDGE_TOLERANCE_TELEMETRY = '1';
+    const projectDir = mkdtempSync(resolve(tmpDir, 'tolerance-telemetry-'));
+    await execFileAsync('git', ['init', '--initial-branch=main', projectDir]);
+    seedOkScaffold(projectDir);
+
+    const booted = await bootServer({
+      config: TEST_CONFIG,
+      projectDir,
+      contentDir: projectDir,
+      port: 0,
+      quiet: true,
+      gitEnabled: false,
+      idleShutdownMs: null,
+      attachUiSibling: false,
+    });
+    try {
+      await booted.ready;
+      emitToleranceFire(['crlf'], 'a\r\n', 'a\n', 'smoke-doc');
+    } finally {
+      await booted.destroy();
+      if (prevFlag === undefined) delete process.env.OK_BRIDGE_TOLERANCE_TELEMETRY;
+      else process.env.OK_BRIDGE_TOLERANCE_TELEMETRY = prevFlag;
+    }
+
+    const logPath = resolve(projectDir, '.ok', 'local', 'tolerance-telemetry.jsonl');
+    expect(existsSync(logPath)).toBe(true);
+    const record = JSON.parse(readFileSync(logPath, 'utf-8').trim().split('\n')[0] ?? '');
+    expect(record.event).toBe('bridge-tolerance-fire');
+    expect(record.class).toBe('crlf');
+    expect(record.document).toBe('smoke-doc');
   });
 });
 

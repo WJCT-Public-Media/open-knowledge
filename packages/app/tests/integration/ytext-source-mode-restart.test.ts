@@ -43,7 +43,7 @@ describe('T10: Y.Text (source-mode) duplication on restart', () => {
 
     writeFileSync(join(server.contentDir, 'test-doc.md'), FIXTURE, 'utf-8');
 
-    const pool = new ProviderPool(3, `ws://localhost:${server.port}/collab`);
+    const pool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`);
     cleanups.push(() => pool.dispose());
     await seedPoolServerInstanceId(server, pool);
 

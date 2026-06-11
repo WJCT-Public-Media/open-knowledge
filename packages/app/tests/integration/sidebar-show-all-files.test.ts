@@ -57,7 +57,7 @@ afterAll(async () => {
 
 describe('/api/documents?showAll=true', () => {
   test("non-bypass request returns today's filtered view (no .gitignored / .okignored / BUILTIN_SKIP_DIRS)", async () => {
-    const res = await fetch(`http://localhost:${server.port}/api/documents`);
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`);
     expect(res.ok).toBe(true);
     const body = DocumentListSuccessSchema.parse(await res.json());
 
@@ -74,7 +74,7 @@ describe('/api/documents?showAll=true', () => {
   });
 
   test('?showAll=true surfaces .gitignored / .okignored / content-bearing skip-dir markdown but prunes the always-skip floor', async () => {
-    const res = await fetch(`http://localhost:${server.port}/api/documents?showAll=true`);
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/documents?showAll=true`);
     expect(res.ok).toBe(true);
     const body = DocumentListSuccessSchema.parse(await res.json());
 
@@ -92,7 +92,7 @@ describe('/api/documents?showAll=true', () => {
   });
 
   test('?showAll=true surfaces non-md / non-asset files as kind=asset', async () => {
-    const res = await fetch(`http://localhost:${server.port}/api/documents?showAll=true`);
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/documents?showAll=true`);
     expect(res.ok).toBe(true);
     const body = DocumentListSuccessSchema.parse(await res.json());
 
@@ -121,7 +121,7 @@ describe('/api/documents?showAll=true', () => {
   });
 
   test('?showAll=true emits folder entries for content dirs but prunes the always-skip floor (.git / node_modules / .ok)', async () => {
-    const res = await fetch(`http://localhost:${server.port}/api/documents?showAll=true`);
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/documents?showAll=true`);
     expect(res.ok).toBe(true);
     const body = DocumentListSuccessSchema.parse(await res.json());
 
@@ -140,7 +140,7 @@ describe('/api/documents?showAll=true', () => {
   });
 
   test('STOP rule preserved — synthetic system + config docs stay hidden in bypass mode', async () => {
-    const res = await fetch(`http://localhost:${server.port}/api/documents?showAll=true`);
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/documents?showAll=true`);
     expect(res.ok).toBe(true);
     const body = DocumentListSuccessSchema.parse(await res.json());
 
@@ -164,13 +164,13 @@ describe('/api/documents?showAll=true', () => {
   });
 
   test('?showAll=true is per-request only — non-bypass call after bypass call still returns filtered view', async () => {
-    const r1 = await fetch(`http://localhost:${server.port}/api/documents?showAll=true`);
+    const r1 = await fetch(`http://127.0.0.1:${server.port}/api/documents?showAll=true`);
     const b1 = DocumentListSuccessSchema.parse(await r1.json());
     expect(b1.documents.some((e) => e.kind === 'document' && e.docName === 'secrets/api-key')).toBe(
       true,
     );
 
-    const r2 = await fetch(`http://localhost:${server.port}/api/documents`);
+    const r2 = await fetch(`http://127.0.0.1:${server.port}/api/documents`);
     const b2 = DocumentListSuccessSchema.parse(await r2.json());
     expect(b2.documents.some((e) => e.kind === 'document' && e.docName === 'secrets/api-key')).toBe(
       false,

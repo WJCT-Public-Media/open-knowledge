@@ -10,7 +10,7 @@ const ROOT_FILE_COUNT = 40;
 let server: TestServer;
 
 function showAllUrl(dir?: string): string {
-  const base = `http://localhost:${server.port}/api/documents?showAll=true`;
+  const base = `http://127.0.0.1:${server.port}/api/documents?showAll=true`;
   return dir ? `${base}&dir=${encodeURIComponent(dir)}` : base;
 }
 

@@ -70,7 +70,7 @@ async function getHistory(
   const params = new URLSearchParams({ docName });
   if (opts?.branch) params.set('branch', opts.branch);
   if (opts?.limit !== undefined) params.set('limit', String(opts.limit));
-  const res = await fetch(`http://localhost:${port}/api/history?${params}`);
+  const res = await fetch(`http://127.0.0.1:${port}/api/history?${params}`);
   return (await res.json()) as TimelineResponse;
 }
 
@@ -83,7 +83,7 @@ async function getHistoryVersion(
   body: { ok: boolean; sha?: string; content?: string; error?: string };
 }> {
   const params = new URLSearchParams({ docName });
-  const res = await fetch(`http://localhost:${port}/api/history/${sha}?${params}`);
+  const res = await fetch(`http://127.0.0.1:${port}/api/history/${sha}?${params}`);
   return {
     status: res.status,
     body: (await res.json()) as { ok: boolean; sha?: string; content?: string; error?: string },
@@ -94,7 +94,7 @@ async function rollback(
   port: number,
   body: { docName: string; commitSha: string; agentId?: string; agentName?: string },
 ): Promise<{ status: number; body: RollbackResponse }> {
-  const res = await fetch(`http://localhost:${port}/api/rollback`, {
+  const res = await fetch(`http://127.0.0.1:${port}/api/rollback`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -114,7 +114,7 @@ async function renamePath(
     summary?: string;
   },
 ): Promise<{ status: number; body: RenameResponse }> {
-  const res = await fetch(`http://localhost:${port}/api/rename-path`, {
+  const res = await fetch(`http://127.0.0.1:${port}/api/rename-path`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -127,7 +127,7 @@ async function deletePath(
   port: number,
   body: { kind: 'file' | 'folder'; path: string; agentId?: string; agentName?: string },
 ): Promise<{ status: number }> {
-  const res = await fetch(`http://localhost:${port}/api/delete-path`, {
+  const res = await fetch(`http://127.0.0.1:${port}/api/delete-path`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -139,7 +139,7 @@ async function saveVersion(
   port: number,
   opts?: { agentId?: string; agentName?: string; message?: string },
 ): Promise<void> {
-  const res = await fetch(`http://localhost:${port}/api/save-version`, {
+  const res = await fetch(`http://127.0.0.1:${port}/api/save-version`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -204,7 +204,7 @@ async function awaitWipCommit(
   const intervals = [100, 250, 500, 1000];
   let attempt = 0;
   while (Date.now() < deadline) {
-    const flushRes = await fetch(`http://localhost:${server.port}/api/test-flush-git`, {
+    const flushRes = await fetch(`http://127.0.0.1:${server.port}/api/test-flush-git`, {
       method: 'POST',
     });
     if (!flushRes.ok) {
@@ -637,7 +637,7 @@ describe('Timeline rename-history mitigation — integration', () => {
     const server = await bootServer();
     writeFileSync(join(server.contentDir, 'summary-a.md'), '# A\n', 'utf-8');
     await pollUntil(async () => {
-      const res = await fetch(`http://localhost:${server.port}/api/documents`);
+      const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`);
       if (!res.ok) return false;
       const data = (await res.json()) as { documents?: DocumentListEntry[] };
       return (data.documents ?? []).some((d) => isDocumentListDoc(d) && d.docName === 'summary-a');
@@ -717,7 +717,7 @@ describe('Timeline rename-history mitigation — integration', () => {
     const server = await bootServer();
     writeFileSync(join(server.contentDir, 'pure-a.md'), '# Pure A\n', 'utf-8');
     await pollUntil(async () => {
-      const res = await fetch(`http://localhost:${server.port}/api/documents`);
+      const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`);
       if (!res.ok) return false;
       const data = (await res.json()) as { documents?: DocumentListEntry[] };
       return (data.documents ?? []).some((d) => isDocumentListDoc(d) && d.docName === 'pure-a');
@@ -750,12 +750,12 @@ describe('Timeline rename-history mitigation — integration', () => {
       writeFileSync(join(server.contentDir, 'big', `doc-${i}.md`), `# doc-${i}\n`, 'utf-8');
     }
 
-    const rescanRes = await fetch(`http://localhost:${server.port}/api/test-rescan-files`, {
+    const rescanRes = await fetch(`http://127.0.0.1:${server.port}/api/test-rescan-files`, {
       method: 'POST',
     });
     expect(rescanRes.status).toBe(200);
 
-    const docsRes = await fetch(`http://localhost:${server.port}/api/documents`);
+    const docsRes = await fetch(`http://127.0.0.1:${server.port}/api/documents`);
     expect(docsRes.status).toBe(200);
     const docsData = (await docsRes.json()) as { documents?: DocumentListEntry[] };
     const indexedCount = (docsData.documents ?? []).filter(

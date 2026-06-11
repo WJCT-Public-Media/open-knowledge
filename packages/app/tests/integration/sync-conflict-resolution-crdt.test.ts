@@ -23,7 +23,7 @@ async function setupServerWithDoc(docName: string, initial: string): Promise<Tes
   cleanups.push(() => server.cleanup());
   writeFileSync(join(server.contentDir, `${docName}.md`), initial, 'utf-8');
   await pollUntil(async () => {
-    const res = await fetch(`http://localhost:${server.port}/api/documents`).catch(() => null);
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`).catch(() => null);
     if (!res?.ok) return false;
     const data = (await res.json()) as { documents?: Array<{ docName: string }> };
     return data.documents?.some((d) => d.docName === docName) ?? false;
@@ -122,7 +122,7 @@ describe('case "conflicts" reconcile branch -> CRDT lifecycle', () => {
     cleanups.push(() => server.cleanup());
     writeFileSync(join(server.contentDir, `${docName}.md`), baseContent, 'utf-8');
     await pollUntil(async () => {
-      const res = await fetch(`http://localhost:${server.port}/api/documents`).catch(() => null);
+      const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`).catch(() => null);
       if (!res?.ok) return false;
       const data = (await res.json()) as { documents?: Array<{ docName: string }> };
       return data.documents?.some((d) => d.docName === docName) ?? false;
@@ -193,7 +193,7 @@ describe('FR7 + FR9: mutating handlers refuse with RFC 9457 slim 409 during conf
 
   test('POST /api/agent-write returns 409 doc-in-conflict', async () => {
     const { docName, server } = await seedConflictedDoc();
-    const res = await fetch(`http://localhost:${server.port}/api/agent-write`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/agent-write`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -208,7 +208,7 @@ describe('FR7 + FR9: mutating handlers refuse with RFC 9457 slim 409 during conf
 
   test('POST /api/agent-write-md returns 409 doc-in-conflict', async () => {
     const { docName, server } = await seedConflictedDoc();
-    const res = await fetch(`http://localhost:${server.port}/api/agent-write-md`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/agent-write-md`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -224,7 +224,7 @@ describe('FR7 + FR9: mutating handlers refuse with RFC 9457 slim 409 during conf
 
   test('POST /api/agent-patch returns 409 doc-in-conflict', async () => {
     const { docName, server } = await seedConflictedDoc();
-    const res = await fetch(`http://localhost:${server.port}/api/agent-patch`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/agent-patch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -245,7 +245,7 @@ describe('FR7 + FR9: mutating handlers refuse with RFC 9457 slim 409 during conf
       colorSeed: 'u',
     });
 
-    const res = await fetch(`http://localhost:${server.port}/api/agent-undo`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/agent-undo`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -261,7 +261,7 @@ describe('FR7 + FR9: mutating handlers refuse with RFC 9457 slim 409 during conf
 
   test('POST /api/rollback returns 409 doc-in-conflict', async () => {
     const { docName, server } = await seedConflictedDoc();
-    const res = await fetch(`http://localhost:${server.port}/api/rollback`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/rollback`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -274,7 +274,7 @@ describe('FR7 + FR9: mutating handlers refuse with RFC 9457 slim 409 during conf
 
   test('POST /api/rename-path returns 409 doc-in-conflict when source is conflicted', async () => {
     const { docName, server } = await seedConflictedDoc();
-    const res = await fetch(`http://localhost:${server.port}/api/rename-path`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/rename-path`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -288,7 +288,7 @@ describe('FR7 + FR9: mutating handlers refuse with RFC 9457 slim 409 during conf
 
   test('POST /api/delete-path returns 409 doc-in-conflict when target is conflicted', async () => {
     const { docName, server } = await seedConflictedDoc();
-    const res = await fetch(`http://localhost:${server.port}/api/delete-path`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/delete-path`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -318,7 +318,7 @@ describe('FR7 + FR9: mutating handlers refuse with RFC 9457 slim 409 during conf
     });
     cleanups.push(() => server.cleanup());
     await pollUntil(async () => {
-      const res = await fetch(`http://localhost:${server.port}/api/documents`).catch(() => null);
+      const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`).catch(() => null);
       if (!res?.ok) return false;
       const data = (await res.json()) as { documents?: Array<{ docName: string }> };
       return data.documents?.some((d) => d.docName === childDocName) ?? false;
@@ -336,7 +336,7 @@ describe('FR7 + FR9: mutating handlers refuse with RFC 9457 slim 409 during conf
 
   test('POST /api/rename-path (folder) returns 409 when subtree contains a conflicted doc', async () => {
     const { folder, childDocName, server } = await seedConflictedDocInFolder();
-    const res = await fetch(`http://localhost:${server.port}/api/rename-path`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/rename-path`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -375,7 +375,7 @@ describe('GET /api/sync/conflict-content?source=ytext', () => {
     }, 5000);
 
     const ytextRes = await fetch(
-      `http://localhost:${server.port}/api/sync/conflict-content?file=${docName}.md&source=ytext`,
+      `http://127.0.0.1:${server.port}/api/sync/conflict-content?file=${docName}.md&source=ytext`,
     );
     expect(ytextRes.ok).toBe(true);
     const ytextBody = (await ytextRes.json()) as {
@@ -390,7 +390,7 @@ describe('GET /api/sync/conflict-content?source=ytext', () => {
     expect(ytextBody.lifecycleStatus).toBe('conflict');
 
     const defaultRes = await fetch(
-      `http://localhost:${server.port}/api/sync/conflict-content?file=${docName}.md`,
+      `http://127.0.0.1:${server.port}/api/sync/conflict-content?file=${docName}.md`,
     );
     expect(defaultRes.ok).toBe(true);
     const defaultBody = (await defaultRes.json()) as { ours: string };
@@ -421,7 +421,7 @@ describe('GET /api/sync/conflict-content?source=ytext', () => {
     }, 5000);
 
     const ytextRes = await fetch(
-      `http://localhost:${server.port}/api/sync/conflict-content?file=${docName}.md&source=ytext`,
+      `http://127.0.0.1:${server.port}/api/sync/conflict-content?file=${docName}.md&source=ytext`,
     );
     expect(ytextRes.ok).toBe(true);
     const ytextBody = (await ytextRes.json()) as { ours: string; lifecycleStatus: string | null };

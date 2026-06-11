@@ -27,12 +27,18 @@
  *   "Convergence failed after 25s" occurs at ~2-4% rate under heavy macOS
  *   scheduler load with 3 clients + 12 ops + aggressive inter-op pacing.
  *   This is SPEC §11 "PBT convergence fuzzer flakes on CI under runner load"
- *   risk materializing. Seed snapshots written to /tmp/bridge-conv-fuzz-<seed>/
- *   on failure enable deterministic replay:
+ *   risk materializing. The harness now discriminates at budget exhaustion:
+ *   a final state with byte-identical peers AND a holding bridge invariant
+ *   classifies as `converged-late` (a PASS, surfaced separately in the
+ *   RESULT line as a perf signal) — only peer divergence or a
+ *   beyond-tolerance settle fails the seed. Replay-rate triage is therefore
+ *   no longer the discriminator for the timeout class (giant fuzz-grown
+ *   docs replay as a coin-flip on a loaded machine — neither cleanly
+ *   passing nor failing). Seed snapshots written to
+ *   /tmp/bridge-conv-fuzz-<seed>/ on failure enable deterministic replay:
  *     STRESS_FUZZ_SEED=<seed> bun test packages/app/tests/stress/bridge-convergence.fuzz.test.ts
- *   If the replay passes, it's infra flakiness; if it fails repeatedly on
- *   replay, it's a real bug. Content-preservation violations (oracle d) are
- *   deterministic-on-replay — a different signal class from convergence flakes.
+ *   Content-preservation violations (oracle d) remain deterministic-on-replay
+ *   — a different signal class from convergence timing.
  *
  * Seed replay: STRESS_FUZZ_SEED=<n> bun test packages/app/tests/stress/bridge-convergence.fuzz.test.ts
  * Seed count: BRIDGE_FUZZ_SEEDS=<n> (default: 25; CI PR: 25, nightly: 100)
@@ -56,6 +62,7 @@ import {
   agentWriteMd,
   assertBridgeInvariant,
   awaitDocQuiescence,
+  classifyFinalState,
   createItemOriginProbe,
   createTestClients,
   createTestServer,
@@ -190,7 +197,7 @@ async function applyOp(
   clients: TestClient[],
   server: TestServer,
   docName: string,
-): Promise<void> {
+): Promise<boolean> {
   switch (op.kind) {
     case 'wysiwyg-type': {
       const client = clients[op.clientIdx];
@@ -229,26 +236,34 @@ async function applyOp(
     case 'agent-write': {
       try {
         await agentWriteMd(server.port, `${op.text}\n`, { docName, position: op.position });
-      } catch {}
+      } catch {
+        return false;
+      }
       break;
     }
     case 'agent-patch': {
       try {
         await agentPatch(server.port, op.find, op.replace, docName);
-      } catch {}
+      } catch {
+        return false;
+      }
       break;
     }
     case 'agent-undo': {
       try {
         await agentUndo(server.port, { docName, connectionId: 'claude-1' });
-      } catch {}
+      } catch {
+        return false;
+      }
       break;
     }
     case 'external-change': {
+      writeFileSync(join(server.contentDir, `${docName}.md`), op.newContent, 'utf-8');
       try {
-        writeFileSync(join(server.contentDir, `${docName}.md`), op.newContent, 'utf-8');
         applyExternalChange(server.instance.hocuspocus, docName, op.newContent);
-      } catch {}
+      } catch {
+        return false;
+      }
       break;
     }
     case 'sync-pause': {
@@ -268,9 +283,18 @@ async function applyOp(
       break;
     }
   }
+  return true;
 }
 
-async function driveToConvergence(clients: TestClient[], timeoutMs = 15000): Promise<boolean> {
+type ConvergenceOutcome =
+  | { outcome: 'converged' }
+  | { outcome: 'converged-late' }
+  | { outcome: 'stalled'; detail: string };
+
+async function driveToConvergence(
+  clients: TestClient[],
+  timeoutMs = 15000,
+): Promise<ConvergenceOutcome> {
   const start = Date.now();
 
   await Promise.all(clients.map((c) => awaitDocQuiescence(c.doc, { timeoutMs: 3000 })));
@@ -293,7 +317,7 @@ async function driveToConvergence(clients: TestClient[], timeoutMs = 15000): Pro
           break;
         }
       }
-      if (allBridgeOk) return true;
+      if (allBridgeOk) return { outcome: 'converged' };
     }
 
     if (attempts < 8) {
@@ -308,7 +332,10 @@ async function driveToConvergence(clients: TestClient[], timeoutMs = 15000): Pro
     attempts++;
     await wait(200);
   }
-  return false;
+
+  await Promise.all(clients.map((c) => awaitDocQuiescence(c.doc, { timeoutMs: 3000 })));
+  await wait(250);
+  return classifyFinalState(clients);
 }
 
 function writeFuzzSnapshot(
@@ -414,6 +441,7 @@ describe('bridge-convergence fuzzer (FR-17)', () => {
   let server: TestServer;
   const fuzzPassed: number[] = [];
   const fuzzFailed: number[] = [];
+  const fuzzConvergedLate: number[] = [];
 
   beforeAll(async () => {
     server = await createTestServer();
@@ -421,7 +449,7 @@ describe('bridge-convergence fuzzer (FR-17)', () => {
 
   afterAll(async () => {
     process.stdout.write(
-      `[fuzz] RESULT seeds=${fuzzPassed.length + fuzzFailed.length} passed=${fuzzPassed.length} failed=${fuzzFailed.length} failingSeeds=[${fuzzFailed.join(',')}]\n`,
+      `[fuzz] RESULT seeds=${fuzzPassed.length + fuzzFailed.length} passed=${fuzzPassed.length} failed=${fuzzFailed.length} failingSeeds=[${fuzzFailed.join(',')}] convergedLate=${fuzzConvergedLate.length} convergedLateSeeds=[${fuzzConvergedLate.join(',')}]\n`,
     );
     try {
       await server?.cleanup();
@@ -438,293 +466,306 @@ describe('bridge-convergence fuzzer (FR-17)', () => {
       ? [FIXED_SEED]
       : Array.from({ length: SEED_COUNT }, (_, i) => Date.now() + i);
 
-  test.each(seeds)('bridge-convergence seed %d', async (seed) => {
-    let setupOk = false;
-    let clients: Awaited<ReturnType<typeof createTestClients>> = [] as never;
-    const rng = createPRNG(seed);
-    const clientCount = 2 + (seed % 2); // 2..3
-    const opCount = 12;
-    const docName = `fuzz-${seed}`;
+  test.each(seeds)(
+    'bridge-convergence seed %d',
+    async (seed) => {
+      let setupOk = false;
+      let clients: Awaited<ReturnType<typeof createTestClients>> = [] as never;
+      const rng = createPRNG(seed);
+      const clientCount = 2 + (seed % 2); // 2..3
+      const opCount = 12;
+      const docName = `fuzz-${seed}`;
 
-    try {
-      await agentWriteMd(server.port, 'seed paragraph\n', { docName, position: 'replace' });
-      await wait(200);
+      try {
+        await agentWriteMd(server.port, 'seed paragraph\n', { docName, position: 'replace' });
+        await wait(200);
 
-      clients = await createTestClients(server.port, {
-        count: clientCount,
-        docName,
-        perClientOptions: { syncControl: true, skipInvariantWatcher: true },
+        clients = await createTestClients(server.port, {
+          count: clientCount,
+          docName,
+          perClientOptions: { syncControl: true, skipInvariantWatcher: true },
+        });
+        setupOk = true;
+      } catch (err) {
+        fuzzFailed.push(seed);
+        throw err;
+      }
+      if (!setupOk) {
+        fuzzFailed.push(seed);
+        throw new Error(`bridge-convergence fuzz setup invariant violated for seed ${seed}`);
+      }
+
+      const localFuzzOrigin = Object.freeze({
+        source: 'local' as const,
+        skipStoreHooks: false,
+        context: Object.freeze({
+          origin: 'agent-write',
+          paired: true as const,
+          session_id: `fuzz-probe-${seed}`,
+        }),
       });
-      setupOk = true;
-    } catch (err) {
-      fuzzFailed.push(seed);
-      throw err;
-    }
-    if (!setupOk) {
-      fuzzFailed.push(seed);
-      throw new Error(`bridge-convergence fuzz setup invariant violated for seed ${seed}`);
-    }
-
-    const localFuzzOrigin = Object.freeze({
-      source: 'local' as const,
-      skipStoreHooks: false,
-      context: Object.freeze({
-        origin: 'agent-write',
-        paired: true as const,
-        session_id: `fuzz-probe-${seed}`,
-      }),
-    });
-    if (!isPairedWriteOrigin(localFuzzOrigin)) {
-      throw new Error(
-        `fuzz: isPairedWriteOrigin(localFuzzOrigin) failed — per-session origin rejected`,
+      if (!isPairedWriteOrigin(localFuzzOrigin)) {
+        throw new Error(
+          `fuzz: isPairedWriteOrigin(localFuzzOrigin) failed — per-session origin rejected`,
+        );
+      }
+      const agentProbes = clients.map((c) =>
+        createItemOriginProbe(c.ytext, { trackedOrigins: [localFuzzOrigin] }),
       );
-    }
-    const agentProbes = clients.map((c) =>
-      createItemOriginProbe(c.ytext, { trackedOrigins: [localFuzzOrigin] }),
-    );
 
-    const livePrefixes = new Set<string>();
-    const prefixOf = (marker: string): string => {
-      const dashIdx = marker.indexOf('-');
-      return dashIdx === -1 ? marker : marker.slice(0, dashIdx + 1);
-    };
+      const livePrefixes = new Set<string>();
+      const prefixOf = (marker: string): string => {
+        const dashIdx = marker.indexOf('-');
+        return dashIdx === -1 ? marker : marker.slice(0, dashIdx + 1);
+      };
 
-    let expectedBody = 'seed paragraph'; // post-seed, pre-op initial state
-    const updateExpectedBody = (op: Op): void => {
-      switch (op.kind) {
-        case 'wysiwyg-type':
-        case 'source-type':
-          expectedBody = expectedBody.length > 0 ? `${expectedBody}\n\n${op.marker}` : op.marker;
-          break;
-        case 'agent-write': {
-          switch (op.position) {
-            case 'replace':
-              expectedBody = op.marker;
-              break;
-            case 'prepend':
-              expectedBody =
-                expectedBody.length > 0 ? `${op.marker}\n\n${expectedBody}` : op.marker;
-              break;
-            case 'append':
-              expectedBody =
-                expectedBody.trim().length > 0 ? `${expectedBody}\n\n${op.marker}` : op.marker;
-              break;
-          }
-          break;
-        }
-        case 'agent-patch': {
-          const pos = expectedBody.indexOf(op.find);
-          if (pos !== -1) {
-            expectedBody =
-              expectedBody.slice(0, pos) + op.replace + expectedBody.slice(pos + op.find.length);
-          }
-          break;
-        }
-        case 'external-change':
-          expectedBody = op.newContent.replace(/\n+$/, '');
-          break;
-        case 'agent-undo':
-          expectedBody = '';
-          break;
-        case 'sync-pause':
-        case 'sync-resume':
-        case 'wait':
-          break;
-      }
-    };
-
-    try {
-      const ops = generateOps(rng, clientCount, opCount);
-
-      for (const op of ops) {
-        await applyOp(op, clients, server, docName);
-
-        if (op.kind === 'wysiwyg-type' || op.kind === 'source-type' || op.kind === 'agent-write') {
-          livePrefixes.add(prefixOf(op.marker));
-        } else if (op.kind === 'external-change') {
-          livePrefixes.clear();
-          livePrefixes.add(prefixOf(op.marker));
-        } else if (op.kind === 'agent-undo') {
-          livePrefixes.clear();
-        }
-
-        updateExpectedBody(op);
-      }
-
-      for (const c of clients) {
-        try {
-          c.resumeSync();
-        } catch {}
-      }
-
-      const converged = await driveToConvergence(clients, 60000);
-      if (!converged) {
-        const states = snapshotClients(clients);
-        throw new Error(
-          `Convergence failed after 60s.\n${states.map((s, i) => `  Client ${i}: ytext=${s.ytext.length}ch frag=${s.fragmentMd.length}ch`).join('\n')}`,
-        );
-      }
-
-      for (const c of clients) {
-        assertBridgeInvariant(c.ytext, c.fragment);
-      }
-
-      for (const probe of agentProbes) {
-        probe.assertOnlyTrackedOrigins();
-
-        if (probe.undoStackLength() > 0) {
-          probe.recordCapture();
-          probe.assertCaptureIntact();
-        }
-      }
-
-      const missingPrefixes: Array<{ clientIdx: number; prefix: string }> = [];
-      for (const prefix of livePrefixes) {
-        for (let ci = 0; ci < clients.length; ci++) {
-          const client = clients[ci];
-          if (!client) continue;
-          if (!client.ytext.toString().includes(prefix)) {
-            missingPrefixes.push({ clientIdx: ci, prefix });
-          }
-        }
-      }
-
-      if (missingPrefixes.length > 0) {
-        throw new Error(
-          `Content preservation violated — ${missingPrefixes.length} missing prefixes ` +
-            `(zero tolerance: hybrid diff3+DMP merge must preserve all content).\n` +
-            missingPrefixes
-              .slice(0, 5)
-              .map((m) => `  client ${m.clientIdx} missing prefix '${m.prefix}'`)
-              .join('\n') +
-            (missingPrefixes.length > 5 ? `\n  ...and ${missingPrefixes.length - 5} more` : ''),
-        );
-      }
-
-      const preMarkerLines = new Map<string, string>(); // prefix → pre-patch line
-      const patches: Array<{ find: string; replace: string }> = [];
-      for (const op of ops) {
+      let expectedBody = 'seed paragraph'; // post-seed, pre-op initial state
+      const updateExpectedBody = (op: Op): void => {
         switch (op.kind) {
           case 'wysiwyg-type':
           case 'source-type':
-            preMarkerLines.set(prefixOf(op.marker), op.marker);
+            expectedBody = expectedBody.length > 0 ? `${expectedBody}\n\n${op.marker}` : op.marker;
             break;
-          case 'agent-write':
-            if (op.position === 'replace') preMarkerLines.clear();
-            preMarkerLines.set(prefixOf(op.marker), op.marker);
+          case 'agent-write': {
+            switch (op.position) {
+              case 'replace':
+                expectedBody = op.marker;
+                break;
+              case 'prepend':
+                expectedBody =
+                  expectedBody.length > 0 ? `${op.marker}\n\n${expectedBody}` : op.marker;
+                break;
+              case 'append':
+                expectedBody =
+                  expectedBody.trim().length > 0 ? `${expectedBody}\n\n${op.marker}` : op.marker;
+                break;
+            }
             break;
-          case 'agent-patch':
-            patches.push({ find: op.find, replace: op.replace });
+          }
+          case 'agent-patch': {
+            const pos = expectedBody.indexOf(op.find);
+            if (pos !== -1) {
+              expectedBody =
+                expectedBody.slice(0, pos) + op.replace + expectedBody.slice(pos + op.find.length);
+            }
             break;
+          }
           case 'external-change':
-            preMarkerLines.clear();
-            preMarkerLines.set(prefixOf(op.marker), op.marker);
+            expectedBody = op.newContent.replace(/\n+$/, '');
             break;
           case 'agent-undo':
-            preMarkerLines.clear();
+            expectedBody = '';
+            break;
+          case 'sync-pause':
+          case 'sync-resume':
+          case 'wait':
             break;
         }
-      }
+      };
 
-      if (preMarkerLines.size > 0) {
-        const acceptableForPrefix = new Map<string, Set<string>>();
-        for (const [prefix, preLine] of preMarkerLines) {
-          const accepts = new Set<string>([preLine]);
-          for (let iter = 0; iter < patches.length; iter++) {
-            const snapshot = [...accepts];
-            let grew = false;
-            for (const line of snapshot) {
-              for (const { find, replace } of patches) {
-                if (line.includes(find)) {
-                  const idx = line.indexOf(find);
-                  const post = line.slice(0, idx) + replace + line.slice(idx + find.length);
-                  if (!accepts.has(post)) {
-                    accepts.add(post);
-                    grew = true;
+      try {
+        const ops = generateOps(rng, clientCount, opCount);
+
+        for (const op of ops) {
+          const applied = await applyOp(op, clients, server, docName);
+          if (!applied) continue;
+
+          if (
+            op.kind === 'wysiwyg-type' ||
+            op.kind === 'source-type' ||
+            op.kind === 'agent-write'
+          ) {
+            livePrefixes.add(prefixOf(op.marker));
+          } else if (op.kind === 'external-change') {
+            livePrefixes.clear();
+            livePrefixes.add(prefixOf(op.marker));
+          } else if (op.kind === 'agent-undo') {
+            livePrefixes.clear();
+          }
+
+          updateExpectedBody(op);
+        }
+
+        for (const c of clients) {
+          try {
+            c.resumeSync();
+          } catch {}
+        }
+
+        const convergence = await driveToConvergence(clients, 60000);
+        if (convergence.outcome === 'stalled') {
+          const states = snapshotClients(clients);
+          throw new Error(
+            `Convergence failed after 60s (${convergence.detail}).\n${states.map((s, i) => `  Client ${i}: ytext=${s.ytext.length}ch frag=${s.fragmentMd.length}ch`).join('\n')}`,
+          );
+        }
+        if (convergence.outcome === 'converged-late') {
+          fuzzConvergedLate.push(seed);
+          console.log(`[fuzz] converged-late seed=${seed} (final state within tolerance)`);
+        }
+
+        for (const c of clients) {
+          assertBridgeInvariant(c.ytext, c.fragment);
+        }
+
+        for (const probe of agentProbes) {
+          probe.assertOnlyTrackedOrigins();
+
+          if (probe.undoStackLength() > 0) {
+            probe.recordCapture();
+            probe.assertCaptureIntact();
+          }
+        }
+
+        const missingPrefixes: Array<{ clientIdx: number; prefix: string }> = [];
+        for (const prefix of livePrefixes) {
+          for (let ci = 0; ci < clients.length; ci++) {
+            const client = clients[ci];
+            if (!client) continue;
+            if (!client.ytext.toString().includes(prefix)) {
+              missingPrefixes.push({ clientIdx: ci, prefix });
+            }
+          }
+        }
+
+        if (missingPrefixes.length > 0) {
+          throw new Error(
+            `Content preservation violated — ${missingPrefixes.length} missing prefixes ` +
+              `(zero tolerance: hybrid diff3+DMP merge must preserve all content).\n` +
+              missingPrefixes
+                .slice(0, 5)
+                .map((m) => `  client ${m.clientIdx} missing prefix '${m.prefix}'`)
+                .join('\n') +
+              (missingPrefixes.length > 5 ? `\n  ...and ${missingPrefixes.length - 5} more` : ''),
+          );
+        }
+
+        const preMarkerLines = new Map<string, string>(); // prefix → pre-patch line
+        const patches: Array<{ find: string; replace: string }> = [];
+        for (const op of ops) {
+          switch (op.kind) {
+            case 'wysiwyg-type':
+            case 'source-type':
+              preMarkerLines.set(prefixOf(op.marker), op.marker);
+              break;
+            case 'agent-write':
+              if (op.position === 'replace') preMarkerLines.clear();
+              preMarkerLines.set(prefixOf(op.marker), op.marker);
+              break;
+            case 'agent-patch':
+              patches.push({ find: op.find, replace: op.replace });
+              break;
+            case 'external-change':
+              preMarkerLines.clear();
+              preMarkerLines.set(prefixOf(op.marker), op.marker);
+              break;
+            case 'agent-undo':
+              preMarkerLines.clear();
+              break;
+          }
+        }
+
+        if (preMarkerLines.size > 0) {
+          const acceptableForPrefix = new Map<string, Set<string>>();
+          for (const [prefix, preLine] of preMarkerLines) {
+            const accepts = new Set<string>([preLine]);
+            for (let iter = 0; iter < patches.length; iter++) {
+              const snapshot = [...accepts];
+              let grew = false;
+              for (const line of snapshot) {
+                for (const { find, replace } of patches) {
+                  if (line.includes(find)) {
+                    const idx = line.indexOf(find);
+                    const post = line.slice(0, idx) + replace + line.slice(idx + find.length);
+                    if (!accepts.has(post)) {
+                      accepts.add(post);
+                      grew = true;
+                    }
                   }
                 }
               }
+              if (!grew) break;
             }
-            if (!grew) break;
+            acceptableForPrefix.set(prefix, accepts);
           }
-          acceptableForPrefix.set(prefix, accepts);
-        }
 
-        const chunkGlueRe = /^M\d+-chunked-/;
-        const hasChunkedPaste = ops.some((o) => o.kind === 'chunked-source-paste');
+          const chunkGlueRe = /^M\d+-chunked-/;
+          const hasChunkedPaste = ops.some((o) => o.kind === 'chunked-source-paste');
 
-        const missingContent: Array<{ clientIdx: number; prefix: string }> = [];
-        for (let ci = 0; ci < clients.length; ci++) {
-          const client = clients[ci];
-          if (!client) continue;
-          const gotLineList = client.ytext
-            .toString()
-            .split('\n')
-            .map((l) => l.trimEnd());
-          const gotLines = new Set(gotLineList);
-          for (const [prefix, accepts] of acceptableForPrefix) {
-            const matched = [...accepts].some(
-              (l) =>
-                gotLines.has(l) ||
-                (hasChunkedPaste &&
-                  gotLineList.some(
-                    (line) => line.startsWith(l) && chunkGlueRe.test(line.slice(l.length)),
-                  )),
+          const missingContent: Array<{ clientIdx: number; prefix: string }> = [];
+          for (let ci = 0; ci < clients.length; ci++) {
+            const client = clients[ci];
+            if (!client) continue;
+            const gotLineList = client.ytext
+              .toString()
+              .split('\n')
+              .map((l) => l.trimEnd());
+            const gotLines = new Set(gotLineList);
+            for (const [prefix, accepts] of acceptableForPrefix) {
+              const matched = [...accepts].some(
+                (l) =>
+                  gotLines.has(l) ||
+                  (hasChunkedPaste &&
+                    gotLineList.some(
+                      (line) => line.startsWith(l) && chunkGlueRe.test(line.slice(l.length)),
+                    )),
+              );
+              if (!matched) {
+                missingContent.push({ clientIdx: ci, prefix });
+              }
+            }
+          }
+
+          if (missingContent.length > 0) {
+            throw new Error(
+              `Oracle (e) content-set violation — ${missingContent.length} marker prefixes ` +
+                `with no acceptable line form (zero tolerance: tail corruption that can't be ` +
+                `explained by any applied agent-patch).\n` +
+                missingContent
+                  .slice(0, 5)
+                  .map(
+                    (m) =>
+                      `  client ${m.clientIdx} prefix '${m.prefix}' accepts=${JSON.stringify([...(acceptableForPrefix.get(m.prefix) ?? [])])}`,
+                  )
+                  .join('\n') +
+                (missingContent.length > 5 ? `\n  ...and ${missingContent.length - 5} more` : ''),
             );
-            if (!matched) {
-              missingContent.push({ clientIdx: ci, prefix });
-            }
           }
         }
-
-        if (missingContent.length > 0) {
-          throw new Error(
-            `Oracle (e) content-set violation — ${missingContent.length} marker prefixes ` +
-              `with no acceptable line form (zero tolerance: tail corruption that can't be ` +
-              `explained by any applied agent-patch).\n` +
-              missingContent
-                .slice(0, 5)
-                .map(
-                  (m) =>
-                    `  client ${m.clientIdx} prefix '${m.prefix}' accepts=${JSON.stringify([...(acceptableForPrefix.get(m.prefix) ?? [])])}`,
-                )
-                .join('\n') +
-              (missingContent.length > 5 ? `\n  ...and ${missingContent.length - 5} more` : ''),
-          );
+        fuzzPassed.push(seed);
+      } catch (err) {
+        writeFuzzSnapshot(seed, {
+          ops: generateOps(createPRNG(seed), clientCount, opCount),
+          error: err,
+          clientStates: snapshotClients(clients),
+        });
+        fuzzFailed.push(seed);
+        throw err;
+      } finally {
+        for (const p of agentProbes) {
+          try {
+            p.cleanup();
+          } catch (cleanupErr) {
+            console.warn(
+              `[bridge-convergence seed ${seed}] agent-probe cleanup failed:`,
+              cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+            );
+          }
+        }
+        for (const c of clients) {
+          try {
+            await c.cleanup();
+          } catch (cleanupErr) {
+            console.warn(
+              `[bridge-convergence seed ${seed}] client cleanup failed:`,
+              cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+            );
+          }
         }
       }
-      fuzzPassed.push(seed);
-    } catch (err) {
-      writeFuzzSnapshot(seed, {
-        ops: generateOps(createPRNG(seed), clientCount, opCount),
-        error: err,
-        clientStates: snapshotClients(clients),
-      });
-      fuzzFailed.push(seed);
-      throw err;
-    } finally {
-      for (const p of agentProbes) {
-        try {
-          p.cleanup();
-        } catch (cleanupErr) {
-          console.warn(
-            `[bridge-convergence seed ${seed}] agent-probe cleanup failed:`,
-            cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
-          );
-        }
-      }
-      for (const c of clients) {
-        try {
-          await c.cleanup();
-        } catch (cleanupErr) {
-          console.warn(
-            `[bridge-convergence seed ${seed}] client cleanup failed:`,
-            cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
-          );
-        }
-      }
-    }
-  }, 120_000);
+    },
+    FIXED_SEED === undefined ? 120_000 : 300_000,
+  );
 });
 
 describe('D18 coverage gate', () => {

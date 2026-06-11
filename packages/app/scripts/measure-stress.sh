@@ -126,7 +126,7 @@ START_MS="$(epoch_ms)"
 TEST_EXIT=0
 (
   cd "$APP_DIR"
-  bun test "$TEST_FILE" 2>&1
+  bun test --conditions development "$TEST_FILE" 2>&1
 ) | tee "$OUT_FILE" || TEST_EXIT=$?
 
 END_MS="$(epoch_ms)"
@@ -255,7 +255,7 @@ echo ""
 
 if [[ "$OUTCOME" == "fail" ]]; then
   echo "──────── failure replay command ────────"
-  echo "  STRESS_SEED=$ACTUAL_SEED bun test $TEST_FILE  # in $APP_DIR"
+  echo "  STRESS_SEED=$ACTUAL_SEED bun test --conditions development $TEST_FILE  # in $APP_DIR"
   echo ""
 elif [[ "$OUTCOME" == "crash" ]]; then
   echo "──────── crash diagnostic ────────"

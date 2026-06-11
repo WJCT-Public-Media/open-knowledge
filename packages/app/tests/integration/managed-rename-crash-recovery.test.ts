@@ -111,7 +111,7 @@ describe('Managed rename — crash recovery via boot-time initAsync (QA-006)', (
     expect(existsSync(join(contentDir, 'essays', 'a.md'))).toBe(false);
     expect(existsSync(managedRenameJournalPath(contentDir))).toBe(false);
 
-    const res = await fetch(`http://localhost:${server.port}/api/rename-path`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/rename-path`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ kind: 'folder', fromPath: 'articles', toPath: 'essays' }),

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import { MarkdownManager, sharedExtensions } from '@inkeep/open-knowledge-core';
 import { getSchema } from '@tiptap/core';
 import { updateYFragment } from '@tiptap/y-tiptap';
@@ -7,7 +7,11 @@ import { AGENT_WRITE_ORIGIN } from './agent-sessions.ts';
 import { composeAndWriteRawBody } from './bridge-intake.ts';
 import { computeMapDrivenBodySplice } from './map-driven-splice.ts';
 import { getMetrics } from './metrics.ts';
-import { OBSERVER_SYNC_ORIGIN, setupServerObservers } from './server-observers.ts';
+import {
+  __resetMapDrivenParseErrorWarnForTests,
+  OBSERVER_SYNC_ORIGIN,
+  setupServerObservers,
+} from './server-observers.ts';
 
 const mdManager = new MarkdownManager({ extensions: sharedExtensions });
 const schema = getSchema(sharedExtensions);
@@ -334,6 +338,53 @@ describe('map-driven Observer A — default Path A behavior', () => {
 
       expect(splice).toBeNull();
       expect(reasons).toEqual(['parse-error']);
+    });
+
+    test('a sustained parse-error fallback warns once with the error message, then stays counter-only', () => {
+      const raw = '# Heading\n\nFirst.\n\nSecond.\n';
+      const { doc, xmlFragment, ytext } = createTestDoc();
+      const throwingManager = new Proxy(mdManager, {
+        get(target, prop) {
+          if (prop === 'parseToMdast') {
+            return () => {
+              throw new Error('synthetic parser regression');
+            };
+          }
+          const value = Reflect.get(target, prop, target);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+      __resetMapDrivenParseErrorWarnForTests();
+      const warnSpy = spyOn(console, 'warn');
+      const cleanup = setupServerObservers({
+        doc,
+        xmlFragment,
+        ytext,
+        mdManager: throwingManager,
+        schema,
+      });
+      doc.transact(() => {
+        composeAndWriteRawBody(doc, raw, 'agent');
+      }, AGENT_WRITE_ORIGIN);
+
+      const before = getMetrics();
+      populateFragment(doc, xmlFragment, raw.replace('First.', 'First EDITED.'));
+      populateFragment(doc, xmlFragment, raw.replace('First.', 'First EDITED TWICE.'));
+      const after = getMetrics();
+
+      expect(ytext.toString()).toContain('First EDITED TWICE.');
+      expect(
+        (after.mapDrivenSpliceFallback['parse-error'] ?? 0) -
+          (before.mapDrivenSpliceFallback['parse-error'] ?? 0),
+      ).toBeGreaterThanOrEqual(2);
+      const spliceWarns = warnSpy.mock.calls.filter((args) =>
+        String(args[0]).includes('Map-driven splice'),
+      );
+      expect(spliceWarns).toHaveLength(1);
+      expect(spliceWarns[0]?.[1]).toBe('synthetic parser regression');
+
+      warnSpy.mockRestore();
+      cleanup();
     });
 
     test('an offset-less block reports missing-position through the pure computer', () => {

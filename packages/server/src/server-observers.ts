@@ -74,6 +74,23 @@ interface TryComputeMapDrivenSpliceArgs {
   readonly docName: string | undefined;
 }
 
+let mapDrivenParseErrorWarned = false;
+
+/** Test-only: re-arm the parse-error warn-once (process-global, so an earlier
+ * suite test exercising the fallback would otherwise consume the single warn). */
+export function __resetMapDrivenParseErrorWarnForTests(): void {
+  mapDrivenParseErrorWarned = false;
+}
+
+function warnOnceMapDrivenParseError(docName: string | undefined, err: unknown): void {
+  if (mapDrivenParseErrorWarned) return;
+  mapDrivenParseErrorWarned = true;
+  console.warn(
+    `[Server Observer A] Map-driven splice parse/serialize threw (doc: ${docName ?? 'unknown'}); drains fall back to the incremental diff (warned once; further failures count in mapDrivenSpliceFallback only):`,
+    err instanceof Error ? err.message : String(err),
+  );
+}
+
 function tryComputeMapDrivenSplice(
   args: TryComputeMapDrivenSpliceArgs,
 ): YTextMapDrivenSplice | null {
@@ -93,7 +110,10 @@ function tryComputeMapDrivenSplice(
     oldBody,
     json as Parameters<typeof computeMapDrivenBodySplice>[1],
     mdManager,
-    incrementMapDrivenSpliceFallback,
+    (reason, err) => {
+      incrementMapDrivenSpliceFallback(reason);
+      if (reason === 'parse-error') warnOnceMapDrivenParseError(docName, err);
+    },
   );
   if (!splice) return null;
 
@@ -133,8 +153,8 @@ export interface SetupServerObserversOpts {
   onDispatch?: ObserverDispatchHook;
 }
 
-function settlesSplitBrain(settledText: string, md: string): boolean {
-  return settledText !== md && normalizeBridge(settledText) !== normalizeBridge(md);
+function settlesSplitBrain(settledText: string, md: string, normMdPre?: string): boolean {
+  return settledText !== md && normalizeBridge(settledText) !== (normMdPre ?? normalizeBridge(md));
 }
 
 export function setupServerObservers(opts: SetupServerObserversOpts): () => void {
@@ -296,7 +316,9 @@ export function setupServerObservers(opts: SetupServerObserversOpts): () => void
 
       const currentText = ytext.toString();
 
-      if (normalizeBridge(currentText) === normalizeBridge(md)) {
+      const normCurrent = normalizeBridge(currentText);
+      const normMd = normalizeBridge(md);
+      if (normCurrent === normMd) {
         setActiveSpanAttributes({ 'observer.a.path': 'gated-in-sync' });
         recordSettledBaselines(md);
         return;
@@ -304,10 +326,11 @@ export function setupServerObservers(opts: SetupServerObserversOpts): () => void
 
       const preMergeBaseline = lastSyncedYTextBytes;
       const ytextInSync = currentText === lastSyncedYTextBytes;
-      const residualInTolerance =
-        lastSyncedYTextBytes === lastSyncedCanonicalMd ||
-        normalizeBridge(lastSyncedYTextBytes) === normalizeBridge(lastSyncedCanonicalMd);
-      const residualMergeEligible = canonicalWitnessCoherent && !residualInTolerance;
+      const residualMergeEligible =
+        ytextInSync &&
+        canonicalWitnessCoherent &&
+        lastSyncedYTextBytes !== lastSyncedCanonicalMd &&
+        normCurrent !== normalizeBridge(lastSyncedCanonicalMd);
       setActiveSpanAttributes({
         'observer.a.path': ytextInSync
           ? residualMergeEligible
@@ -317,6 +340,7 @@ export function setupServerObservers(opts: SetupServerObserversOpts): () => void
       });
       const pathBState: { mergedText: string | null } = { mergedText: null };
 
+      const spliceComputeStart = performance.now();
       const mapDrivenSplice =
         ytextInSync && residualMergeEligible
           ? null
@@ -328,7 +352,10 @@ export function setupServerObservers(opts: SetupServerObserversOpts): () => void
               docName: opts.docName,
             });
       if (mapDrivenSplice) {
-        setActiveSpanAttributes({ 'observer.a.path': 'map-driven-splice' });
+        setActiveSpanAttributes({
+          'observer.a.path': 'map-driven-splice',
+          'observer.a.splice.compute_ms': Math.round(performance.now() - spliceComputeStart),
+        });
       }
 
       doc.transact(() => {
@@ -376,7 +403,7 @@ export function setupServerObservers(opts: SetupServerObserversOpts): () => void
       incrementServerObserverFire('a');
       recordSettledBaselines(md);
 
-      if (settlesSplitBrain(ytext.toString(), md)) {
+      if (settlesSplitBrain(ytext.toString(), md, normMd)) {
         textDirty = true;
         recordSplitBrainRederive('post-merge');
       }

@@ -28,7 +28,7 @@ describe('PRD-6881: config-doc server-instance recovery', () => {
 
     const doc = new Y.Doc();
     const provider = new HocuspocusProvider({
-      url: `ws://localhost:${server.port}/collab`,
+      url: `ws://127.0.0.1:${server.port}/collab`,
       name: CONFIG_DOC_NAME_OKIGNORE,
       document: doc,
     });
@@ -55,7 +55,7 @@ describe('PRD-6881: config-doc server-instance recovery', () => {
     const instanceA = server.instance.serverInstanceId;
     const doc = new Y.Doc();
     const provider = new HocuspocusProvider({
-      url: `ws://localhost:${server.port}/collab`,
+      url: `ws://127.0.0.1:${server.port}/collab`,
       name: CONFIG_DOC_NAME_OKIGNORE,
       document: doc,
       token: buildAuthToken(null, instanceA, null),

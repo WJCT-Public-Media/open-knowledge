@@ -12,7 +12,7 @@ test('backlink endpoints update after persisted agent writes', async () => {
   const server = await createTestServer();
 
   try {
-    const alpha = await fetch(`http://localhost:${server.port}/api/agent-write-md`, {
+    const alpha = await fetch(`http://127.0.0.1:${server.port}/api/agent-write-md`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -23,7 +23,7 @@ test('backlink endpoints update after persisted agent writes', async () => {
     });
     if (!alpha.ok) throw new Error(`alpha write failed: ${alpha.status}`);
 
-    const beta = await fetch(`http://localhost:${server.port}/api/agent-write-md`, {
+    const beta = await fetch(`http://127.0.0.1:${server.port}/api/agent-write-md`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -35,7 +35,7 @@ test('backlink endpoints update after persisted agent writes', async () => {
     if (!beta.ok) throw new Error(`beta write failed: ${beta.status}`);
 
     await pollUntil(async () => {
-      const res = await fetch(`http://localhost:${server.port}/api/backlinks?docName=beta`);
+      const res = await fetch(`http://127.0.0.1:${server.port}/api/backlinks?docName=beta`);
       const data = (await res.json()) as {
         backlinks?: Array<{ source: string; snippet: string | null }>;
       };
@@ -61,7 +61,7 @@ test('backlink endpoints update from live client edits before persistence deboun
 
     await pollUntil(
       async () => {
-        const res = await fetch(`http://localhost:${server.port}/api/backlinks?docName=beta`);
+        const res = await fetch(`http://127.0.0.1:${server.port}/api/backlinks?docName=beta`);
         const data = (await res.json()) as {
           backlinks?: Array<{ source: string; snippet: string | null }>;
         };

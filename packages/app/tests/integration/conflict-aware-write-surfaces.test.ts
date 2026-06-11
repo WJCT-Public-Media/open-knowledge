@@ -29,7 +29,7 @@ async function setupServerWithDoc(
   cleanups.push(() => server.cleanup());
   writeFileSync(join(server.contentDir, `${docName}.md`), initial, 'utf-8');
   await pollUntil(async () => {
-    const res = await fetch(`http://localhost:${server.port}/api/documents`).catch(() => null);
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`).catch(() => null);
     if (!res?.ok) return false;
     const data = (await res.json()) as { documents?: Array<{ docName: string }> };
     return data.documents?.some((d) => d.docName === docName) ?? false;
@@ -108,7 +108,7 @@ describe('FR1 + FR2: lifecycle swap-in / swap-out (server-observable contract)',
       const lifecycleMap = serverDoc.getMap('lifecycle');
 
       expect(lifecycleMap.get('status')).toBeUndefined();
-      const preGateRes = await fetch(`http://localhost:${server.port}/api/agent-write-md`, {
+      const preGateRes = await fetch(`http://127.0.0.1:${server.port}/api/agent-write-md`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -127,7 +127,7 @@ describe('FR1 + FR2: lifecycle swap-in / swap-out (server-observable contract)',
       expect(lifecycleMap.get('status')).toBe('conflict');
       expect(lifecycleMap.get('reason')).toBe('conflict-markers');
 
-      const inConflictRes = await fetch(`http://localhost:${server.port}/api/agent-write-md`, {
+      const inConflictRes = await fetch(`http://127.0.0.1:${server.port}/api/agent-write-md`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -151,7 +151,7 @@ describe('FR1 + FR2: lifecycle swap-in / swap-out (server-observable contract)',
 
       expect(serverDoc.getText('source').toString()).toBe(ytextBefore);
 
-      const postGateRes = await fetch(`http://localhost:${server.port}/api/agent-write-md`, {
+      const postGateRes = await fetch(`http://127.0.0.1:${server.port}/api/agent-write-md`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -179,7 +179,7 @@ describe('FR11: reconciliation conflict path sets lifecycle.status and fires the
       cleanups.push(() => server.cleanup());
       writeFileSync(join(server.contentDir, `${docName}.md`), baseContent, 'utf-8');
       await pollUntil(async () => {
-        const res = await fetch(`http://localhost:${server.port}/api/documents`).catch(() => null);
+        const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`).catch(() => null);
         if (!res?.ok) return false;
         const data = (await res.json()) as { documents?: Array<{ docName: string }> };
         return data.documents?.some((d) => d.docName === docName) ?? false;
@@ -209,7 +209,7 @@ describe('FR11: reconciliation conflict path sets lifecycle.status and fires the
       expect(lifecycle.get('status')).toBe('conflict');
       expect(lifecycle.get('reason')).toBe('merged-with-markers');
 
-      const res = await fetch(`http://localhost:${server.port}/api/agent-write-md`, {
+      const res = await fetch(`http://127.0.0.1:${server.port}/api/agent-write-md`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -260,7 +260,7 @@ describe('FR12: /api/sync/conflicts + /api/sync/status count parity', () => {
       const server = await createTestServer({ contentDir: tmpDir, keepContentDir: true });
       cleanups.push(() => server.cleanup());
 
-      const conflictsRes = await fetch(`http://localhost:${server.port}/api/sync/conflicts`);
+      const conflictsRes = await fetch(`http://127.0.0.1:${server.port}/api/sync/conflicts`);
       expect(conflictsRes.ok).toBe(true);
       const conflictsBody = (await conflictsRes.json()) as {
         conflicts: Array<{ file: string }>;
@@ -269,12 +269,12 @@ describe('FR12: /api/sync/conflicts + /api/sync/status count parity', () => {
       const files = conflictsBody.conflicts.map((c) => c.file).sort();
       expect(files).toEqual([fileA, fileB].sort());
 
-      const statusRes = await fetch(`http://localhost:${server.port}/api/sync/status`);
+      const statusRes = await fetch(`http://127.0.0.1:${server.port}/api/sync/status`);
       expect(statusRes.ok).toBe(true);
       const statusBody = (await statusRes.json()) as { conflictCount: number };
       expect(statusBody.conflictCount).toBe(2);
 
-      const resolveRes = await fetch(`http://localhost:${server.port}/api/sync/resolve-conflict`, {
+      const resolveRes = await fetch(`http://127.0.0.1:${server.port}/api/sync/resolve-conflict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -285,14 +285,14 @@ describe('FR12: /api/sync/conflicts + /api/sync/status count parity', () => {
       });
       expect(resolveRes.ok).toBe(true);
 
-      const conflictsRes2 = await fetch(`http://localhost:${server.port}/api/sync/conflicts`);
+      const conflictsRes2 = await fetch(`http://127.0.0.1:${server.port}/api/sync/conflicts`);
       const conflictsBody2 = (await conflictsRes2.json()) as {
         conflicts: Array<{ file: string }>;
       };
       expect(conflictsBody2.conflicts).toHaveLength(1);
       expect(conflictsBody2.conflicts[0]?.file).toBe(fileB);
 
-      const statusRes2 = await fetch(`http://localhost:${server.port}/api/sync/status`);
+      const statusRes2 = await fetch(`http://127.0.0.1:${server.port}/api/sync/status`);
       const statusBody2 = (await statusRes2.json()) as { conflictCount: number };
       expect(statusBody2.conflictCount).toBe(1);
     } finally {
@@ -349,7 +349,7 @@ describe('FR14: lifecycle restore function (in-process; CI-runnable)', () => {
       });
       expect(restoredEvent).toBeDefined();
 
-      const res = await fetch(`http://localhost:${server.port}/api/agent-write-md`, {
+      const res = await fetch(`http://127.0.0.1:${server.port}/api/agent-write-md`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -430,7 +430,7 @@ describe('on-load lifecycle seed from ConflictStore (runtime race fix)', () => {
       cleanups.push(() => server.cleanup());
 
       await pollUntil(async () => {
-        const res = await fetch(`http://localhost:${server.port}/api/documents`).catch(() => null);
+        const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`).catch(() => null);
         if (!res?.ok) return false;
         const data = (await res.json()) as { documents?: Array<{ docName: string }> };
         return data.documents?.some((d) => d.docName === docName) ?? false;
@@ -537,7 +537,7 @@ describeBoot('FR14: boot-time lifecycle restoration from conflicts.json', () => 
       });
       expect(restoredEvent).toBeDefined();
 
-      const res = await fetch(`http://localhost:${booted.port}/api/agent-write-md`, {
+      const res = await fetch(`http://127.0.0.1:${booted.port}/api/agent-write-md`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -579,7 +579,7 @@ describe('FR16: "Keep mine" dispatched as strategy="content" writes the bytes th
       await execFileAsync('git', ['-C', server.contentDir, 'commit', '-m', 'base']);
 
       await pollUntil(async () => {
-        const res = await fetch(`http://localhost:${server.port}/api/documents`).catch(() => null);
+        const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`).catch(() => null);
         if (!res?.ok) return false;
         const data = (await res.json()) as { documents?: Array<{ docName: string }> };
         return data.documents?.some((d) => d.docName === docName) ?? false;
@@ -657,7 +657,7 @@ describe('FR17: Conflicts list HTTP shape (data feed the sidebar section consume
       const server = await createTestServer({ contentDir: tmpDir, keepContentDir: true });
       cleanups.push(() => server.cleanup());
 
-      const beforeRes = await fetch(`http://localhost:${server.port}/api/sync/conflicts`);
+      const beforeRes = await fetch(`http://127.0.0.1:${server.port}/api/sync/conflicts`);
       expect(beforeRes.ok).toBe(true);
       const beforeBody = (await beforeRes.json()) as {
         conflicts: Array<{ file: string; detectedAt: string }>;
@@ -670,7 +670,7 @@ describe('FR17: Conflicts list HTTP shape (data feed the sidebar section consume
         expect(typeof entry.detectedAt).toBe('string');
       }
 
-      const resolveRes = await fetch(`http://localhost:${server.port}/api/sync/resolve-conflict`, {
+      const resolveRes = await fetch(`http://127.0.0.1:${server.port}/api/sync/resolve-conflict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -681,7 +681,7 @@ describe('FR17: Conflicts list HTTP shape (data feed the sidebar section consume
       });
       expect(resolveRes.ok).toBe(true);
 
-      const afterRes = await fetch(`http://localhost:${server.port}/api/sync/conflicts`);
+      const afterRes = await fetch(`http://127.0.0.1:${server.port}/api/sync/conflicts`);
       const afterBody = (await afterRes.json()) as { conflicts: Array<{ file: string }> };
       expect(afterBody.conflicts).toHaveLength(1);
       expect(afterBody.conflicts[0]?.file).toBe(fileB);
@@ -694,7 +694,7 @@ describe('FR17: Conflicts list HTTP shape (data feed the sidebar section consume
       await execFileAsync('git', ['init', '--initial-branch=main', tmpDir2]);
       const server2 = await createTestServer({ contentDir: tmpDir2, keepContentDir: true });
       cleanups.push(() => server2.cleanup());
-      const emptyRes = await fetch(`http://localhost:${server2.port}/api/sync/conflicts`);
+      const emptyRes = await fetch(`http://127.0.0.1:${server2.port}/api/sync/conflicts`);
       const emptyBody = (await emptyRes.json()) as { conflicts: Array<{ file: string }> };
       expect(emptyBody.conflicts).toHaveLength(0);
 

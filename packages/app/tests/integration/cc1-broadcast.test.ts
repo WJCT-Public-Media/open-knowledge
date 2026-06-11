@@ -31,7 +31,7 @@ function connectSystemDoc(port: number): {
   const doc = new Y.Doc();
   const signals: CC1DerivedViewPayload[] = [];
   const provider = new HocuspocusProvider({
-    url: `ws://localhost:${port}/collab`,
+    url: `ws://127.0.0.1:${port}/collab`,
     name: SYSTEM_DOC_NAME,
     document: doc,
     connect: true,
@@ -93,7 +93,7 @@ describe('CC1 broadcast — L1 integration', () => {
 
       await pollUntil(() => signals.length > 0, 5000, 50);
 
-      const docsRes = await fetch(`http://localhost:${server.port}/api/documents`);
+      const docsRes = await fetch(`http://127.0.0.1:${server.port}/api/documents`);
       const docsBody: { documents?: Array<{ docName: string }> } = await docsRes.json();
       expect(docsBody.documents?.some((doc) => doc.docName === docName)).toBe(true);
     } finally {
@@ -169,14 +169,14 @@ describe('CC1 broadcast — L1 integration', () => {
   test('skip surface: no __system__ state in any subsystem', async () => {
     expect(existsSync(join(server.contentDir, '__system__.md'))).toBe(false);
 
-    const docsRes = await fetch(`http://localhost:${server.port}/api/documents`);
+    const docsRes = await fetch(`http://127.0.0.1:${server.port}/api/documents`);
     const body = (await docsRes.json()) as { documents: Array<{ docName: string }> };
     const systemDocs = body.documents.filter((d) => d.docName === '__system__');
     expect(systemDocs).toHaveLength(0);
   });
 
   test('POST /api/create-page rejects __system__ docName', async () => {
-    const res = await fetch(`http://localhost:${server.port}/api/create-page`, {
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/create-page`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: '__system__.md' }),
@@ -203,7 +203,7 @@ describe('CC1 broadcast — L1 integration', () => {
       );
       const forgedFrame = encoding.toUint8Array(enc);
 
-      const attackerWs = new WebSocket(`ws://localhost:${server.port}/collab/${SYSTEM_DOC_NAME}`);
+      const attackerWs = new WebSocket(`ws://127.0.0.1:${server.port}/collab/${SYSTEM_DOC_NAME}`);
       await new Promise<void>((resolve, reject) => {
         attackerWs.onopen = () => resolve();
         attackerWs.onerror = (e) => reject(new Error(`ws error: ${String(e)}`));
@@ -343,7 +343,7 @@ describe('CC1 broadcast — L1 integration', () => {
     const doc = new Y.Doc();
     const arrivals: Array<{ seq: number; at: number }> = [];
     const provider = new HocuspocusProvider({
-      url: `ws://localhost:${server.port}/collab`,
+      url: `ws://127.0.0.1:${server.port}/collab`,
       name: SYSTEM_DOC_NAME,
       document: doc,
       connect: true,

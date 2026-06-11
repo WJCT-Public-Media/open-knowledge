@@ -70,7 +70,7 @@ describe('MCP move tool — real roundtrip against live OK server (QA-004 / QA-0
 
     const { server: mcp, registrations } = createCapturingServer();
     registerMove(mcp, {
-      serverUrl: `http://localhost:${server.port}`,
+      serverUrl: `http://127.0.0.1:${server.port}`,
       config: BASE_CONFIG,
       resolveCwd: async () => server.contentDir,
     });
@@ -121,7 +121,7 @@ describe('MCP move tool — real roundtrip against live OK server (QA-004 / QA-0
 
     const { server: mcp, registrations } = createCapturingServer();
     registerMove(mcp, {
-      serverUrl: `http://localhost:${server.port}`,
+      serverUrl: `http://127.0.0.1:${server.port}`,
       config: BASE_CONFIG,
       resolveCwd: async () => server.contentDir,
     });

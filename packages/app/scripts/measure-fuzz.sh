@@ -176,7 +176,7 @@ START_MS="$(epoch_ms)"
 TEST_EXIT=0
 (
   cd "$APP_DIR"
-  bun test "$TEST_FILE" 2>&1
+  bun test --conditions development "$TEST_FILE" 2>&1
 ) | tee "$OUT_FILE" || TEST_EXIT=$?
 
 END_MS="$(epoch_ms)"
@@ -194,6 +194,12 @@ DURATION_MS=$(( END_MS - START_MS ))
 # Fallback (when RESULT is missing — the test crashed before the after-all
 # hook could run): count all seeds as failed conservatively, since we
 # cannot confirm any specific seed passed.
+
+# Optional appended field (newer harness): converged-late count — seeds that
+# exhausted the convergence budget but settled within tolerance. Counted as
+# passes by the harness; recorded here as a perf signal.
+CONVERGED_LATE="$(grep -oE '^\[fuzz\] RESULT [^\n]*convergedLate=[0-9]+' "$OUT_FILE" | grep -oE 'convergedLate=[0-9]+' | tail -1 | cut -d= -f2 || true)"
+CONVERGED_LATE="${CONVERGED_LATE:-0}"
 
 FUZZ_RESULT_LINE="$(grep -oE '^\[fuzz\] RESULT seeds=[0-9]+ passed=[0-9]+ failed=[0-9]+ failingSeeds=\[[0-9,]*\]' "$OUT_FILE" | tail -1 || true)"
 
@@ -271,6 +277,7 @@ RECORD="$(jq -c -n \
   --arg script      "deep-fuzz" \
   --argjson seedCount   "$SEED_COUNT" \
   --argjson seedsFailed "$SEEDS_FAILED" \
+    --argjson convergedLate "${CONVERGED_LATE}" \
   --argjson rate        "$RATE" \
   --arg invokedBy   "$INVOKED_BY" \
   --arg context     "$CONTEXT" \
@@ -285,6 +292,7 @@ RECORD="$(jq -c -n \
      script: $script,
      seedCount: $seedCount,
      seedsFailed: $seedsFailed,
+     convergedLate: $convergedLate,
      rate: $rate,
      invokedBy: $invokedBy,
      context: $context,
@@ -320,7 +328,7 @@ if [[ "$SEEDS_FAILED" != "0" ]]; then
     echo "──────── failing seed replay commands ────────"
     while IFS= read -r seed; do
       [[ -z "$seed" ]] && continue
-      echo "  STRESS_FUZZ_SEED=$seed bun test $TEST_FILE  # in $APP_DIR"
+      echo "  STRESS_FUZZ_SEED=$seed bun test --conditions development $TEST_FILE  # in $APP_DIR"
     done <<< "$FAILING_SEEDS_LIST"
     echo ""
   fi

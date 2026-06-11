@@ -16,7 +16,7 @@ async function awaitFolderPathsIndexed(
   const deadline = Date.now() + timeoutMs;
   let lastFolderPaths: string[] = [];
   while (Date.now() < deadline) {
-    const res = await fetch(`http://localhost:${server.port}/api/documents`).catch(() => null);
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`).catch(() => null);
     if (res?.ok) {
       const body = DocumentListSuccessSchema.parse(await res.json());
       lastFolderPaths = body.documents.filter((e) => e.kind === 'folder').map((e) => e.path ?? '');
@@ -49,7 +49,7 @@ describe('/api/documents empty folder — boot-time', () => {
   });
 
   test('returns empty subfolder created before server start', async () => {
-    const res = await fetch(`http://localhost:${server.port}/api/documents`);
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`);
     expect(res.ok).toBe(true);
     const body = DocumentListSuccessSchema.parse(await res.json());
     const folders = body.documents.filter((e) => e.kind === 'folder');
@@ -58,7 +58,7 @@ describe('/api/documents empty folder — boot-time', () => {
   });
 
   test('returns nested empty folder hierarchy created before server start', async () => {
-    const res = await fetch(`http://localhost:${server.port}/api/documents`);
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`);
     expect(res.ok).toBe(true);
     const body = DocumentListSuccessSchema.parse(await res.json());
     const folderPaths = body.documents.filter((e) => e.kind === 'folder').map((e) => e.path);

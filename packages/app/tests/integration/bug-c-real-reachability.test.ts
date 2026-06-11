@@ -39,7 +39,7 @@ async function createNoObserverPeer(
   const ytext = doc.getText('source');
   const fragment = doc.getXmlFragment('default');
   const provider = new HocuspocusProvider({
-    url: `ws://localhost:${port}/collab`,
+    url: `ws://127.0.0.1:${port}/collab`,
     name: docName,
     document: doc,
     connect: true,

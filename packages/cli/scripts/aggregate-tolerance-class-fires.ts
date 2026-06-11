@@ -2,14 +2,9 @@
 
 import { readFileSync } from 'node:fs';
 
-interface FireRecord {
-  event: string;
-  timestamp: string;
-  class: string;
-  document: string | null;
-  codeUnitPosition: number;
-  severity: string;
-}
+import type { ToleranceFireLine } from '@inkeep/open-knowledge-server';
+
+type FireRecord = ToleranceFireLine;
 
 interface ClassStats {
   totalFires: number;
@@ -31,6 +26,7 @@ function main(): void {
   const raw = readFileSync(logPath, 'utf-8');
   const lines = raw.split('\n').filter((l) => l.trim().length > 0);
   const records: FireRecord[] = [];
+  let skipped = 0;
 
   for (const line of lines) {
     try {
@@ -38,11 +34,23 @@ function main(): void {
       if (parsed.event === 'bridge-tolerance-fire') {
         records.push(parsed);
       }
-    } catch {}
+    } catch {
+      skipped += 1;
+    }
+  }
+
+  if (skipped > 0) {
+    console.error(`[aggregate-tolerance] skipped ${skipped} malformed line(s)`);
   }
 
   if (records.length === 0) {
-    console.log(JSON.stringify({ totalRecords: 0, classes: {}, bySeverity: {} }, null, 2));
+    console.log(
+      JSON.stringify(
+        { totalRecords: 0, skippedLines: skipped, classes: {}, bySeverity: {} },
+        null,
+        2,
+      ),
+    );
     return;
   }
 
@@ -93,6 +101,7 @@ function main(): void {
 
   const report = {
     totalRecords: records.length,
+    skippedLines: skipped,
     timeRange,
     bySeverity: Object.fromEntries(bySeverity),
     classes: classStats,

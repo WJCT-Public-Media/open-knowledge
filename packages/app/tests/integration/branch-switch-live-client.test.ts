@@ -95,12 +95,12 @@ describe('T5: Branch switch while tab open', () => {
     });
     cleanups.push(() => server.shutdown());
 
-    const pool = new ProviderPool(3, `ws://localhost:${server.port}/collab`);
+    const pool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`);
     cleanups.push(() => pool.dispose());
 
     const systemDoc = new Y.Doc();
     const systemProvider = new HocuspocusProvider({
-      url: `ws://localhost:${server.port}/collab`,
+      url: `ws://127.0.0.1:${server.port}/collab`,
       name: SYSTEM_DOC_NAME,
       document: systemDoc,
       onStateless: ({ payload }: { payload: string }) => {

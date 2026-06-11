@@ -17,7 +17,7 @@ afterAll(async () => {
 });
 
 function openKeepalive(port: number, connectionId: string): WebSocket {
-  const url = `ws://localhost:${port}/collab/keepalive?connectionId=${encodeURIComponent(connectionId)}&pid=${process.pid}`;
+  const url = `ws://127.0.0.1:${port}/collab/keepalive?connectionId=${encodeURIComponent(connectionId)}&pid=${process.pid}`;
   return new WebSocket(url);
 }
 
@@ -119,7 +119,7 @@ describe('Keepalive-WS close cleanup (US-011)', () => {
 
     expect(server.instance.sessionManager.hasSession(docName, connectionId)).toBe(true);
 
-    const ws = new WebSocket(`ws://localhost:${server.port}/collab/keepalive?pid=${process.pid}`);
+    const ws = new WebSocket(`ws://127.0.0.1:${server.port}/collab/keepalive?pid=${process.pid}`);
     await new Promise<void>((resolve) => {
       ws.addEventListener('open', () => {
         ws.close();

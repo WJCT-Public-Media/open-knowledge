@@ -14,7 +14,7 @@ interface InitializedSession {
 }
 
 async function openMcpSession(port: number, clientName: string): Promise<InitializedSession> {
-  const init = await fetch(`http://localhost:${port}/mcp`, {
+  const init = await fetch(`http://127.0.0.1:${port}/mcp`, {
     method: 'POST',
     headers: {
       accept: 'application/json, text/event-stream',
@@ -37,7 +37,7 @@ async function openMcpSession(port: number, clientName: string): Promise<Initial
   const initBody = (await init.json()) as { result?: { protocolVersion?: string } };
   const protocolVersion = initBody.result?.protocolVersion ?? MCP_PROTOCOL_VERSION;
 
-  const initialized = await fetch(`http://localhost:${port}/mcp`, {
+  const initialized = await fetch(`http://127.0.0.1:${port}/mcp`, {
     method: 'POST',
     headers: {
       accept: 'application/json, text/event-stream',
@@ -69,7 +69,7 @@ async function callWriteDocument(
   },
   rpcId: number,
 ): Promise<ToolCallResult> {
-  const res = await fetch(`http://localhost:${port}/mcp`, {
+  const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
     method: 'POST',
     headers: {
       accept: 'application/json, text/event-stream',
@@ -164,11 +164,11 @@ test('two simultaneous Claude MCP sessions land with identical displayName but d
     }
   } finally {
     await client.cleanup();
-    await fetch(`http://localhost:${server.port}/mcp`, {
+    await fetch(`http://127.0.0.1:${server.port}/mcp`, {
       method: 'DELETE',
       headers: { 'mcp-session-id': sessionA.sessionId },
     });
-    await fetch(`http://localhost:${server.port}/mcp`, {
+    await fetch(`http://127.0.0.1:${server.port}/mcp`, {
       method: 'DELETE',
       headers: { 'mcp-session-id': sessionB.sessionId },
     });

@@ -50,6 +50,34 @@ function stripTrailingPipe(line: string): string {
   return line.slice(0, -1).trimEnd();
 }
 
+const CONTINUATION_BLOCK_START_RE =
+  /^(?:#{1,6}[ \t]|>|(?:[-+*]|\d{1,9}[.)])[ \t]|`{3,}|~{3,}|=+[ \t]*$|-+[ \t]*$|(?:\*[ \t]*){3,}$|(?:_[ \t]*){3,}$)/;
+
+/** Line indices inside fenced-code interiors (opening/closing fence lines
+ *  excluded). Same opener-char discipline as `findTableRowLines`: a
+ *  mismatched fence char inside an open fence is content. */
+function findFenceInteriorLines(lines: readonly string[]): Set<number> {
+  const interior = new Set<number>();
+  let opener: '`' | '~' | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    const m = /^(`{3,}|~{3,})/.exec(line.trimStart());
+    if (m?.[1]) {
+      const ch = m[1][0] as '`' | '~';
+      if (opener === null) {
+        opener = ch;
+        continue;
+      }
+      if (opener === ch) {
+        opener = null;
+        continue;
+      }
+    }
+    if (opener !== null) interior.add(i);
+  }
+  return interior;
+}
+
 export function normalizeBridge(s: string): string {
   const lines = s
     .replace(/^﻿/, '')
@@ -62,9 +90,23 @@ export function normalizeBridge(s: string): string {
     .replace(/^([#>+-].*|\d+[.)].*|`{3,}.*|~{3,}.*)\n([^\n])/gm, '$1\n\n$2')
     .split('\n');
   const tableRowLines = findTableRowLines(lines);
+  const fenceInterior = findFenceInteriorLines(lines);
   return lines
     .map((l, i) => {
       const trimmed = l.trimEnd();
+      if (
+        i > 0 &&
+        !fenceInterior.has(i) &&
+        /^[ \t]+\S/.test(trimmed) &&
+        (lines[i - 1] ?? '').trim() !== '' &&
+        !LIST_ITEM_INDENT_RE.test(trimmed) &&
+        !CONTINUATION_BLOCK_START_RE.test(trimmed.trimStart())
+      ) {
+        const prev = (lines[i - 1] ?? '').trimStart();
+        if (!CONTINUATION_BLOCK_START_RE.test(prev) && !prev.startsWith('|')) {
+          return trimmed.replace(/^[ \t]+/, '');
+        }
+      }
       if (TABLE_ALIGN_ROW_RE.test(trimmed)) {
         const collapsed = trimmed.replace(/\s+/g, '');
         return tableRowLines.has(i) &&
@@ -97,6 +139,7 @@ export const BRIDGE_TOLERANCE_CLASSES = [
   'row-no-trailing-pipe',
   'list-indent-canonical',
   'ordered-list-marker-number',
+  'paragraph-continuation-indent',
   'trailing-whitespace',
   'blank-line-collapse',
   'trailing-newline',
@@ -168,6 +211,11 @@ export function detectAppliedToleranceClasses(left: string, right: string): Brid
   const listIndentMultiline = /^[ \t]+([-+*]|\d+[.)]|[a-zA-Z][.)])\s/m;
   if (listIndentMultiline.test(leftLf) || listIndentMultiline.test(rightLf)) {
     classes.push('list-indent-canonical');
+  }
+
+  const continuationIndentMultiline = /[^\n]\n[ \t]+(?![-+*>#]|\d+[.)])\S/;
+  if (continuationIndentMultiline.test(leftLf) || continuationIndentMultiline.test(rightLf)) {
+    classes.push('paragraph-continuation-indent');
   }
 
   const canonMarkerLine = (line: string): string =>

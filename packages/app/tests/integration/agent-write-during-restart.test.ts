@@ -26,7 +26,7 @@ describe('T6: Agent write during restart', () => {
     let server = await createRestartableServer();
     cleanups.push(() => server.shutdown());
 
-    const pool = new ProviderPool(3, `ws://localhost:${server.port}/collab`);
+    const pool = new ProviderPool(3, `ws://127.0.0.1:${server.port}/collab`);
     cleanups.push(() => pool.dispose());
     await seedPoolServerInstanceId(server, pool);
 

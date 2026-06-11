@@ -484,6 +484,7 @@ export {
 export {
   initToleranceTelemetryWriter,
   isToleranceTelemetryEnabled,
+  type ToleranceFireLine,
   teardownToleranceTelemetryWriter,
 } from './tolerance-telemetry-writer.ts';
 export {

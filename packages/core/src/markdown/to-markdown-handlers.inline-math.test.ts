@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { JSONContent } from '@tiptap/core';
 import { sharedExtensions } from '../extensions/shared.ts';
 import { MarkdownManager } from './index.ts';
+import { assertByteStable } from './round-trip-asserts.test-helper.ts';
 
 const md = new MarkdownManager({ extensions: sharedExtensions });
 
@@ -24,11 +25,8 @@ function countInJson(json: JSONContent, predicate: (n: JSONContent) => boolean):
 
 const isMath = (n: JSONContent) => n.type === 'mathInline';
 
-function expectByteStable(source: string) {
-  const once = md.serialize(md.parse(source));
-  expect(once).toBe(source);
-  expect(md.serialize(md.parse(once))).toBe(once);
-}
+const expectByteStable = (source: string): void =>
+  assertByteStable((s) => md.serialize(md.parse(s)), source);
 
 function expectReparsesAsMath(emitted: string, formula: string) {
   const json = md.parse(emitted);

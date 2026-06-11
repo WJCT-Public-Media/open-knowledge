@@ -46,7 +46,7 @@ afterAll(async () => {
 
 describe('/api/documents sidebar asset rows', () => {
   test('returns referenced local assets as non-document rows', async () => {
-    const res = await fetch(`http://localhost:${server.port}/api/documents`);
+    const res = await fetch(`http://127.0.0.1:${server.port}/api/documents`);
     expect(res.ok).toBe(true);
     const body = DocumentListSuccessSchema.parse(await res.json());
 
