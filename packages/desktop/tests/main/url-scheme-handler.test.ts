@@ -259,6 +259,59 @@ describe('registerProtocolHandler — before-quit Launch Services cleanup', () =
   });
 });
 
+describe('registerProtocolHandler — deferred-share routeUrl + dedup', () => {
+  let env: TestEnv;
+
+  beforeEach(() => {
+    env = makeEnv();
+  });
+
+  test('routeUrl feeds a redeemed /d/ universal link through the share spine; a near-simultaneous duplicate is deduped', async () => {
+    env.readyWindow = { id: 'pre-existing' };
+    const resolveShareTarget = mock(async (): Promise<CandidateSelection> => ({ kind: 'miss' }));
+    const routeShareToNavigator = mock(() => {});
+    let clock = 1_000_000;
+
+    const control = registerProtocolHandler({
+      app: env.app,
+      focusWindowForProject: env.focusWindowForProject,
+      openProject: env.openProject,
+      sendDeepLink: env.sendDeepLink,
+      getAnyReadyWindow: env.getAnyReadyWindow,
+      resolveShareTarget: resolveShareTarget as unknown as (
+        share: ShareUrlPayload,
+      ) => Promise<CandidateSelection>,
+      routeShareToNavigator,
+      setTimeout: (cb, ms) => env.timers.push({ cb, ms }),
+      now: () => clock,
+    });
+    env.app.resolveReady();
+    await flushPromises();
+
+    const token = encodeShareUrl('https://github.com/inkeep/tech-ipos/blob/main/README.md');
+    const url = `https://openknowledge.ai/d/${token}`;
+
+    control.routeUrl(url);
+    await flushPromises();
+    await flushPromises();
+    expect(resolveShareTarget).toHaveBeenCalledTimes(1);
+    expect(routeShareToNavigator).toHaveBeenCalledTimes(1); // miss → launcher-miss
+
+    clock += 2_000;
+    control.routeUrl(url);
+    await flushPromises();
+    await flushPromises();
+    expect(resolveShareTarget).toHaveBeenCalledTimes(1);
+    expect(routeShareToNavigator).toHaveBeenCalledTimes(1);
+
+    clock += 11_000;
+    control.routeUrl(url);
+    await flushPromises();
+    await flushPromises();
+    expect(resolveShareTarget).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('registerProtocolHandler — queue-then-flush', () => {
   let env: TestEnv;
 

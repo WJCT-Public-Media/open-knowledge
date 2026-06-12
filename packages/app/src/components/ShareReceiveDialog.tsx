@@ -191,7 +191,7 @@ function ShareReceiveDialogInner({
       });
       return;
     }
-    if (!authStatus?.authenticated || cloneRunning) return;
+    if (cloneRunning) return;
     setCloneRunning(true);
     const cloneUrl = buildCloneUrl(expected);
     let result: ShareReceiveCloneResult;
@@ -452,13 +452,8 @@ function ShareReceiveDialogInner({
 
   if (!launcherMiss || !share || !expected) return null;
 
-  const cloneEnabled =
-    cloneController !== undefined && authStatus?.authenticated === true && !cloneRunning;
-  const cloneLabel = cloneRunning
-    ? t`Cloning...`
-    : cloneController && authStatus?.authenticated === false
-      ? t`Connect to clone`
-      : t`Clone to a new folder`;
+  const cloneEnabled = cloneController !== undefined && !cloneRunning;
+  const cloneLabel = cloneRunning ? t`Cloning...` : t`Clone to a new folder`;
 
   const shareOwner = share.owner;
   const shareRepo = share.repo;

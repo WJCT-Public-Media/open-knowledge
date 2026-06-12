@@ -9,6 +9,7 @@ import {
   realpathSync,
   writeFileSync,
 } from 'node:fs';
+import { createServer as createHttpServer } from 'node:http';
 import { homedir as osHomedir, hostname as osHostname } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import {
@@ -165,6 +166,7 @@ import { runOkInit } from './ok-init.ts';
 import {
   type OnboardingFlowKind,
   recordCreateNewBannerShown,
+  recordFirstRunShareHandoff,
   recordOnboardingFlow,
 } from './onboarding-telemetry.ts';
 import { type EnsureCliOnPathResult, ensureCliOnPath } from './path-install.ts';
@@ -184,6 +186,7 @@ import { removeGitFolder } from './remove-git-folder.ts';
 import { attachRendererConsoleCapture } from './renderer-console-capture.ts';
 import { resolveDetachedSpawnArgs } from './resolve-detached-spawn-args.ts';
 import { resolveShareTarget as resolveShareTargetMain } from './resolve-share-target.ts';
+import { startFirstRunHandshake } from './share-handoff.ts';
 import { handleShellOpenExternal } from './shell-allowlist.ts';
 import { createShowGateRegistry, type ShowGateRegistry } from './show-gate.ts';
 import { reclaimProjectSkillsOnProjectOpen, reclaimUserSkillsOnLaunch } from './skill-reclaim.ts';
@@ -2346,6 +2349,8 @@ function bootPrimaryInstance(): void {
     .then(async () => {
       app.setAboutPanelOptions(buildAboutPanelOptions(app.getVersion()));
 
+      const isTrueFirstRun = !existsSync(join(app.getPath('userData'), 'state.json'));
+
       const result = await runBootstrap({
         loadAppState,
         evaluateSchemaCompatibility,
@@ -2455,6 +2460,40 @@ function bootPrimaryInstance(): void {
         openNavigator();
       } else {
         protocolControl.drainQueuedUrls();
+      }
+
+      if (isTrueFirstRun && decision.action === 'navigator') {
+        startFirstRunHandshake({
+          isFirstRun: () => true,
+          createServer: (handler) => {
+            const httpServer = createHttpServer((req, res) => handler(req, res));
+            return {
+              listen: (port, host, cb) => {
+                httpServer.listen(port, host, cb);
+              },
+              on: (event, cb) => {
+                httpServer.on(event, cb);
+              },
+              address: () => httpServer.address(),
+              close: () => {
+                httpServer.close();
+              },
+            };
+          },
+          openExternal: (url) => {
+            void shell.openExternal(url).catch((err) => {
+              console.warn('[main] deferred-share openExternal failed', {
+                err: err instanceof Error ? err.message : String(err),
+              });
+            });
+          },
+          routeShareUrl: (url) => protocolControl.routeUrl(url),
+          recordOutcome: (outcome) => recordFirstRunShareHandoff(outcome),
+          log: {
+            warn: (obj, msg) => console.warn(msg, obj),
+            info: (obj, msg) => console.info(msg, obj),
+          },
+        });
       }
 
       void reclaimUserSkillsOnLaunch({

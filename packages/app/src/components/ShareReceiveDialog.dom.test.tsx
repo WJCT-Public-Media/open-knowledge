@@ -184,6 +184,26 @@ describe('ShareReceiveDialog runtime behavior', () => {
     expect(typeof mod.ShareReceiveDialog).toBe('function');
   });
 
+  test('clone failure leaves the dialog mounted and the sign-in affordance visible', async () => {
+    const cloneController = {
+      getAuthStatus: mock(() => Promise.resolve({ authenticated: false, host: 'github.com' })),
+      runClone: mock(() => Promise.resolve({ kind: 'error' })),
+      startSignIn: mock(() => Promise.resolve(null)),
+    };
+
+    await renderDialog({ cloneController });
+
+    await waitFor(() =>
+      expect((screen.getByTestId('share-receive-clone') as HTMLButtonElement).disabled).toBe(false),
+    );
+
+    fireEvent.click(screen.getByTestId('share-receive-clone'));
+    await waitFor(() => expect(cloneController.runClone).toHaveBeenCalled());
+
+    expect(screen.getByTestId('share-receive-dialog')).toBeTruthy();
+    expect(screen.getByTestId('share-receive-signin')).toBeTruthy();
+  });
+
   test('non-ok payloads toast and dismiss without mounting the dialog', async () => {
     const store = createTestStore({ kind: 'invalid' });
     await renderDialog({ store });
@@ -193,7 +213,7 @@ describe('ShareReceiveDialog runtime behavior', () => {
     expect(screen.queryByTestId('share-receive-dialog')).toBeNull();
   });
 
-  test('Q2 miss renders metadata, auth-gated clone, sign-in, clone success, and local picker recovery', async () => {
+  test('Q2 miss renders metadata, anonymous clone without sign-in, sign-in affordance, clone success, and local picker recovery', async () => {
     const bridge = createBridge();
     const store = createTestStore(okPayload({ branch: 'feat/share' }));
     const cloneController = {
@@ -218,13 +238,12 @@ describe('ShareReceiveDialog runtime behavior', () => {
     expect(screen.getByTestId('share-receive-metadata').textContent).toContain('docs/guide.md');
     expect(screen.getByTestId('share-receive-metadata-branch').textContent).toBe('feat/share');
     await waitFor(() =>
-      expect(screen.getByTestId('share-receive-clone').textContent).toContain('Connect to clone'),
+      expect(screen.getByTestId('share-receive-clone').textContent).toContain(
+        'Clone to a new folder',
+      ),
     );
-    expect((screen.getByTestId('share-receive-clone') as HTMLButtonElement).disabled).toBe(true);
-
-    fireEvent.click(await screen.findByTestId('share-receive-signin'));
-    await waitFor(() => expect(cloneController.startSignIn).toHaveBeenCalledTimes(1));
-    expect(await screen.findByText(/@alice/)).toBeTruthy();
+    expect((screen.getByTestId('share-receive-clone') as HTMLButtonElement).disabled).toBe(false);
+    expect(await screen.findByTestId('share-receive-signin')).toBeTruthy();
 
     fireEvent.click(screen.getByTestId('share-receive-clone'));
     await waitFor(() =>

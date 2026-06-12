@@ -132,7 +132,7 @@ export default async function SplashPage({ params }: SplashPageProps) {
           )}
 
           <SplashCtaCluster
-            downloadUrl={SPLASH_DOWNLOAD_URL}
+            downloadUrl={`/d/${encoded}/download`}
             customSchemeUrl={view.customSchemeUrl}
             githubUrl={view.githubUrl}
           />

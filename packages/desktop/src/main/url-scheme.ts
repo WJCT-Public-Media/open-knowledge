@@ -336,6 +336,7 @@ interface ProtocolHandlerDeps {
   getAnyReadyWindow(): BrowserWindowHandle | null;
   getInitialArgv?: () => readonly string[];
   setTimeout?: (cb: () => void, ms: number) => unknown;
+  now?: () => number;
   log?: {
     warn(obj: object, msg: string): void;
     info?(obj: object, msg: string): void;
@@ -348,7 +349,10 @@ interface BrowserWindowHandle {}
 interface ProtocolHandlerControl {
   singleFileLaunch(): boolean;
   drainQueuedUrls(): void;
+  routeUrl(url: string): void;
 }
+
+const SHARE_DEDUP_WINDOW_MS = 10_000;
 
 const QUEUE_FLUSH_MAX_ATTEMPTS = 10;
 const QUEUE_FLUSH_INTERVAL_MS = 500;
@@ -356,6 +360,7 @@ const QUEUE_FLUSH_INTERVAL_MS = 500;
 export function registerProtocolHandler(deps: ProtocolHandlerDeps): ProtocolHandlerControl {
   const schedule = deps.setTimeout ?? ((cb, ms) => setTimeout(cb, ms));
   const urlQueue: string[] = [];
+  const shareDedup = new Map<string, number>();
   let flushed = false;
   let singleFileLaunch = false;
 
@@ -564,6 +569,16 @@ export function registerProtocolHandler(deps: ProtocolHandlerDeps): ProtocolHand
       broadcastShareToast(url, { kind: result.kind });
       return;
     }
+    const now = deps.now ? deps.now() : Date.now();
+    const last = shareDedup.get(result.payload.sharedUrl);
+    if (last !== undefined && now - last < SHARE_DEDUP_WINDOW_MS) {
+      deps.log?.warn({ source: result.source, result: result.kind }, '[receive] action=deduped');
+      return;
+    }
+    shareDedup.set(result.payload.sharedUrl, now);
+    for (const [url, ts] of shareDedup) {
+      if (now - ts >= SHARE_DEDUP_WINDOW_MS) shareDedup.delete(url);
+    }
     const resolver = deps.resolveShareTarget;
     if (!resolver) {
       deps.log?.warn({ url }, '[receive] resolveShareTarget dep missing — share dropped');
@@ -719,5 +734,6 @@ export function registerProtocolHandler(deps: ProtocolHandlerDeps): ProtocolHand
   return {
     singleFileLaunch: () => singleFileLaunch,
     drainQueuedUrls: () => drainAll(),
+    routeUrl: (url) => enqueueOrRoute(url),
   };
 }

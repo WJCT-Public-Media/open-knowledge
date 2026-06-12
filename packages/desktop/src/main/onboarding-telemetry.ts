@@ -1,6 +1,7 @@
 import type { CreateNewBannerKind } from '@inkeep/open-knowledge-core';
 import { withSpanSync } from '@inkeep/open-knowledge-server';
 import type { EntryPoint } from '../shared/entry-point.ts';
+import type { HandoffOutcome } from './share-handoff.ts';
 
 export type OnboardingFlowKind =
   | 'managed-promote'
@@ -35,6 +36,20 @@ export function recordCreateNewBannerShown(banner: CreateNewBannerKind): void {
     {
       attributes: {
         'ok.desktop.banner': banner,
+      },
+    },
+    () => undefined,
+  );
+}
+
+export type FirstRunHandoffOutcome = HandoffOutcome;
+
+export function recordFirstRunShareHandoff(outcome: FirstRunHandoffOutcome): void {
+  withSpanSync(
+    'ok.desktop.firstRunShareHandoff',
+    {
+      attributes: {
+        'ok.desktop.handoff_outcome': outcome,
       },
     },
     () => undefined,

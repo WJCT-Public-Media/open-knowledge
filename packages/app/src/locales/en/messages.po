@@ -1251,10 +1251,6 @@ msgstr "Connect Open Knowledge to other tools you use."
 msgid "Connect to AI tools"
 msgstr "Connect to AI tools"
 
-#: src/components/ShareReceiveDialog.tsx
-msgid "Connect to clone"
-msgstr "Connect to clone"
-
 #: src/components/settings/SettingsDialogBody.tsx
 msgid "Connect to GitHub"
 msgstr "Connect to GitHub"

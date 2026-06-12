@@ -1246,10 +1246,6 @@ msgstr ""
 msgid "Connect to AI tools"
 msgstr ""
 
-#: src/components/ShareReceiveDialog.tsx
-msgid "Connect to clone"
-msgstr ""
-
 #: src/components/settings/SettingsDialogBody.tsx
 msgid "Connect to GitHub"
 msgstr ""

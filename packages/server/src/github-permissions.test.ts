@@ -84,10 +84,10 @@ describe('checkPushPermission — classification', () => {
       expected: { kind: 'denied', reason: 'no-collaborator' },
     },
     {
-      name: '200 without permissions field (anonymous public repo) → unknown/malformed-response',
+      name: '200 without permissions field (authed, schema drift) → unknown/malformed-response',
       status: 200,
       body: { full_name: 'inkeep/open-knowledge' },
-      withToken: false,
+      withToken: true,
       expected: { kind: 'unknown', error: 'malformed-response' },
     },
     {
@@ -102,12 +102,6 @@ describe('checkPushPermission — classification', () => {
       status: 404,
       withToken: true,
       expected: { kind: 'denied', reason: 'private-no-access' },
-    },
-    {
-      name: '404 anonymous → denied/repo-not-found',
-      status: 404,
-      withToken: false,
-      expected: { kind: 'denied', reason: 'repo-not-found' },
     },
     {
       name: '401 → unknown/token-invalid',
@@ -198,7 +192,7 @@ describe('checkPushPermission — classification', () => {
     const result = await checkPushPermission({
       owner: 'inkeep',
       repo: 'open-knowledge',
-      detectGh: ghUnavailable(),
+      detectGh: ghAvailable(),
       _fetchFn: fetchFn,
     });
     expect(result).toEqual({ kind: 'unknown', error: 'network' });
@@ -219,7 +213,7 @@ describe('checkPushPermission — classification', () => {
     const result = await checkPushPermission({
       owner: 'inkeep',
       repo: 'open-knowledge',
-      detectGh: ghUnavailable(),
+      detectGh: ghAvailable(),
       _fetchFn: fetchFn,
       _timeoutMs: 20,
     });
@@ -257,23 +251,29 @@ describe('checkPushPermission — token resolution', () => {
     expect(hosts).toEqual(['github.com']);
   });
 
-  test('anonymous: no gh and no stored token → no Authorization header', async () => {
+  test('anonymous: no credential → denied/no-collaborator with NO HTTP call (short-circuit)', async () => {
     const { fetch, calls } = mockFetch(() => jsonResponse(200, {}));
     const { store } = fakeStore(null);
-    await checkPushPermission({
+    const result = await checkPushPermission({
       owner: 'inkeep',
       repo: 'open-knowledge',
       detectGh: ghUnavailable(),
       tokenStore: store,
       _fetchFn: fetch,
     });
-    expect(authHeader(calls[0]?.init)).toBeUndefined();
+    expect(result).toEqual({ kind: 'denied', reason: 'no-collaborator' });
+    expect(calls).toHaveLength(0); // no credential ⇒ no push ⇒ no probe
   });
 
-  test('anonymous: omitting both detectGh and tokenStore probes without auth', async () => {
+  test('anonymous: omitting both detectGh and tokenStore short-circuits without a request', async () => {
     const { fetch, calls } = mockFetch(() => jsonResponse(200, {}));
-    await checkPushPermission({ owner: 'inkeep', repo: 'open-knowledge', _fetchFn: fetch });
-    expect(authHeader(calls[0]?.init)).toBeUndefined();
+    const result = await checkPushPermission({
+      owner: 'inkeep',
+      repo: 'open-knowledge',
+      _fetchFn: fetch,
+    });
+    expect(result).toEqual({ kind: 'denied', reason: 'no-collaborator' });
+    expect(calls).toHaveLength(0);
   });
 
   test('gh detection is scoped to the requested host', async () => {
@@ -316,7 +316,7 @@ describe('checkPushPermission — request shape', () => {
       owner: 'acme',
       repo: 'docs',
       host: 'github.example.com',
-      detectGh: ghUnavailable(),
+      detectGh: ghAvailable(),
       _fetchFn: fetch,
     });
     expect(calls[0]?.url).toBe('https://github.example.com/api/v3/repos/acme/docs');
@@ -327,7 +327,7 @@ describe('checkPushPermission — request shape', () => {
     await checkPushPermission({
       owner: 'owner/../escape',
       repo: 'name',
-      detectGh: ghUnavailable(),
+      detectGh: ghAvailable(),
       _fetchFn: fetch,
     });
     expect(calls[0]?.url).toBe('https://api.github.com/repos/owner%2F..%2Fescape/name');

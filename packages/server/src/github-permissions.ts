@@ -131,6 +131,12 @@ async function runProbe(opts: CheckPushPermissionOptions): Promise<PushPermissio
     detectGh,
     tokenStore,
   );
+
+  if (tokenSource === 'anonymous') {
+    log.info({ host }, '[permissions] no credential resolved — denying push (read-only)');
+    return { kind: 'denied', reason: 'no-collaborator' };
+  }
+
   const url = `${githubApiBase(host)}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
 
   log.info(
