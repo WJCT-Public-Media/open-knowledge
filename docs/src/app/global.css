@@ -19,11 +19,6 @@
 @theme {
   --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
 
-  /* Extends the default duration scale (0,75,100,150,200,300,500,700,1000) so
-     hero-preview's reveal + chart-draw animations have utility classes. */
-  --duration-400: 400ms;
-  --duration-1200: 1200ms;
-
   --text-2xs: 0.688rem; /* 11px */
   --text-1sm: 0.813rem; /* 13px */
   --color-gray-50: oklch(0.985 0.001 106.423);

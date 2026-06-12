@@ -433,6 +433,7 @@ describe('Notice B — ok:update:whats-new', () => {
     expect(notice.body).toBe('Updated to Version 0.3.1');
     expect(notice.id).toBe('whats-new-0.3.1');
     expect(notice.action?.label).toBe(TOAST_B_ACTION);
+    expect(notice.variant).toBe('success'); // green card — distinct from the gray "ready to install"
     expect(notice.priority).toBe(3); // whats-new = lowest
     notice.action?.onClick();
     expect(bridge.shell.openExternal).toHaveBeenCalledWith(releaseUrl);
