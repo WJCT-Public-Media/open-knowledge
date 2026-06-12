@@ -77,6 +77,78 @@ describe('parseServerResponse', () => {
       expect(result.body).toBeNull();
     }
   });
+
+  test('2xx whose body read is aborted mid-stream → cancellation stays observable to the caller', async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.error(new DOMException('The operation was aborted.', 'AbortError'));
+      },
+    });
+    const res = new Response(stream, {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+
+    let result: Awaited<ReturnType<typeof parseServerResponse>> | undefined;
+    try {
+      result = await parseServerResponse(res, 'unused');
+    } catch (err) {
+      expect(err instanceof Error && err.name === 'AbortError').toBe(true);
+      return;
+    }
+    expect(result).not.toEqual({ ok: true, body: null });
+  });
+
+  test('5xx whose body read is aborted mid-stream → cancellation stays observable, not a server-error title', async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.error(new DOMException('The operation was aborted.', 'AbortError'));
+      },
+    });
+    const res = new Response(stream, {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    });
+
+    let result: Awaited<ReturnType<typeof parseServerResponse>> | undefined;
+    try {
+      result = await parseServerResponse(res, 'unused');
+    } catch (err) {
+      expect(err instanceof Error && err.name === 'AbortError').toBe(true);
+      return;
+    }
+    expect(result).not.toMatchObject({ ok: false });
+    expect(result).not.toEqual({ ok: true, body: null });
+  });
+
+  test('aborted body read emits no transport console.warn (no per-supersede log spam)', async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.error(new DOMException('The operation was aborted.', 'AbortError'));
+      },
+    });
+    const res = new Response(stream, {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+
+    const consoleWarnSpy: unknown[][] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      consoleWarnSpy.push(args);
+    };
+    try {
+      await parseServerResponse(res, 'unused').catch((err: unknown) => {
+        if (!(err instanceof Error && err.name === 'AbortError')) throw err;
+      });
+      const transportWarns = consoleWarnSpy.filter(
+        (args) => typeof args[0] === 'string' && args[0].includes('[parse-server-response]'),
+      );
+      expect(transportWarns).toEqual([]);
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
 });
 
 describe('parseSuccessOrWarn', () => {

@@ -12,6 +12,9 @@ export async function parseServerResponse(
   } catch (err) {
     parseErr = err;
   }
+  if (parseErr instanceof Error && parseErr.name === 'AbortError') {
+    throw parseErr;
+  }
   if (res.ok) {
     if (parseErr !== undefined) {
       console.warn(
