@@ -696,14 +696,11 @@ describe('first-launch version notice (Toast B — AC7, D9)', () => {
     expect(rig.state.lastSeenVersion).toBe('0.3.1');
   });
 
-  test('lastSeenVersion is null (first launch) → dispatch whats-new + state advances', () => {
+  test('lastSeenVersion is null (fresh install) → no dispatch, state seeds silently', () => {
     const { rig } = makeRig({ lastSeenVersion: null, appVersion: '0.3.1' });
     const whatsNew = rig.captured.filter((c) => c.channel === 'ok:update:whats-new');
-    expect(whatsNew).toHaveLength(1);
-    expect(whatsNew[0]?.payload).toEqual({
-      version: '0.3.1',
-      releaseUrl: releaseUrlFor('0.3.1'),
-    });
+    expect(whatsNew).toHaveLength(0);
+    expect(rig.dispatches).not.toContain('whats-new-toast-b' as DispatchKind);
     expect(rig.state.lastSeenVersion).toBe('0.3.1');
   });
 

@@ -570,7 +570,8 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
     }
   }
 
-  const shouldShowVersionNotice = state.lastSeenVersion !== currentVersion;
+  const shouldShowVersionNotice =
+    state.lastSeenVersion !== null && state.lastSeenVersion !== currentVersion;
   const needsStateAdvance = state.lastSeenVersion !== currentVersion;
 
   if (needsStateAdvance) {
