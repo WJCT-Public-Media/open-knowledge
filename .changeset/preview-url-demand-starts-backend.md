@@ -1,5 +1,0 @@
----
-"@inkeep/open-knowledge": patch
----
-
-`preview_url` now treats a preview request as demand for a backend. When no Open Knowledge server is running for the project, the tool auto-starts one through the same machinery the read/write tools use (`OK_MCP_AUTOSTART` gate, spawn timeout, spawn-error log) and waits briefly for the preview UI sibling to bind, so an agent whose first action is "open the preview" gets a working URL instead of `running: false`. The ensure also runs when a UI is already up, which revives the backend for a surviving preview UI whose server idle-shut-down. When no UI can be reached the recovery hint now names the right command for the actual state: `ok start` when nothing is running (previously the hint said `ok ui`, which produces a backend-less UI shell in that state) and `ok ui` when the server is alive but no UI is bound. Auto-start opt-out (`OK_MCP_AUTOSTART=0`) keeps today's soft not-running answer; spawn failures surface as tool errors with the spawn log attached.
