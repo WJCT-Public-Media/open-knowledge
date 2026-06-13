@@ -172,7 +172,7 @@ append_jsonl_atomic() {
   fi
 }
 
-# ── jq + git pre-flight ────────────────────────────────────────────────────
+# ── jq pre-flight ──────────────────────────────────────────────────────────
 # Fail loud and early if the script's hard dependencies are missing. Keeps
 # the callers symmetric — neither has to reimplement the check.
 require_jq() {
@@ -183,23 +183,23 @@ require_jq() {
   fi
 }
 
+# ── OK workspace root ──────────────────────────────────────────────────────
+# Derive the workspace root structurally from this lib's own location
+# (packages/app/scripts → three levels up). git's toplevel is the wrong
+# oracle here: it coincides with the workspace root only in a standalone
+# clone — inside the agents-private monorepo the toplevel is the monorepo
+# root, one level above public/open-knowledge. Marker validation fails
+# loud if the derived directory is not an OK workspace (e.g. the lib was
+# copied somewhere with a different shape). The walk is physical
+# (`cd -P`/`pwd -P`) so a symlinked invocation path — including macOS's
+# /var → /private/var TMPDIR — resolves to one canonical root.
 resolve_repo_root() {
-  # The OK WORKSPACE root, not the git toplevel: inside the agents-private
-  # monorepo `git rev-parse --show-toplevel` resolves two levels above
-  # public/open-knowledge/, which silently mislocates LOG_DIR/APP_DIR (JSONL
-  # records written outside the subtree; replay hints pointing at paths that
-  # don't exist). Walk up from this library's own location to the nearest
-  # directory carrying bun.lock — correct in both the standalone public repo
-  # and the monorepo, and independent of the caller's cwd.
-  local dir
-  dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  while [[ "$dir" != "/" ]]; do
-    if [[ -f "$dir/bun.lock" ]]; then
-      printf '%s\n' "$dir"
-      return 0
-    fi
-    dir="$(dirname "$dir")"
-  done
-  echo "error: no bun.lock workspace root above ${BASH_SOURCE[0]}" >&2
-  exit 4
+  local lib_dir root
+  lib_dir="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+  root="$(cd -P "$lib_dir/../../.." && pwd -P)"
+  if [[ ! -d "$root/packages/app" || ! -f "$root/package.json" ]]; then
+    echo "error: derived workspace root $root lacks packages/app + package.json markers" >&2
+    exit 4
+  fi
+  printf '%s\n' "$root"
 }

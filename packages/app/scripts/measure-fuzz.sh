@@ -39,6 +39,10 @@
 # On test failure:
 #   - Still appends JSONL record (failure is a valid measurement).
 #   - Exit code matches the test runner (non-zero).
+# On a non-measurement (RESULT line never emitted, or a clean-sweep RESULT
+# contradicted by a non-zero runner exit):
+#   - Appends NOTHING — a run whose evidence is missing or self-
+#     contradictory is not a measurement. Exits non-zero with a diagnostic.
 #
 # JSONL schema (see specs/2026-04-16-bridge-correctness/evidence/residual-measurements-SCHEMA.md)
 # ---------------------------------------------------------------------------
@@ -48,6 +52,7 @@
 #     "script":      "deep-fuzz",              // fixed for this script
 #     "seedCount":   500,
 #     "seedsFailed": 23,
+#     "convergedLate": 0,                      // seeds that settled within tolerance late
 #     "rate":        0.046,                    // seedsFailed / seedCount
 #     "invokedBy":   "ci-user",                // $USER or CI identifier
 #     "context":     "pre-PR-218 baseline",
@@ -55,19 +60,18 @@
 #     "durationMs":  8912000,
 #     "host":        "local-macos",
 #     "bunVersion":  "1.3.11",
-#     "extra":       { "outcome": "pass" }     // "pass" | "fail" | "crash"
+#     "extra":       { "outcome": "pass" }     // "pass" | "fail"
 #   }
 #
 # outcome field (in extra)
 # ------------------------
-#   "pass"  — RESULT line emitted, seedsFailed == 0
+#   "pass"  — RESULT line emitted, seedsFailed == 0, runner exit 0
 #   "fail"  — RESULT line emitted, seedsFailed >= 1 (replayable seeds in
 #             failingSeeds array)
-#   "crash" — RESULT line NOT emitted (harness crashed before afterAll —
-#             setup failure, OOM, worker death). failingSeeds is best-
-#             effort from pre-crash stdout. Filter crash records with
-#             jq 'select(.extra.outcome == "crash")' to distinguish them
-#             from real seed failures.
+#   A run whose RESULT line never appeared (setup failure, OOM, worker
+#   death) — or whose clean-sweep RESULT is contradicted by a non-zero
+#   runner exit — aborts without appending. Appended records carry only
+#   "pass" | "fail".
 #
 # Query patterns (same as script header for discoverability via `head`)
 # ---------------------------------------------------------------------
@@ -146,12 +150,10 @@ mkdir -p "$LOG_DIR"
 if [[ -n "$SEED_REPLAY" ]]; then
   export STRESS_FUZZ_SEED="$SEED_REPLAY"
   unset BRIDGE_FUZZ_SEEDS
-  EFFECTIVE_SEED_COUNT=1
   echo "[measure-fuzz] seed-replay mode: STRESS_FUZZ_SEED=$SEED_REPLAY"
 else
   export BRIDGE_FUZZ_SEEDS="$SEEDS"
   unset STRESS_FUZZ_SEED
-  EFFECTIVE_SEED_COUNT="$SEEDS"
   echo "[measure-fuzz] sampling mode: BRIDGE_FUZZ_SEEDS=$SEEDS"
 fi
 
@@ -172,10 +174,16 @@ echo "[measure-fuzz] running $TEST_FILE ..."
 START_MS="$(epoch_ms)"
 
 # We want the test to run but don't want its exit code to kill the script —
-# we still need to compose the JSONL record on failure.
+# a test failure is a valid measurement; the classifier below decides what,
+# if anything, gets recorded.
 TEST_EXIT=0
 (
-  cd "$APP_DIR"
+  # Explicit exit: errexit is suppressed inside a piped compound, so a bare
+  # failed cd would let bun test run from the wrong cwd.
+  cd "$APP_DIR" || exit 1
+  # --conditions development resolves workspace deps from source exports
+  # instead of an unbuilt dist/ (the fresh-worktree state) — without it the
+  # run dies on missing build artifacts.
   bun test --conditions development "$TEST_FILE" 2>&1
 ) | tee "$OUT_FILE" || TEST_EXIT=$?
 
@@ -191,9 +199,8 @@ DURATION_MS=$(( END_MS - START_MS ))
 # fragile to bun output drift and stderr conflation via 2>&1). Mirrors
 # `measure-stress.sh`'s RESULT-line strategy for sibling-script symmetry.
 #
-# Fallback (when RESULT is missing — the test crashed before the after-all
-# hook could run): count all seeds as failed conservatively, since we
-# cannot confirm any specific seed passed.
+# When RESULT is missing the test crashed before the after-all hook could
+# run — the classifier below aborts the script without appending.
 
 # Optional appended field (newer harness): converged-late count — seeds that
 # exhausted the convergence budget but settled within tolerance. Counted as
@@ -203,19 +210,20 @@ CONVERGED_LATE="${CONVERGED_LATE:-0}"
 
 FUZZ_RESULT_LINE="$(grep -oE '^\[fuzz\] RESULT seeds=[0-9]+ passed=[0-9]+ failed=[0-9]+ failingSeeds=\[[0-9,]*\]' "$OUT_FILE" | tail -1 || true)"
 
-# 3-way outcome classifier (parallels measure-stress.sh's pass/fail/crash):
+# Outcome classifier (parallels measure-stress.sh's pass/fail):
 #   "pass"  — RESULT line printed, failed=0, test exit 0
 #   "fail"  — RESULT line printed, failed>=1 (real seed failures with
 #             replayable seeds in failingSeeds array)
-#   "crash" — RESULT line NOT printed (harness crashed before afterAll
-#             could emit — setup failure, OOM, worker death). failingSeeds
-#             is best-effort from pre-crash stdout; outcome="crash" is the
-#             triage filter that distinguishes this from a real seed
-#             failure.
+#   anything else — not a measurement: no RESULT line (the harness
+#             crashed before afterAll could emit — setup failure, OOM,
+#             worker death), or a clean-sweep RESULT contradicted by a
+#             non-zero exit (post-RESULT teardown failure, sibling test).
+#             Abort without appending so the trend log stays a record of
+#             true measurements.
 if [[ -n "$FUZZ_RESULT_LINE" ]]; then
-  # Parse the structured line via a single awk pass for robustness against
-  # future field reorderings (within reason — extending the format still
-  # requires updating this regex, but field-position changes don't).
+  # Parse each field by name (not by position) via separate grep passes —
+  # robust against future field reorderings (within reason — extending the
+  # format still requires updating this regex, but position changes don't).
   RESULT_SEEDS="$(echo "$FUZZ_RESULT_LINE" | grep -oE 'seeds=[0-9]+' | awk -F= '{print $2}')"
   RESULT_PASSED="$(echo "$FUZZ_RESULT_LINE" | grep -oE 'passed=[0-9]+' | awk -F= '{print $2}')"
   RESULT_FAILED="$(echo "$FUZZ_RESULT_LINE" | grep -oE 'failed=[0-9]+' | awk -F= '{print $2}')"
@@ -228,29 +236,31 @@ if [[ -n "$FUZZ_RESULT_LINE" ]]; then
   else
     FAILING_SEEDS_JSON="[$RESULT_SEEDS_ARR]"
   fi
-  if [[ "$SEEDS_FAILED" == "0" ]]; then
+  if [[ "$SEEDS_FAILED" == "0" && "$TEST_EXIT" -eq 0 ]]; then
     OUTCOME="pass"
-  else
+  elif [[ "$SEEDS_FAILED" != "0" ]]; then
     OUTCOME="fail"
+  else
+    echo "" >&2
+    echo "error: RESULT reported a clean sweep (failed=0) but the runner exited $TEST_EXIT" >&2
+    echo "       — post-RESULT failure (teardown error, sibling test). The run cannot be" >&2
+    echo "       certified clean. No record appended — the trend log is untouched." >&2
+    exit "$TEST_EXIT"
   fi
 else
-  # Crash before the after-all emitted RESULT. Conservative all-failed
-  # accounting — we cannot confirm any specific seed passed, but we also
-  # cannot attribute the failure to replayable seeds. outcome:"crash"
-  # keeps these records distinguishable from real seed failures when
-  # querying the log (e.g. `jq 'select(.extra.outcome == "fail")'`).
-  OUTCOME="crash"
-  SEED_COUNT="$EFFECTIVE_SEED_COUNT"
-  SEEDS_FAILED="$SEED_COUNT"
-  SEEDS_PASSED=0
-  FAILING_SEEDS_RAW="$(grep -oE '(seed=|STRESS_FUZZ_SEED=)[0-9]+' "$OUT_FILE" \
-    | awk -F= '{print $2}' | sort -u | head -100 || true)"
-  if [[ -z "$FAILING_SEEDS_RAW" ]]; then
-    FAILING_SEEDS_JSON="[]"
+  echo "" >&2
+  if [[ "$TEST_EXIT" -eq 0 ]]; then
+    echo "error: runner exited 0 but the harness RESULT line never appeared — no tests" >&2
+    echo "       matched, or the RESULT emission moved or its format drifted." >&2
   else
-    FAILING_SEEDS_JSON="$(printf '%s\n' "$FAILING_SEEDS_RAW" \
-      | jq -R 'tonumber' | jq -s '.')"
+    echo "error: harness crashed before emitting its result line." >&2
   fi
+  echo "       Nothing was measured. No record appended — the trend log is untouched." >&2
+  echo "       Full output above." >&2
+  if [[ "$TEST_EXIT" -ne 0 ]]; then
+    exit "$TEST_EXIT"
+  fi
+  exit 1
 fi
 
 # rate with 4-digit precision. Use awk for portability; Bun/bash arithmetic
@@ -277,7 +287,7 @@ RECORD="$(jq -c -n \
   --arg script      "deep-fuzz" \
   --argjson seedCount   "$SEED_COUNT" \
   --argjson seedsFailed "$SEEDS_FAILED" \
-    --argjson convergedLate "${CONVERGED_LATE}" \
+  --argjson convergedLate "$CONVERGED_LATE" \
   --argjson rate        "$RATE" \
   --arg invokedBy   "$INVOKED_BY" \
   --arg context     "$CONTEXT" \
@@ -320,9 +330,8 @@ echo "  logFile:      $LOG_FILE"
 echo ""
 
 if [[ "$SEEDS_FAILED" != "0" ]]; then
-  # Derive replay commands from FAILING_SEEDS_JSON (authoritative) rather
-  # than the raw grep output. Works whether the seeds came from the
-  # RESULT line or the fallback grep path.
+  # Derive replay commands from FAILING_SEEDS_JSON (authoritative) — always
+  # populated from the parsed RESULT line, the only seed source.
   FAILING_SEEDS_LIST="$(jq -r '.[]' <<< "$FAILING_SEEDS_JSON" 2>/dev/null || true)"
   if [[ -n "$FAILING_SEEDS_LIST" ]]; then
     echo "──────── failing seed replay commands ────────"

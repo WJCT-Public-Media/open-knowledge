@@ -38,12 +38,16 @@
 # Same JSONL schema as measure-fuzz.sh, with these differences:
 #   - script:       "deep-stress"
 #   - seedCount:    1  (one run per invocation)
-#   - seedsFailed:  0 on pass, 1 on fail-or-crash
-#   - outcome:      "pass" | "fail" | "crash" (inside extra)
+#   - seedsFailed:  0 on pass, 1 on fail
+#   - outcome:      "pass" | "fail" (inside extra)
 #   - failingSeeds: [<seed>] on a real test failure where the seed banner
-#                   was captured; [] on pass OR on crash before banner
-#                   (to avoid poisoning the log with a phantom seed 0)
-#   - extra:        { stressSeed: <seed-or-null>, outcome: "pass"|"fail"|"crash" }
+#                   was captured; [] on pass
+#   - extra:        { stressSeed: <seed>, outcome: "pass"|"fail" }
+#
+# A run that measured nothing appends nothing: harness crashed before its
+# banner, RESULT line missing on a zero exit, RESULT-pass contradicted by
+# a non-zero exit, or no attributable seed — each aborts with a diagnostic
+# and a non-zero exit, leaving the log untouched.
 #
 # See measure-fuzz.sh for the full schema + query pattern examples.
 
@@ -125,7 +129,12 @@ START_MS="$(epoch_ms)"
 
 TEST_EXIT=0
 (
-  cd "$APP_DIR"
+  # Explicit exit: errexit is suppressed inside a piped compound, so a bare
+  # failed cd would let bun test run from the wrong cwd.
+  cd "$APP_DIR" || exit 1
+  # --conditions development resolves workspace deps from source exports
+  # instead of an unbuilt dist/ (the fresh-worktree state) — without it the
+  # run dies on missing build artifacts.
   bun test --conditions development "$TEST_FILE" 2>&1
 ) | tee "$OUT_FILE" || TEST_EXIT=$?
 
@@ -138,7 +147,8 @@ DURATION_MS=$(( END_MS - START_MS ))
 #   (1) Startup banner — printed BEFORE any setup work in the test body:
 #         [server-authoritative stress] seed=<n>
 #         [server-authoritative stress] seed=<n> (replay)
-#       Emitted even on pre-loop crash. Primary source for stressSeed.
+#       Emitted before the loop, so present unless a crash precedes the
+#       banner. Primary source for stressSeed.
 #
 #   (2) Machine-parseable result line — printed AFTER all assertions pass:
 #         [stress] RESULT outcome=pass seed=<n> edits=<n> convergenceMs=<n>
@@ -166,47 +176,63 @@ HAS_RESULT_PASS="${HAS_RESULT_PASS:-0}"
 
 # Classify outcome:
 #   "pass"  — test exit 0 AND the RESULT line printed
-#   "fail"  — test exit != 0 AND the seed banner printed (real test
-#             failure with a known seed for replay)
-#   "crash" — test exit != 0 AND the seed banner did NOT print (setup
-#             failure, OOM, or pre-banner assertion — seed is unknown,
-#             no replay command should suggest a specific value)
+#   "fail"  — test exit != 0 AND the seed banner printed AND no RESULT
+#             line (real test failure with a known seed for replay)
+#   anything else — not a measurement. Either the harness never reached
+#             its seed banner (setup failure, OOM, pre-banner crash), or
+#             the evidence is contradictory: exit 0 without a RESULT line
+#             (no tests matched, or the RESULT emission moved or its
+#             format drifted), or a RESULT line with a non-zero exit
+#             (post-test teardown failure). Abort without appending so
+#             the trend log stays a record of true measurements.
 #
 # Note: on a successful run, exit code alone is not sufficient — a bun
 # test that ran but reported an assertion failure still has exit != 0.
-# The RESULT line is the authoritative pass marker.
+# A pass requires both the RESULT line AND exit 0; they corroborate.
 SEED_COUNT=1
 if [[ "$TEST_EXIT" -eq 0 && "$HAS_RESULT_PASS" -ge 1 ]]; then
   OUTCOME="pass"
   SEEDS_FAILED=0
   RATE="0.0000"
   FAILING_SEEDS_JSON="[]"
-elif [[ -n "$ACTUAL_SEED_BANNER" ]]; then
+elif [[ "$TEST_EXIT" -ne 0 && -n "$ACTUAL_SEED_BANNER" && "$HAS_RESULT_PASS" -eq 0 ]]; then
   OUTCOME="fail"
   SEEDS_FAILED=1
   RATE="1.0000"
   FAILING_SEEDS_JSON="$(jq -c -n --argjson s "$ACTUAL_SEED" '[$s]')"
 else
-  OUTCOME="crash"
-  SEEDS_FAILED=1
-  RATE="1.0000"
-  # Crash before banner — no known seed to attribute the failure to. Emit
-  # an empty failingSeeds array so grep'ing the log for real seed failures
-  # stays sharp; `outcome: "crash"` is the triage filter.
-  FAILING_SEEDS_JSON="[]"
+  echo "" >&2
+  if [[ "$TEST_EXIT" -eq 0 ]]; then
+    echo "error: runner exited 0 but the harness RESULT line never appeared — no tests" >&2
+    echo "       matched, or the RESULT emission moved or its format drifted." >&2
+  elif [[ "$HAS_RESULT_PASS" -ge 1 ]]; then
+    echo "error: RESULT line printed but the runner exited $TEST_EXIT — post-test failure" >&2
+    echo "       (teardown error, sibling test). The run cannot be attributed." >&2
+  else
+    echo "error: harness crashed before emitting its seed banner or result line." >&2
+  fi
+  echo "       Nothing was measured. No record appended — the trend log is untouched." >&2
+  echo "       Full output above." >&2
+  if [[ "$TEST_EXIT" -ne 0 ]]; then
+    exit "$TEST_EXIT"
+  fi
+  exit 1
 fi
 
 # ── Compose extra (script-specific fields) ─────────────────────────────────
-# stressSeed is JSON null when unknown (crash before banner, no --seed given).
-# Consumers query `.extra.stressSeed != null` to filter to records with a
-# replayable seed.
+# SCHEMA.md promises a replayable stressSeed in every appended record. A
+# classified run can reach this point seedless only when the banner regex
+# matched nothing and no --seed pinned a value (banner format drift) — that
+# run is unattributable, so abort rather than record a null seed.
 if [[ -z "$ACTUAL_SEED" ]]; then
-  EXTRA_JSON="$(jq -c -n --arg outcome "$OUTCOME" \
-    '{ stressSeed: null, outcome: $outcome }')"
-else
-  EXTRA_JSON="$(jq -c -n --argjson stressSeed "$ACTUAL_SEED" --arg outcome "$OUTCOME" \
-    '{ stressSeed: $stressSeed, outcome: $outcome }')"
+  echo "" >&2
+  echo "error: outcome \"$OUTCOME\" but no seed was captured — the seed banner regex" >&2
+  echo "       matched nothing and no --seed was given (banner format drift?)." >&2
+  echo "       No record appended — fix the banner/regex pairing, then re-measure." >&2
+  exit 1
 fi
+EXTRA_JSON="$(jq -c -n --argjson stressSeed "$ACTUAL_SEED" --arg outcome "$OUTCOME" \
+  '{ stressSeed: $stressSeed, outcome: $outcome }')"
 
 # ── Compose JSONL record ───────────────────────────────────────────────────
 RECORD="$(jq -c -n \
@@ -247,7 +273,7 @@ echo "──────── measure-stress summary ────────"
 echo "  context:      $CONTEXT"
 echo "  commit:       $COMMIT"
 echo "  host:         $HOST"
-echo "  stressSeed:   ${ACTUAL_SEED:-<unknown — crash before banner>}"
+echo "  stressSeed:   $ACTUAL_SEED"
 echo "  outcome:      $OUTCOME"
 echo "  durationMs:   $DURATION_MS"
 echo "  logFile:      $LOG_FILE"
@@ -256,12 +282,6 @@ echo ""
 if [[ "$OUTCOME" == "fail" ]]; then
   echo "──────── failure replay command ────────"
   echo "  STRESS_SEED=$ACTUAL_SEED bun test --conditions development $TEST_FILE  # in $APP_DIR"
-  echo ""
-elif [[ "$OUTCOME" == "crash" ]]; then
-  echo "──────── crash diagnostic ────────"
-  echo "  The test crashed before printing its seed banner. Seed is unknown."
-  echo "  Rerun with an explicit seed to reproduce deterministically:"
-  echo "    bun run measure:stress --seed <n> --context 're-investigating crash'"
   echo ""
 fi
 

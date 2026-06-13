@@ -41,6 +41,7 @@ export default {
     'scripts/check-license-fields.test.mjs': ['files'],
     'scripts/check-gate-catches-build-errors.test.mjs': ['files'],
     'scripts/bun-install-ci.test.mjs': ['files'],
+    'scripts/measure-scripts-contract.test.mjs': ['files'],
     'scripts/promote-stable-token.test.mjs': ['files'],
     '.github/scripts/cla-gate.test.mjs': ['files'],
     '.github/scripts/cla-gate.mjs': ['exports'],
