@@ -3,8 +3,8 @@ import { randomUUID } from 'node:crypto';
 import {
   agentPatch,
   agentWriteMd,
+  awaitWipCommits,
   createTestServer,
-  pollUntil,
   type TestServer,
 } from './test-harness.ts';
 
@@ -80,27 +80,17 @@ describe('disk-persistence failure surfacing — edit_frontmatter (/api/frontmat
   });
 });
 
-async function getCheckpointShas(port: number, docName: string): Promise<string[]> {
-  const r = await fetch(
-    `http://127.0.0.1:${port}/api/history?docName=${encodeURIComponent(docName)}`,
-  );
-  if (!r.ok) return [];
-  const body = (await r.json().catch(() => ({}))) as { entries?: Array<{ sha?: string }> };
-  return (body.entries ?? []).map((e) => e.sha ?? '').filter((s) => /^[0-9a-f]{40}$/i.test(s));
-}
-
 describe('disk-persistence failure surfacing — version rollback (/api/rollback)', () => {
-  test.skip('reports a storage error instead of a false success when the rollback store fails', async () => {
+  test('reports a storage error instead of a false success when the rollback store fails', async () => {
     server = await createTestServer({ gitEnabled: true, commitDebounceMs: 100 });
     const docName = `rb-fault-${randomUUID()}`;
 
     await agentWriteMd(server.port, '# V1\n\nbody one\n', { docName, position: 'replace' });
-    await pollUntil(async () => (await getCheckpointShas(server.port, docName)).length >= 1, 12000);
+    await awaitWipCommits(server, docName, 1);
     await agentWriteMd(server.port, '# V2\n\nbody two\n', { docName, position: 'replace' });
-    await pollUntil(async () => (await getCheckpointShas(server.port, docName)).length >= 2, 12000);
+    const shas = await awaitWipCommits(server, docName, 2);
 
-    const shas = await getCheckpointShas(server.port, docName);
-    const priorSha = shas[shas.length - 1]; // oldest checkpoint = V1
+    const priorSha = shas[shas.length - 1]; // oldest WIP commit = V1
     expect(priorSha).toMatch(/^[0-9a-f]{40}$/i);
 
     process.env.OK_TEST_STORE_FAULT = docName;
