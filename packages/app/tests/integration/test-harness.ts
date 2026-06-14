@@ -648,6 +648,49 @@ export async function awaitBacklinkIndexed(
   );
 }
 
+export async function awaitWipCommits(
+  server: TestServer,
+  docName: string,
+  count: number,
+  timeoutMs = 20_000,
+): Promise<string[]> {
+  const intervals = [100, 250, 500, 1000];
+  let attempt = 0;
+  let lastShas: string[] = [];
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const flushRes = await fetch(`http://127.0.0.1:${server.port}/api/test-flush-git`, {
+      method: 'POST',
+    }).catch((err: unknown) => {
+      console.warn(
+        `[awaitWipCommits] test-flush-git fetch threw: ${String(err)} - continuing poll`,
+      );
+      return null;
+    });
+    if (flushRes !== null && !flushRes.ok) {
+      console.warn(
+        `[awaitWipCommits] test-flush-git returned ${flushRes.status} - continuing poll`,
+      );
+    }
+    const r = await fetch(
+      `http://127.0.0.1:${server.port}/api/history?docName=${encodeURIComponent(docName)}`,
+    ).catch(() => null);
+    if (r?.ok) {
+      const body = (await r.json().catch(() => ({}))) as {
+        entries?: Array<{ sha?: string; type?: string }>;
+      };
+      lastShas = (body.entries ?? [])
+        .filter((e) => e.type === 'wip' && /^[0-9a-f]{40}$/i.test(e.sha ?? ''))
+        .map((e) => e.sha as string);
+      if (lastShas.length >= count) return lastShas;
+    }
+    await wait(intervals[Math.min(attempt++, intervals.length - 1)]);
+  }
+  throw new Error(
+    `awaitWipCommits: doc ${docName} reached ${lastShas.length}/${count} WIP commits within ${timeoutMs}ms`,
+  );
+}
+
 export type ServerDocState = {
   ytext: Y.Text;
   fragment: Y.XmlFragment;
