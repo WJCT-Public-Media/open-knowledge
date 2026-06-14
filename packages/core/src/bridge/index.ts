@@ -25,6 +25,12 @@ export {
 } from './bridge-invariant.ts';
 export { type DiffChange, diffLinesFast } from './diff-lines.ts';
 export {
+  type DocBoundarySplit,
+  projectMergeBoundarySpace,
+  reattachLeadingDocBoundary,
+  splitLeadingDocBoundary,
+} from './doc-boundary-space.ts';
+export {
   applyPatchToFm,
   applyPathDeleteToFm,
   applyPathRenameToFm,

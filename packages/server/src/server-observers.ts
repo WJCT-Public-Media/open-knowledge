@@ -8,6 +8,9 @@ import {
   mergeThreeWay,
   normalizeBridge,
   prependFrontmatter,
+  projectMergeBoundarySpace,
+  reattachLeadingDocBoundary,
+  splitLeadingDocBoundary,
   stripFrontmatter,
 } from '@inkeep/open-knowledge-core';
 import type { Schema } from '@tiptap/pm/model';
@@ -151,6 +154,7 @@ export interface SetupServerObserversOpts {
   resolveEmbed?: (basename: string, sourcePath: string) => string | null;
   resolveSize?: (basename: string, sourcePath: string) => number | null;
   onDispatch?: ObserverDispatchHook;
+  mergeThreeWay?: typeof mergeThreeWay;
 }
 
 function settlesSplitBrain(settledText: string, md: string, normMdPre?: string): boolean {
@@ -365,16 +369,27 @@ export function setupServerObservers(opts: SetupServerObserversOpts): () => void
           applyIncrementalDiff(ytext, currentText, md);
         } else {
           const mergeBase = ytextInSync ? lastSyncedCanonicalMd : preMergeBaseline;
+          const { boundary } = splitLeadingDocBoundary(currentText);
+          const projectMerged = (merged: string): string =>
+            reattachLeadingDocBoundary(splitLeadingDocBoundary(merged).text, boundary);
+          const mergeThreeWayFn = opts.mergeThreeWay ?? mergeThreeWay;
           try {
-            const mergedText = mergeThreeWay(mergeBase, md, currentText);
+            const mergedText = projectMerged(
+              mergeThreeWayFn(
+                projectMergeBoundarySpace(mergeBase),
+                projectMergeBoundarySpace(md),
+                projectMergeBoundarySpace(currentText),
+              ),
+            );
             applyFastDiff(ytext, currentText, mergedText);
             pathBState.mergedText = mergedText;
           } catch (mergeErr) {
             if (!(mergeErr instanceof BridgeMergeContentLossError)) throw mergeErr;
             handleBridgeMergeLoss(mergeErr, preMergeBaseline);
             if (shouldRethrowBridgeMergeLoss()) throw mergeErr;
-            applyFastDiff(ytext, currentText, mergeErr.info.result);
-            pathBState.mergedText = mergeErr.info.result;
+            const asComputed = projectMerged(mergeErr.info.result);
+            applyFastDiff(ytext, currentText, asComputed);
+            pathBState.mergedText = asComputed;
           }
         }
       }, OBSERVER_SYNC_ORIGIN);
