@@ -1,20 +1,21 @@
 ---
 title: Timeline and recovery
-description: Every revision, auto-save, and recovery checkpoint for the current document, with restore.
+description: Review the edit history for the open document, including agent, human, upstream sync, and file system changes, with inline diffs and version restore.
 ---
 
-The timeline allows you to view the history of changes to the current document. It combines manual saved versions, auto-saves, upstream sync entries, and recovery checkpoints into one readable history.
+import { Clock, Undo2 } from 'lucide-react';
+
+The timeline shows you the history of edits made to the document you have open. From there you can view or revert to older versions of the document.
 
 ## What the timeline shows
 
-Open the timeline from the document side panel. Each entry shows who made the change, when it happened, and what kind of change it was.
+Open the timeline from the document side panel by clicking the <Clock role="img" aria-label="Timeline" className="inline size-4 align-text-bottom" /> icon. Each entry shows who made the change, when it happened, and a short summary of the change.
 
 Timeline entries include:
 
-- **Agent and human edits** with contributor attribution
-- **Saved versions** created by the user with **Save Version**
+- **Agent and human edits** with contributor attribution and change summaries
 - **Upstream sync** entries from Git
-- **Recovery checkpoints** created automatically before operations like rollbacks
+- **File system** changes made outside of Open Knowledge
 
 ## Review changes
 
@@ -22,10 +23,8 @@ Click a timeline entry to expand it. Open Knowledge shows an inline diff so you 
 
 You can switch between unified and split diff layouts from the editor controls.
 
+![An expanded timeline entry showing a split diff next to the document, with removed lines highlighted in red and added lines in green](/screenshots/timeline-diff-view.png)
+
 ## Restore a previous version
 
-Use the restore button on a timeline entry to restore the document to the selected version. Restoring is append-only: Open Knowledge creates a new change with the old content instead of deleting history.
-
-## Save a version
-
-Use **Save Version** before major edits, before handing work to an agent, or before pulling in external changes. The saved version snapshots the project state so you can find and restore it later.
+Use the restore button <Undo2 role="img" aria-label="Restore" className="inline size-4 align-text-bottom" /> on a timeline entry to restore the document to the selected version. Restoring is append-only: Open Knowledge creates a new change with the old content instead of deleting history.

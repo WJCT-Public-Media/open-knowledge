@@ -121,8 +121,7 @@ referenced person, company, and concept dossiers using the Entity vault (GBrain-
 ```
 
 4. Review the agent edits in OK. If the agent inferred something wrong, correct it in the editor.
-5. Save a version checkpoint before any risky enrichment pass.
-6. Commit the Markdown changes.
+5. Commit the Markdown changes.
 
 The core value is the correction loop: the durable memory is not hidden in a model context window or database row. It is a file you can inspect, edit, diff, and roll back.
 
@@ -154,7 +153,7 @@ For a GBrain-literate reviewer, the demo target is not "OK replaces GBrain." It 
 2. Let an agent write/update a dossier through OK MCP.
 3. Watch the edit land live with attribution.
 4. Correct a wrong claim by hand in OK.
-5. Save a checkpoint and commit.
+5. Commit the changes.
 6. Run `gbrain sync --repo <vault>`.
 7. Query/search in `gbrain` and see the corrected fact.
 
