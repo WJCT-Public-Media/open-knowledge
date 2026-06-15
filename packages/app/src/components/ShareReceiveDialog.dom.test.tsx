@@ -204,6 +204,118 @@ describe('ShareReceiveDialog runtime behavior', () => {
     expect(screen.getByTestId('share-receive-signin')).toBeTruthy();
   });
 
+  test('clone failure surfaces a persistent in-dialog error view with the GitHub error, reasons, and recovery', async () => {
+    const cloneController = {
+      getAuthStatus: mock(() => Promise.resolve({ authenticated: false, host: 'github.com' })),
+      runClone: mock(() =>
+        Promise.resolve({
+          kind: 'error',
+          detail: [
+            "Cloning into '/Users/me/Documents/sharing-repo'...",
+            'remote: Repository not found.',
+            "fatal: repository 'https://github.com/inkeep/open-knowledge.git/' not found",
+          ].join('\n'),
+        }),
+      ),
+      startSignIn: mock(() => Promise.resolve(null)),
+    };
+
+    await renderDialog({ cloneController });
+
+    await waitFor(() =>
+      expect((screen.getByTestId('share-receive-clone') as HTMLButtonElement).disabled).toBe(false),
+    );
+
+    fireEvent.click(screen.getByTestId('share-receive-clone'));
+    await waitFor(() => expect(cloneController.runClone).toHaveBeenCalled());
+
+    await screen.findByTestId('share-receive-clone-error');
+    expect(screen.getByRole('alert').textContent).toContain("We couldn't clone this repository");
+
+    const message = screen.getByTestId('share-receive-clone-error-message').textContent ?? '';
+    expect(message).toContain('Error:');
+    expect(message).toContain('Repository not found');
+    expect(message).not.toMatch(/Cloning into/i);
+    expect(message).not.toContain('/Users/me');
+    expect(message).not.toContain('github.com/inkeep/open-knowledge');
+    expect(screen.queryByTestId('share-receive-clone-error-url')).toBeNull();
+    expect(screen.queryByTestId('share-receive-clone-error-detail')).toBeNull();
+
+    expect(screen.getByTestId('share-receive-clone-error-reasons').textContent).toMatch(/private/i);
+
+    expect(screen.getByTestId('share-receive-clone-retry')).toBeTruthy();
+    expect(screen.getByTestId('share-receive-signin')).toBeTruthy();
+
+    expect(screen.getByTestId('share-receive-dialog')).toBeTruthy();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  test('clone error with no detail omits the error-message line but still shows the error view', async () => {
+    const cloneController = {
+      getAuthStatus: mock(() => Promise.resolve({ authenticated: false, host: 'github.com' })),
+      runClone: mock(() => Promise.resolve({ kind: 'error' })),
+      startSignIn: mock(() => Promise.resolve(null)),
+    };
+
+    await renderDialog({ cloneController });
+    await waitFor(() =>
+      expect((screen.getByTestId('share-receive-clone') as HTMLButtonElement).disabled).toBe(false),
+    );
+    fireEvent.click(screen.getByTestId('share-receive-clone'));
+
+    await screen.findByTestId('share-receive-clone-error');
+    expect(screen.getByTestId('share-receive-clone-error-reasons')).toBeTruthy();
+    expect(screen.queryByTestId('share-receive-clone-error-message')).toBeNull();
+  });
+
+  test('"Try again" clears the error view and re-invokes the clone', async () => {
+    let call = 0;
+    const cloneController = {
+      getAuthStatus: mock(() => Promise.resolve({ authenticated: false, host: 'github.com' })),
+      runClone: mock(() => {
+        call += 1;
+        return Promise.resolve(
+          call === 1 ? { kind: 'error', detail: 'boom' } : { kind: 'cancelled' },
+        );
+      }),
+      startSignIn: mock(() => Promise.resolve(null)),
+    };
+
+    await renderDialog({ cloneController });
+    await waitFor(() =>
+      expect((screen.getByTestId('share-receive-clone') as HTMLButtonElement).disabled).toBe(false),
+    );
+    fireEvent.click(screen.getByTestId('share-receive-clone'));
+
+    const retry = await screen.findByTestId('share-receive-clone-retry');
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(cloneController.runClone).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByTestId('share-receive-clone-error')).toBeNull());
+  });
+
+  test('error view "I already have it locally" clears the error and opens the folder picker', async () => {
+    const bridge = createBridge(); // openFolder returns null by default (user cancels)
+    const cloneController = {
+      getAuthStatus: mock(() => Promise.resolve({ authenticated: false, host: 'github.com' })),
+      runClone: mock(() => Promise.resolve({ kind: 'error', detail: 'boom' })),
+      startSignIn: mock(() => Promise.resolve(null)),
+    };
+
+    await renderDialog({ bridge, cloneController });
+    await waitFor(() =>
+      expect((screen.getByTestId('share-receive-clone') as HTMLButtonElement).disabled).toBe(false),
+    );
+    fireEvent.click(screen.getByTestId('share-receive-clone'));
+
+    const localBtn = await screen.findByTestId('share-receive-error-local');
+    fireEvent.click(localBtn);
+
+    await waitFor(() => expect(screen.queryByTestId('share-receive-clone-error')).toBeNull());
+    await waitFor(() => expect(bridge.dialog.openFolder).toHaveBeenCalled());
+    expect(screen.getByTestId('share-receive-clone')).toBeTruthy();
+  });
+
   test('non-ok payloads toast and dismiss without mounting the dialog', async () => {
     const store = createTestStore({ kind: 'invalid' });
     await renderDialog({ store });

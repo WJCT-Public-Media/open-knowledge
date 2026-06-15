@@ -37,12 +37,12 @@ export function createCloneController(deps: CloneControllerDeps): ShareReceiveCl
       });
 
       const requestedBranch = typeof branch === 'string' && branch.length > 0 ? branch : null;
-      const handle = deps.cloneTransport.start({
-        url,
-        dir: targetDir,
-        branch: requestedBranch,
-      });
       try {
+        const handle = deps.cloneTransport.start({
+          url,
+          dir: targetDir,
+          branch: requestedBranch,
+        });
         for await (const event of handle.events) {
           if (event.type === 'progress') {
             const phase = event.phase;
@@ -66,17 +66,17 @@ export function createCloneController(deps: CloneControllerDeps): ShareReceiveCl
             return { kind: 'ok', dir: event.dir };
           }
           if (event.type === 'error') {
-            const failureMessage = event.message;
-            toast.error(t`Clone failed: ${failureMessage}`, { id: toastId, duration: 8000 });
-            return { kind: 'error' };
+            toast.dismiss(toastId);
+            return { kind: 'error', detail: event.message };
           }
         }
-        toast.error(t`Clone ended unexpectedly.`, { id: toastId, duration: 8000 });
-        return { kind: 'error' };
+        toast.dismiss(toastId);
+        return { kind: 'error', detail: 'Clone ended unexpectedly.' };
       } catch (err) {
-        const message = err instanceof Error ? err.message : t`Unknown error`;
-        toast.error(t`Clone failed: ${message}`, { id: toastId, duration: 8000 });
-        return { kind: 'error' };
+        console.warn('[clone-controller] clone transport threw', err);
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        toast.dismiss(toastId);
+        return { kind: 'error', detail: message };
       }
     },
   };

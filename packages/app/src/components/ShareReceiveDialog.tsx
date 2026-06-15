@@ -33,6 +33,7 @@ import {
 import {
   buildCloneUrl,
   canonicalGitHubRemoteUrl,
+  formatCloneErrorMessage,
   formatReceiveLog,
   mapValidationToToast,
   presentReceiveError,
@@ -42,7 +43,7 @@ import { type ShareReceiveStore, shareReceiveStore } from '@/lib/share/receive-s
 export type ShareReceiveCloneResult =
   | { readonly kind: 'ok'; readonly dir: string }
   | { readonly kind: 'cancelled' }
-  | { readonly kind: 'error' };
+  | { readonly kind: 'error'; readonly detail?: string };
 
 export interface ShareReceiveCloneController {
   getAuthStatus(): Promise<OkLocalOpAuthStatusResponse>;
@@ -128,8 +129,13 @@ function ShareReceiveDialogInner({
   const [authStatus, setAuthStatus] = useState<OkLocalOpAuthStatusResponse | null>(null);
   const [authChecking, setAuthChecking] = useState(false);
   const [cloneRunning, setCloneRunning] = useState(false);
+  const [cloneError, setCloneError] = useState<{ detail: string | null } | null>(null);
   const [consentState, setConsentState] = useState<ConsentFlowState | null>(null);
   const authProbeStartedRef = useRef(false);
+  const cloneErrorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (cloneError) cloneErrorRef.current?.focus();
+  }, [cloneError]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: payload-keyed effect; setConsentState identity is stable.
   useEffect(() => {
@@ -162,7 +168,11 @@ function ShareReceiveDialogInner({
       .then((result) => {
         setAuthStatus(result);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.warn(
+          '[receive] auth pre-flight probe failed',
+          err instanceof Error ? err.message : err,
+        );
         setAuthStatus({ authenticated: false, host: 'github.com' });
       })
       .finally(() => {
@@ -192,17 +202,23 @@ function ShareReceiveDialogInner({
       return;
     }
     if (cloneRunning) return;
+    setCloneError(null);
     setCloneRunning(true);
     const cloneUrl = buildCloneUrl(expected);
     let result: ShareReceiveCloneResult;
     try {
       result = await cloneController.runClone({ url: cloneUrl, branch: launcherMiss.share.branch });
-    } catch {
-      toast.error(t`Clone failed. Please try again.`);
+    } catch (err) {
+      console.warn('[receive] runClone threw unexpectedly', err);
       setCloneRunning(false);
+      setCloneError({ detail: err instanceof Error ? err.message : String(err) });
       return;
     }
     setCloneRunning(false);
+    if (result.kind === 'error') {
+      setCloneError({ detail: result.detail ?? null });
+      return;
+    }
     if (result.kind === 'ok') {
       try {
         await bridge.project.open({
@@ -214,10 +230,14 @@ function ShareReceiveDialogInner({
             path: shareTargetPath(launcherMiss.share.target),
           },
         });
-      } catch {
+        store.dismiss();
+      } catch (err) {
+        console.warn(
+          '[receive] project open after clone failed',
+          err instanceof Error ? err.message : err,
+        );
         toast.error(t`Cloned successfully, but could not open the project.`);
       }
-      store.dismiss();
       return;
     }
   }
@@ -238,6 +258,7 @@ function ShareReceiveDialogInner({
 
   async function handleLocalCtaClick(): Promise<void> {
     if (!launcherMiss || !expected || pickerOpen) return;
+    setCloneError(null);
     setPickerOpen(true);
     console.log(formatReceiveLog({ q2_path: 'local' }));
     try {
@@ -459,6 +480,7 @@ function ShareReceiveDialogInner({
   const shareRepo = share.repo;
   const lookingForUrl = canonicalGitHubRemoteUrl(expected);
   const signedInLogin = authStatus?.authenticated ? authStatus.login : undefined;
+  const cloneErrorMessage = cloneError?.detail ? formatCloneErrorMessage(cloneError.detail) : '';
 
   return (
     <DialogRoot
@@ -487,41 +509,105 @@ function ShareReceiveDialogInner({
           />
         </DialogHeader>
         <DialogBody>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              data-testid="share-receive-clone"
-              className="flex flex-col items-start gap-2 rounded-lg border-2 border-primary/40 bg-card p-4 text-left transition hover:border-primary hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-primary/40 disabled:hover:bg-card"
-              onClick={() => {
-                void handleCloneCtaClick();
-              }}
-              disabled={cloneController !== undefined && !cloneEnabled}
-              aria-disabled={cloneController !== undefined && !cloneEnabled}
+          {cloneError ? (
+            <div
+              ref={cloneErrorRef}
+              tabIndex={-1}
+              className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 outline-none"
+              data-testid="share-receive-clone-error"
             >
-              <span className="text-sm font-semibold">{cloneLabel}</span>
-              <span className="text-1sm text-muted-foreground">
-                <Trans>
-                  Downloads {shareOwner}/{shareRepo} from GitHub.
-                </Trans>
-              </span>
-            </button>
-            <button
-              type="button"
-              data-testid="share-receive-local"
-              className="flex flex-col items-start gap-2 rounded-lg border border-border bg-card p-4 text-left transition hover:border-foreground/50 hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => {
-                void handleLocalCtaClick();
-              }}
-              disabled={pickerOpen || cloneRunning}
-            >
-              <span className="text-sm font-semibold">
-                <Trans>I already have it locally →</Trans>
-              </span>
-              <span className="text-1sm text-muted-foreground">
-                <Trans>Pick the folder where you've cloned it.</Trans>
-              </span>
-            </button>
-          </div>
+              <p className="text-sm font-semibold text-foreground" role="alert">
+                <Trans>We couldn't clone this repository.</Trans>
+              </p>
+              {cloneErrorMessage ? (
+                <p
+                  className="mt-2 break-words text-xs text-destructive"
+                  data-testid="share-receive-clone-error-message"
+                >
+                  <Trans>Error:</Trans>{' '}
+                  <span className="font-mono text-foreground/80">"{cloneErrorMessage}"</span>
+                </p>
+              ) : null}
+              <p className="mt-3 text-sm text-muted-foreground">
+                <Trans>This usually means one of:</Trans>
+              </p>
+              <ul
+                className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground"
+                data-testid="share-receive-clone-error-reasons"
+              >
+                <li>
+                  <Trans>
+                    The repository is private and your GitHub account doesn't have access to it.
+                  </Trans>
+                </li>
+                <li>
+                  <Trans>The repository was moved, renamed, or deleted.</Trans>
+                </li>
+                <li>
+                  <Trans>A network problem or GitHub outage interrupted the clone.</Trans>
+                </li>
+              </ul>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  onClick={() => {
+                    void handleCloneCtaClick();
+                  }}
+                  data-testid="share-receive-clone-retry"
+                >
+                  {/* No in-place loading state: handleCloneCtaClick clears
+                      cloneError, so this view unmounts and the card grid's
+                      "Cloning..." button shows progress instead. */}
+                  <Trans>Try again</Trans>
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    void handleLocalCtaClick();
+                  }}
+                  disabled={pickerOpen || cloneRunning}
+                  data-testid="share-receive-error-local"
+                >
+                  <Trans>I already have it locally</Trans>
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                data-testid="share-receive-clone"
+                className="flex flex-col items-start gap-2 rounded-lg border-2 border-primary/40 bg-card p-4 text-left transition hover:border-primary hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-primary/40 disabled:hover:bg-card"
+                onClick={() => {
+                  void handleCloneCtaClick();
+                }}
+                disabled={cloneController !== undefined && !cloneEnabled}
+                aria-disabled={cloneController !== undefined && !cloneEnabled}
+              >
+                <span className="text-sm font-semibold">{cloneLabel}</span>
+                <span className="text-1sm text-muted-foreground">
+                  <Trans>
+                    Downloads {shareOwner}/{shareRepo} from GitHub.
+                  </Trans>
+                </span>
+              </button>
+              <button
+                type="button"
+                data-testid="share-receive-local"
+                className="flex flex-col items-start gap-2 rounded-lg border border-border bg-card p-4 text-left transition hover:border-foreground/50 hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => {
+                  void handleLocalCtaClick();
+                }}
+                disabled={pickerOpen || cloneRunning}
+              >
+                <span className="text-sm font-semibold">
+                  <Trans>I already have it locally →</Trans>
+                </span>
+                <span className="text-1sm text-muted-foreground">
+                  <Trans>Pick the folder where you've cloned it.</Trans>
+                </span>
+              </button>
+            </div>
+          )}
           {cloneController ? (
             <div
               className="mt-3 flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2 text-xs"
@@ -560,15 +646,17 @@ function ShareReceiveDialogInner({
               )}
             </div>
           ) : null}
-          <p className="mt-3 text-1sm text-muted-foreground">
-            <Trans>
-              Looking for{' '}
-              <code className="rounded-sm bg-muted px-1 py-0.5 text-foreground/80">
-                {lookingForUrl}
-              </code>
-              .
-            </Trans>
-          </p>
+          {cloneError ? null : (
+            <p className="mt-3 text-1sm text-muted-foreground">
+              <Trans>
+                Looking for{' '}
+                <code className="rounded-sm bg-muted px-1 py-0.5 text-foreground/80">
+                  {lookingForUrl}
+                </code>
+                .
+              </Trans>
+            </p>
+          )}
         </DialogBody>
         <DialogFooter>
           <Button variant="outline" className="font-mono uppercase" onClick={() => store.dismiss()}>

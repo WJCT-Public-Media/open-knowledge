@@ -432,6 +432,10 @@ msgstr "A key is set, but the embeddings provider rejected it or was unreachable
 msgid "A line with a footnote<0><1>[1]</1></0> and a definition shown below."
 msgstr "A line with a footnote<0><1>[1]</1></0> and a definition shown below."
 
+#: src/components/ShareReceiveDialog.tsx
+msgid "A network problem or GitHub outage interrupted the clone."
+msgstr "A network problem or GitHub outage interrupted the clone."
+
 #: src/components/settings/SettingsDialogErrorBoundary.tsx
 msgid "A newer version may have been deployed since this tab opened."
 msgstr "A newer version may have been deployed since this tab opened."
@@ -984,10 +988,6 @@ msgstr "Clone"
 msgid "Clone complete — opening project"
 msgstr "Clone complete — opening project"
 
-#: src/lib/share/clone-controller.ts
-msgid "Clone ended unexpectedly."
-msgstr "Clone ended unexpectedly."
-
 #: src/components/CloneDialog.tsx
 msgid "Clone failed — connection error"
 msgstr "Clone failed — connection error"
@@ -995,18 +995,6 @@ msgstr "Clone failed — connection error"
 #: src/components/CloneDialog.tsx
 msgid "Clone failed: {cloneError}"
 msgstr "Clone failed: {cloneError}"
-
-#: src/lib/share/clone-controller.ts
-msgid "Clone failed: {failureMessage}"
-msgstr "Clone failed: {failureMessage}"
-
-#: src/lib/share/clone-controller.ts
-msgid "Clone failed: {message}"
-msgstr "Clone failed: {message}"
-
-#: src/components/ShareReceiveDialog.tsx
-msgid "Clone failed. Please try again."
-msgstr "Clone failed. Please try again."
 
 #: src/components/CloneDialog.tsx
 #: src/components/NavigatorApp.tsx
@@ -2064,6 +2052,10 @@ msgstr "Enter a name for this template."
 msgid "Enter a repository URL or owner/repo"
 msgstr "Enter a repository URL or owner/repo"
 
+#: src/components/ShareReceiveDialog.tsx
+msgid "Error:"
+msgstr "Error:"
+
 #: src/components/DiffView.tsx
 msgid "Exit merge"
 msgstr "Exit merge"
@@ -2693,6 +2685,10 @@ msgstr "https://github.com/owner/repo or owner/repo"
 #: src/components/GraphPanel.tsx
 msgid "Hubs"
 msgstr "Hubs"
+
+#: src/components/ShareReceiveDialog.tsx
+msgid "I already have it locally"
+msgstr "I already have it locally"
 
 #: src/components/ShareReceiveDialog.tsx
 msgid "I already have it locally →"
@@ -5439,6 +5435,14 @@ msgstr "The preview blocks resources that don't meet its security rules (for exa
 msgid "The properties block at the top of this doc has a formatting error. Switch to source mode to fix it."
 msgstr "The properties block at the top of this doc has a formatting error. Switch to source mode to fix it."
 
+#: src/components/ShareReceiveDialog.tsx
+msgid "The repository is private and your GitHub account doesn't have access to it."
+msgstr "The repository is private and your GitHub account doesn't have access to it."
+
+#: src/components/ShareReceiveDialog.tsx
+msgid "The repository was moved, renamed, or deleted."
+msgstr "The repository was moved, renamed, or deleted."
+
 #: src/components/settings/SettingsDialogBody.tsx
 msgid "Theme"
 msgstr "Theme"
@@ -5543,6 +5547,10 @@ msgstr "This setting is per-machine and isn't shared with collaborators. It need
 msgid "This template lives in a parent folder — deleting it affects every folder beneath it that doesn't define its own version."
 msgstr "This template lives in a parent folder — deleting it affects every folder beneath it that doesn't define its own version."
 
+#: src/components/ShareReceiveDialog.tsx
+msgid "This usually means one of:"
+msgstr "This usually means one of:"
+
 #: src/components/TimelinePanel.tsx
 msgid "This will replace the current document content with the version from <0>{relative} ({absoluteTime}, {entrySha})</0> by <1>{authorName}</1>. Your current content is already saved in the timeline — you can restore it anytime."
 msgstr "This will replace the current document content with the version from <0>{relative} ({absoluteTime}, {entrySha})</0> by <1>{authorName}</1>. Your current content is already saved in the timeline — you can restore it anytime."
@@ -5639,6 +5647,7 @@ msgstr "Tree View Options"
 #: src/components/DocumentErrorBoundary.tsx
 #: src/components/InstallInClaudeDesktopDialog.tsx
 #: src/components/settings/AccountSection.tsx
+#: src/components/ShareReceiveDialog.tsx
 msgid "Try again"
 msgstr "Try again"
 
@@ -5743,7 +5752,6 @@ msgid "Unknown component: {unregisteredComponentName}"
 msgstr "Unknown component: {unregisteredComponentName}"
 
 #: src/components/DocumentErrorBoundary.tsx
-#: src/lib/share/clone-controller.ts
 msgid "Unknown error"
 msgstr "Unknown error"
 
@@ -5883,6 +5891,10 @@ msgstr "Waiting for authorization"
 #: src/components/settings/AccountSection.tsx
 msgid "We couldn't check your GitHub connection."
 msgstr "We couldn't check your GitHub connection."
+
+#: src/components/ShareReceiveDialog.tsx
+msgid "We couldn't clone this repository."
+msgstr "We couldn't clone this repository."
 
 #: src/components/InstallInClaudeDesktopDialog.tsx
 msgid "We'll build <0>openknowledge.skill</0>, save it to <1>~/Downloads</1>, and open the Claude Desktop App for you."

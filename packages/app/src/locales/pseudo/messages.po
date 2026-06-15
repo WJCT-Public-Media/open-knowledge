@@ -427,6 +427,10 @@ msgstr ""
 msgid "A line with a footnote<0><1>[1]</1></0> and a definition shown below."
 msgstr ""
 
+#: src/components/ShareReceiveDialog.tsx
+msgid "A network problem or GitHub outage interrupted the clone."
+msgstr ""
+
 #: src/components/settings/SettingsDialogErrorBoundary.tsx
 msgid "A newer version may have been deployed since this tab opened."
 msgstr ""
@@ -979,28 +983,12 @@ msgstr ""
 msgid "Clone complete — opening project"
 msgstr ""
 
-#: src/lib/share/clone-controller.ts
-msgid "Clone ended unexpectedly."
-msgstr ""
-
 #: src/components/CloneDialog.tsx
 msgid "Clone failed — connection error"
 msgstr ""
 
 #: src/components/CloneDialog.tsx
 msgid "Clone failed: {cloneError}"
-msgstr ""
-
-#: src/lib/share/clone-controller.ts
-msgid "Clone failed: {failureMessage}"
-msgstr ""
-
-#: src/lib/share/clone-controller.ts
-msgid "Clone failed: {message}"
-msgstr ""
-
-#: src/components/ShareReceiveDialog.tsx
-msgid "Clone failed. Please try again."
 msgstr ""
 
 #: src/components/CloneDialog.tsx
@@ -2059,6 +2047,10 @@ msgstr ""
 msgid "Enter a repository URL or owner/repo"
 msgstr ""
 
+#: src/components/ShareReceiveDialog.tsx
+msgid "Error:"
+msgstr ""
+
 #: src/components/DiffView.tsx
 msgid "Exit merge"
 msgstr ""
@@ -2687,6 +2679,10 @@ msgstr ""
 
 #: src/components/GraphPanel.tsx
 msgid "Hubs"
+msgstr ""
+
+#: src/components/ShareReceiveDialog.tsx
+msgid "I already have it locally"
 msgstr ""
 
 #: src/components/ShareReceiveDialog.tsx
@@ -5434,6 +5430,14 @@ msgstr ""
 msgid "The properties block at the top of this doc has a formatting error. Switch to source mode to fix it."
 msgstr ""
 
+#: src/components/ShareReceiveDialog.tsx
+msgid "The repository is private and your GitHub account doesn't have access to it."
+msgstr ""
+
+#: src/components/ShareReceiveDialog.tsx
+msgid "The repository was moved, renamed, or deleted."
+msgstr ""
+
 #: src/components/settings/SettingsDialogBody.tsx
 msgid "Theme"
 msgstr ""
@@ -5538,6 +5542,10 @@ msgstr ""
 msgid "This template lives in a parent folder — deleting it affects every folder beneath it that doesn't define its own version."
 msgstr ""
 
+#: src/components/ShareReceiveDialog.tsx
+msgid "This usually means one of:"
+msgstr ""
+
 #: src/components/TimelinePanel.tsx
 msgid "This will replace the current document content with the version from <0>{relative} ({absoluteTime}, {entrySha})</0> by <1>{authorName}</1>. Your current content is already saved in the timeline — you can restore it anytime."
 msgstr ""
@@ -5634,6 +5642,7 @@ msgstr ""
 #: src/components/DocumentErrorBoundary.tsx
 #: src/components/InstallInClaudeDesktopDialog.tsx
 #: src/components/settings/AccountSection.tsx
+#: src/components/ShareReceiveDialog.tsx
 msgid "Try again"
 msgstr ""
 
@@ -5738,7 +5747,6 @@ msgid "Unknown component: {unregisteredComponentName}"
 msgstr ""
 
 #: src/components/DocumentErrorBoundary.tsx
-#: src/lib/share/clone-controller.ts
 msgid "Unknown error"
 msgstr ""
 
@@ -5877,6 +5885,10 @@ msgstr ""
 
 #: src/components/settings/AccountSection.tsx
 msgid "We couldn't check your GitHub connection."
+msgstr ""
+
+#: src/components/ShareReceiveDialog.tsx
+msgid "We couldn't clone this repository."
 msgstr ""
 
 #: src/components/InstallInClaudeDesktopDialog.tsx

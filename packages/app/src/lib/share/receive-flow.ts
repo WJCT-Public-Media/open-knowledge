@@ -54,6 +54,22 @@ export function presentReceiveError(payload: OkShareReceivedPayload): ReceiveErr
   return null;
 }
 
+export function formatCloneErrorMessage(detail: string): string {
+  const lines = detail
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !/^Cloning into /i.test(line));
+
+  const remoteLines = lines.filter((line) => /^remote:/i.test(line));
+  const remote = remoteLines[remoteLines.length - 1];
+  if (remote) return remote.replace(/^remote:\s*/i, '').trim();
+
+  const fatal = lines.find((line) => /^fatal:/i.test(line));
+  if (fatal) return fatal.replace(/^fatal:\s*/i, '').trim();
+
+  return lines[0] ?? '';
+}
+
 export type BranchAction = 'switch' | 'fallback' | 'fetch-failed' | 'open-current' | 'cancel';
 
 export type BranchDialogAction =

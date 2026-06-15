@@ -7,10 +7,64 @@ import type {
 
 import {
   buildCloneUrl,
+  formatCloneErrorMessage,
   formatReceiveLog,
   mapValidationToToast,
   presentReceiveError,
 } from './receive-flow';
+
+describe('formatCloneErrorMessage', () => {
+  test('private/missing repo: drops the progress preamble + fatal URL line, keeps the remote message', () => {
+    const stderr = [
+      "Cloning into '/Users/me/Documents/sharing-repo'...",
+      'remote: Repository not found.',
+      "fatal: repository 'https://github.com/me/sharing-repo.git/' not found",
+    ].join('\n');
+    expect(formatCloneErrorMessage(stderr)).toBe('Repository not found.');
+  });
+
+  test('strips the local path from the message (no leak of the recipient filesystem path)', () => {
+    const stderr = [
+      "Cloning into '/Users/me/Documents/sharing-repo'...",
+      'remote: Repository not found.',
+    ].join('\n');
+    const result = formatCloneErrorMessage(stderr);
+    expect(result).not.toContain('/Users/me');
+    expect(result).not.toMatch(/Cloning into/i);
+  });
+
+  test('auth failure: surfaces the remote line over the fatal line', () => {
+    const stderr = [
+      'remote: Invalid username or password.',
+      "fatal: Authentication failed for 'https://github.com/me/x.git/'",
+    ].join('\n');
+    expect(formatCloneErrorMessage(stderr)).toBe('Invalid username or password.');
+  });
+
+  test('partial-progress failure: picks the last remote line (diagnostic), not a progress line', () => {
+    const stderr = [
+      "Cloning into '/tmp/r'...",
+      'remote: Enumerating objects: 100% (50/50), done.',
+      'remote: Repository not found.',
+    ].join('\n');
+    expect(formatCloneErrorMessage(stderr)).toBe('Repository not found.');
+  });
+
+  test('falls back to the fatal line (prefix stripped) when there is no remote line', () => {
+    expect(formatCloneErrorMessage('fatal: could not read Username for https://github.com')).toBe(
+      'could not read Username for https://github.com',
+    );
+  });
+
+  test('non-git controller message passes through unchanged', () => {
+    expect(formatCloneErrorMessage('Clone ended unexpectedly.')).toBe('Clone ended unexpectedly.');
+  });
+
+  test('only-preamble or empty input yields an empty string (caller omits the line)', () => {
+    expect(formatCloneErrorMessage("Cloning into '/tmp/x'...")).toBe('');
+    expect(formatCloneErrorMessage('   \n  ')).toBe('');
+  });
+});
 
 describe('buildCloneUrl', () => {
   test('matches the canonical .git form (the clone wizard accepts both forms equally)', () => {

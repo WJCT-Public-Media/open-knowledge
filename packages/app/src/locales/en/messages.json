@@ -148,6 +148,7 @@
     "484LKL": ["Remove link"],
     "48uGTI": ["Failed to load docs. Press Escape and re-open to retry."],
     "4A3Yzu": ["Code block"],
+    "4BITzH": ["Error:"],
     "4CfgPM": ["Project folder created, but git init failed. Try again."],
     "4KmEoC": ["Hotkeys"],
     "4NC2Ym": ["Move to the next or previous table cell."],
@@ -228,6 +229,7 @@
     "636K3K": ["Delete adjacent chip"],
     "67f-3g": ["Duplicate succeeded but the sidebar may be out of date — refresh to resync"],
     "6Aih4U": ["Offline"],
+    "6LbUG7": ["The repository is private and your GitHub account doesn't have access to it."],
     "6O626z": ["No headings match \"", ["trimmedAnchorQuery"], "\""],
     "6Pxqwv": [
       "No project templates yet. Create one to make it available everywhere in this project. Folder-scoped templates live on each folder's overview page."
@@ -599,6 +601,7 @@
     "J2eKUI": ["File"],
     "J3HzPL": ["Collapse ", ["keyName"]],
     "J6N5MX": ["Couldn't construct the share URL. Try Done and re-share."],
+    "J6mxC1": ["A network problem or GitHub outage interrupted the clone."],
     "JCxGEX": [
       "No disconnected pages. Pages appear here only when they have no incoming and no outgoing graph edges."
     ],
@@ -673,6 +676,7 @@
     "LdABLa": ["Could not open ", ["target"], ". Try opening it manually."],
     "LhWYpm": ["Other OK paths are tracked upstream:"],
     "LlHqdU": ["Initializing project"],
+    "Llyqvo": ["This usually means one of:"],
     "LpB85N": ["Plain"],
     "LtI9AS": ["Owner"],
     "LtSYdi": ["Reveal in Finder"],
@@ -784,7 +788,6 @@
     "PR9FSv": ["Move to the next visual-editor find result."],
     "PVUn_c": ["Open folder"],
     "PZt1uN": ["Search files, commands, projects, and AI handoff actions."],
-    "PZt2Ds": ["Clone ended unexpectedly."],
     "PdA9NZ": [["ahead"], " ahead"],
     "Pgu10b": ["Saved as <0>", ["slug"], ".md</0>"],
     "PgzIpb": ["Move to the previous visual-editor find result."],
@@ -1082,6 +1085,7 @@
     "_VRtd7": ["Couldn't send the selection — please try again."],
     "_W-elG": ["(inline)"],
     "_gkGSK": ["deleted template"],
+    "_pY_Vq": ["The repository was moved, renamed, or deleted."],
     "_qD6mn": ["Pick the folder where you've cloned it."],
     "_rP3HI": [["minutes"], "m ago"],
     "_tekeB": ["updated folder properties"],
@@ -1111,6 +1115,7 @@
     "aalx4E": ["Editing broken MDX source: ", ["reason"]],
     "abiHje": ["Delete selected items"],
     "adsMWO": ["Resolving deltas"],
+    "aiArms": ["We couldn't clone this repository."],
     "ajz9F8": ["Couldn't load conflict content for ", ["filePath"], ". Try reloading the page."],
     "aoa6xA": ["network error (is `ok ui` running?)"],
     "av_PD9": ["you"],
@@ -1354,7 +1359,6 @@
     "jhtG3I": [" Your selection has been restored."],
     "jjmuxV": ["Lost connection to the main process"],
     "jjtmV_": ["First file name"],
-    "jnXr0e": ["Clone failed. Please try again."],
     "jol95m": ["Failed to open Project Navigator."],
     "ju38ms": [
       "This project has no git repository — sharing mode does not apply. Initialize a repo to enable the toggle."
@@ -1428,7 +1432,6 @@
     "mBltnd": ["Path suggestions"],
     "mGaZwZ": ["See the full install guide"],
     "mHVPm5": ["Reconnect required"],
-    "mHzJ0v": ["Clone failed: ", ["message"]],
     "mKZODc": [
       "Adds the Open Knowledge skill to the <0>Claude Desktop App</0> so it's available in Chat and Cowork sessions."
     ],
@@ -1706,7 +1709,6 @@
     "uksqrP": ["Repository not found. It may have been renamed, deleted, or moved."],
     "un8kBM": ["Creating page: ", ["linkTitle"], "."],
     "ur2XSb": ["Visual editor"],
-    "usidp7": ["Clone failed: ", ["failureMessage"]],
     "uuoHOU": ["Command failed."],
     "uynXup": [["tokens", "plural", { "one": ["token"], "other": ["tokens"] }]],
     "v-h2hx": ["Delete ", ["targetGitPath"]],
@@ -1760,6 +1762,7 @@
     "xCJdfg": ["Clear"],
     "xCdTnb": ["Close new tab"],
     "xDBki3": ["Heading suggestions"],
+    "xFQRu4": ["I already have it locally"],
     "xG4tb6": ["Lost connection to \"", ["docName"], "\"."],
     "xHGM4U": ["Hide HTML preview"],
     "xK291b": ["Two-page (odd)"],
