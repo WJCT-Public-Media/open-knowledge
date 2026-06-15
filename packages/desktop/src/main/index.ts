@@ -2464,7 +2464,7 @@ function bootPrimaryInstance(): void {
         lastOpenedProject: appState.lastOpenedProject,
         optionHeld: process.argv.includes('--navigator'),
         pathExists: existsSync,
-        urlLaunch: protocolControl.singleFileLaunch(),
+        urlLaunch: protocolControl.urlLaunchOwnsWindow(),
       });
       if (decision.clearSnapshot) {
         appState = { ...appState, pendingWindowRestore: null };
@@ -2475,7 +2475,8 @@ function bootPrimaryInstance(): void {
         }
       }
 
-      if (decision.action !== 'none') {
+      const skipGitPreflight = decision.action === 'none' && protocolControl.singleFileLaunch();
+      if (!skipGitPreflight) {
         const gitOutcome = await ensureGitAvailable({
           assertGitAvailable,
           showMessageBox: async (opts) =>

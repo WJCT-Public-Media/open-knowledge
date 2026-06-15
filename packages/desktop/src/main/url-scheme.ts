@@ -348,6 +348,7 @@ interface BrowserWindowHandle {}
 
 interface ProtocolHandlerControl {
   singleFileLaunch(): boolean;
+  urlLaunchOwnsWindow(): boolean;
   drainQueuedUrls(): void;
   routeUrl(url: string): void;
 }
@@ -363,6 +364,7 @@ export function registerProtocolHandler(deps: ProtocolHandlerDeps): ProtocolHand
   const shareDedup = new Map<string, number>();
   let flushed = false;
   let singleFileLaunch = false;
+  let urlLaunchOwnsWindow = false;
 
   if (!deps.app.isPackaged) {
     try {
@@ -669,8 +671,12 @@ export function registerProtocolHandler(deps: ProtocolHandlerDeps): ProtocolHand
   };
 
   const enqueueOrRoute = (url: string): void => {
-    if (parseOpenKnowledgeFileUrl(url) !== null) {
+    const isSingleFile = parseOpenKnowledgeFileUrl(url) !== null;
+    if (isSingleFile) {
       singleFileLaunch = true;
+    }
+    if (isSingleFile || parseShareUrl(url)?.kind === 'ok') {
+      urlLaunchOwnsWindow = true;
     }
     if (flushed) {
       routeUrl(url);
@@ -733,6 +739,7 @@ export function registerProtocolHandler(deps: ProtocolHandlerDeps): ProtocolHand
 
   return {
     singleFileLaunch: () => singleFileLaunch,
+    urlLaunchOwnsWindow: () => urlLaunchOwnsWindow,
     drainQueuedUrls: () => drainAll(),
     routeUrl: (url) => enqueueOrRoute(url),
   };

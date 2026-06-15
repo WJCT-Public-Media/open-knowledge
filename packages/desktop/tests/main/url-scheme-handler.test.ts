@@ -587,6 +587,68 @@ describe('registerProtocolHandler — single-file launch control', () => {
   });
 });
 
+describe('registerProtocolHandler — urlLaunchOwnsWindow (boot-restore suppression)', () => {
+  let env: TestEnv;
+  const SHARE_URL = `https://openknowledge.ai/d/${encodeShareUrl(
+    'https://github.com/inkeep/notes/blob/main/welcome.md',
+  )}`;
+  const FILE_URL = `openknowledge://open?file=${encodeURIComponent('/Users/me/notes/todo.md')}`;
+
+  beforeEach(() => {
+    env = makeEnv();
+  });
+
+  function makeControl() {
+    return registerProtocolHandler({
+      app: env.app,
+      focusWindowForProject: env.focusWindowForProject,
+      openProject: env.openProject,
+      openEphemeralFile: env.openEphemeralFile,
+      sendDeepLink: env.sendDeepLink,
+      getAnyReadyWindow: env.getAnyReadyWindow,
+      setTimeout: (cb, ms) => env.timers.push({ cb, ms }),
+    });
+  }
+
+  test('becomes true after a valid share URL queued pre-ready (suppresses boot-restore window)', () => {
+    const control = makeControl();
+    expect(control.urlLaunchOwnsWindow()).toBe(false);
+    env.app.fireOpenUrl(SHARE_URL);
+    expect(control.urlLaunchOwnsWindow()).toBe(true);
+  });
+
+  test('becomes true after a valid custom-scheme share URL', () => {
+    const control = makeControl();
+    const blobUrl = 'https://github.com/inkeep/notes/blob/main/welcome.md';
+    env.app.fireOpenUrl(`openknowledge://share?url=${encodeURIComponent(blobUrl)}`);
+    expect(control.urlLaunchOwnsWindow()).toBe(true);
+  });
+
+  test('becomes true after a single-file file= URL (own-window launch parity)', () => {
+    const control = makeControl();
+    env.app.fireOpenUrl(FILE_URL);
+    expect(control.urlLaunchOwnsWindow()).toBe(true);
+  });
+
+  test('stays false for an invalid share URL — its toast needs an existing window', () => {
+    const control = makeControl();
+    env.app.fireOpenUrl('https://openknowledge.ai/d/!!!not-base64!!!');
+    expect(control.urlLaunchOwnsWindow()).toBe(false);
+  });
+
+  test('stays false after a screen deep-link — it targets an existing window', () => {
+    const control = makeControl();
+    env.app.fireOpenUrl('openknowledge://screen?name=settings');
+    expect(control.urlLaunchOwnsWindow()).toBe(false);
+  });
+
+  test('stays false after a legacy project deep-link (unchanged scope)', () => {
+    const control = makeControl();
+    env.app.fireOpenUrl('openknowledge://open?project=/tmp/p&doc=a.md');
+    expect(control.urlLaunchOwnsWindow()).toBe(false);
+  });
+});
+
 describe('registerProtocolHandler — second-instance argv parsing', () => {
   test('extracts openknowledge:// entries from second-instance argv', async () => {
     const env = makeEnv();
