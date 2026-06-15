@@ -115,6 +115,14 @@ describe('file-tree-adapter', () => {
     ).toBe('archive/docs/');
   });
 
+  test('promotes nested entries to root and treats already-root entries as no-ops', () => {
+    const root = dropTarget({ kind: 'root', directoryPath: null });
+    expect(computeTreeDropDestinationPath('docs/archive/', root)).toBe('archive/');
+    expect(computeTreeDropDestinationPath('a/b/c/', root)).toBe('c/');
+    expect(computeTreeDropDestinationPath('guide.md', root)).toBe('guide.md');
+    expect(computeTreeDropDestinationPath('archive/', root)).toBe('archive/');
+  });
+
   test('converts context menu items to sidebar targets and relative paths', () => {
     const file = menuItem('docs/guide.md', 'file');
     const folder = menuItem('docs/', 'directory');

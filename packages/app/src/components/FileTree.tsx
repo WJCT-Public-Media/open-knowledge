@@ -258,7 +258,39 @@ const FILE_TREE_DECORATION_SPRITE_SHEET = `<svg data-icon-sprite aria-hidden="tr
   ${MARKDOWN_FILE_ICON_SYMBOL}
 </svg>`;
 
-const FILE_TREE_UNSAFE_CSS = `${FILE_TREE_EXT_BADGE_CSS}\n${FILE_TREE_RENAME_CHIP_CSS}`;
+const FILE_TREE_ROOT_DROP_CSS = `
+  [data-file-tree-virtualized-root][data-file-tree-root-drag-target="true"] {
+    position: relative;
+  }
+  [data-file-tree-virtualized-root][data-file-tree-root-drag-target="true"]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    border-radius: 0.375rem;
+    box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--color-primary) 80%, transparent);
+    background: color-mix(in oklab, var(--color-primary) 6%, transparent);
+    pointer-events: none;
+  }
+  /* Forced-colors (Windows High Contrast) suppresses box-shadow and overrides
+     color-mix backgrounds, so the ring above would vanish. Borders survive
+     forced-colors — fall back to a system Highlight border (mirrors the JSX
+     in-range halo fallback in globals.css). */
+  @media (forced-colors: active) {
+    [data-file-tree-virtualized-root][data-file-tree-root-drag-target="true"]::after {
+      border: 2px solid Highlight;
+    }
+  }
+`;
+
+const FILE_TREE_CREATION_CLEARED_ATTR = 'data-ok-creation-cleared';
+const FILE_TREE_CREATION_CLEARED_CSS = `
+  :host([${FILE_TREE_CREATION_CLEARED_ATTR}]) [data-item-focused="true"] {
+    --trees-focus-ring-color: transparent;
+  }
+`;
+
+const FILE_TREE_UNSAFE_CSS = `${FILE_TREE_EXT_BADGE_CSS}\n${FILE_TREE_RENAME_CHIP_CSS}\n${FILE_TREE_ROOT_DROP_CSS}\n${FILE_TREE_CREATION_CLEARED_CSS}`;
 
 function createFileTreeStyle(resolvedTheme: string | undefined): CSSProperties {
   return {
@@ -985,6 +1017,7 @@ export interface FileTreeHandle {
   expandAll(): void;
   collapseAll(): void;
   getFolderState(): { folderCount: number; expandedCount: number };
+  isCreationTargetCleared(): boolean;
   subscribe(listener: () => void): () => void;
 }
 
@@ -1083,6 +1116,9 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
   const { conflicts: activeConflicts } = useConflicts();
   const [newItemRequest, setNewItemRequest] = useState<{ parentDir: string } | null>(null);
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
+  const [creationDirCleared, setCreationDirCleared] = useState(false);
+  const creationDirClearedRef = useRef(creationDirCleared);
+  const handleListenersRef = useRef<Set<() => void>>(new Set());
 
   const documentsRef = useRef(documents);
   const pageMetaRef = useRef(pageMeta);
@@ -1228,7 +1264,7 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
     selectedFolderPath,
     navigationPath: activeNavigationPath,
   } = resolveFileTreeSelection(activeTarget, isNewTabActive ? null : activeDocName);
-  const activeTreePath = selectedFilePath
+  const baseActiveTreePath = selectedFilePath
     ? docNameToTreePath(
         selectedFilePath,
         documents.find(
@@ -1240,6 +1276,7 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
       : activeTarget?.kind === 'asset'
         ? activeTarget.assetPath
         : null;
+  const activeTreePath = creationDirCleared ? null : baseActiveTreePath;
 
   const handoffInstallStates = useInstalledAgents().states;
   const { dispatch: dispatchHandoff } = useHandoffDispatch();
@@ -1836,6 +1873,16 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
     treePathsSignature,
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: setCreationDirCleared is a stable state setter; baseActiveTreePath is the sole trigger.
+  useEffect(() => {
+    setCreationDirCleared(false);
+  }, [baseActiveTreePath]);
+
+  useEffect(() => {
+    creationDirClearedRef.current = creationDirCleared;
+    for (const listener of handleListenersRef.current) listener();
+  }, [creationDirCleared]);
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: activeAncestorTreePathsSignature + treePathsSignature are re-run triggers — the row's visible index shifts when ancestors expand or the tree repopulates.
   useEffect(() => {
     if (loading || !activeTreePath) return;
@@ -2343,7 +2390,10 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
       if (suppressSelectionRef.current || sidebarDragInProgressRef.current) return;
       if (selectedPaths.length !== 1) return;
       const selected = selectedPaths[0];
-      if (selected) activateTreePath(normalizeSelectionPath(selected), documents);
+      if (selected) {
+        setCreationDirCleared(false);
+        activateTreePath(normalizeSelectionPath(selected), documents);
+      }
     };
     handleRenameErrorRef.current = (message) => {
       if (recoverMarkdownRenameConflict(message)) return;
@@ -2530,8 +2580,16 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
         folderStateCacheRef.current = next;
         return next;
       },
+      isCreationTargetCleared() {
+        return creationDirClearedRef.current;
+      },
       subscribe(listener: () => void) {
-        return model.subscribe(listener);
+        handleListenersRef.current.add(listener);
+        const unsubscribeModel = model.subscribe(listener);
+        return () => {
+          handleListenersRef.current.delete(listener);
+          unsubscribeModel();
+        };
       },
     }),
     [model],
@@ -2959,7 +3017,13 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 
     const item = findTreeItemElement(event.nativeEvent);
-    if (!item || item.getAttribute('aria-selected') !== 'true') return;
+    if (!item) {
+      if (clickIsInTreeContentArea(event.nativeEvent)) {
+        setCreationDirCleared(true);
+      }
+      return;
+    }
+    if (item.getAttribute('aria-selected') !== 'true') return;
 
     const rawPath = item.dataset.itemPath;
     if (!rawPath) return;
@@ -3035,6 +3099,7 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
           }
           model={model}
           style={createFileTreeStyle(resolvedTheme)}
+          {...{ [FILE_TREE_CREATION_CLEARED_ATTR]: creationDirCleared ? '' : undefined }}
           onClickCapture={handleTreeClickCapture}
           onMouseMove={handleTreeMouseMove}
           onMouseLeave={cancelCurrentHoverPrewarm}
@@ -3159,6 +3224,15 @@ function findTreeItemElement(event: MouseEvent): HTMLElement | null {
     }
   }
   return null;
+}
+
+function clickIsInTreeContentArea(event: MouseEvent): boolean {
+  for (const entry of event.composedPath()) {
+    if (entry instanceof HTMLElement && entry.matches('[data-file-tree-virtualized-scroll]')) {
+      return true;
+    }
+  }
+  return false;
 }
 
 const FILE_TREE_SKELETON_ROW_WIDTHS = ['w-3/4', 'w-2/3', 'w-4/5', 'w-1/2', 'w-3/5', 'w-2/3'];

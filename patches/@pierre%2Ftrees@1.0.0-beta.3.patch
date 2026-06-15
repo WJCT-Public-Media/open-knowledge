@@ -24,3 +24,33 @@ index 95778fc6e74ef7262a54ffd473e670a6be14786c..d39b43e84a33187ebdec7c67348ca099
  	getFocusedPath() {
  		return this.#controller.getFocusedPath();
  	}
+diff --git a/dist/render/FileTreeView.js b/dist/render/FileTreeView.js
+index 50a32001d7a7d3612b7f1929ccb11b3f1cbffd4f..260b5b0807ac3c844043c644c8a6760b3c642be2 100644
+--- a/dist/render/FileTreeView.js
++++ b/dist/render/FileTreeView.js
+@@ -128,7 +128,16 @@ function getShadowPointElementByGeometry(rootNode, clientX, clientY) {
+ }
+ function resolveDropTargetFromElement(target) {
+ 	const rowButton = target?.closest?.("[data-type=\"item\"]");
+-	if (!(rowButton instanceof HTMLElement)) return null;
++	if (!(rowButton instanceof HTMLElement)) {
++		const scrollArea = target?.closest?.("[data-file-tree-virtualized-scroll]");
++		if (scrollArea instanceof HTMLElement) return {
++			directoryPath: null,
++			flattenedSegmentPath: null,
++			hoveredPath: null,
++			kind: "root"
++		};
++		return null;
++	}
+ 	const hoveredPath = rowButton.dataset.itemPath ?? null;
+ 	if (hoveredPath == null) return null;
+ 	const flattenedSegment = target?.closest?.("[data-item-flattened-subitem]");
+@@ -1806,6 +1815,7 @@ function FileTreeView({ composition, controller, gitStatusByPath, ignoredGitDire
+ 		"data-file-tree-has-context-menu-action-lane": contextMenuEnabled && contextMenuButtonTriggerEnabled ? "true" : void 0,
+ 		"data-file-tree-has-git-lane": gitLaneActive ? "true" : void 0,
+ 		"data-file-tree-virtualized-root": "true",
++		"data-file-tree-root-drag-target": dragTarget?.kind === "root" ? "true" : void 0,
+ 		onDragLeave: dragAndDropEnabled ? handleTreeDragLeave : void 0,
+ 		onDragOver: dragAndDropEnabled ? handleTreeDragOver : void 0,
+ 		onDrop: dragAndDropEnabled ? handleTreeDrop : void 0,

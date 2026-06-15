@@ -81,6 +81,7 @@ mock.module('@/components/FileTree', () => ({
         collapseAll: treeCalls.collapseAll,
         expandAll: treeCalls.expandAll,
         getFolderState: () => ({ folderCount: 2, expandedCount: 1 }),
+        isCreationTargetCleared: () => false,
         startCreating: treeCalls.startCreating,
         startCreatingFromTemplate: treeCalls.startCreatingFromTemplate,
         subscribe: () => () => {},

@@ -126,10 +126,12 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
   const [tree, setTree] = useState<FileTreeHandle | null>(null);
 
   const { activeDocName, activeTarget } = useDocumentContext();
-  const initialCreateDir =
+  const baseCreateDir =
     activeTarget?.kind === 'folder' || activeTarget?.kind === 'folder-index'
       ? activeTarget.folderPath
       : defaultInitialDir(activeDocName);
+  const [treeCreationCleared, setTreeCreationCleared] = useState(false);
+  const initialCreateDir = treeCreationCleared ? '' : baseCreateDir;
 
   const isElectronHost = typeof window !== 'undefined' && window.okDesktop != null;
 
@@ -142,10 +144,12 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
   const [folderState, setFolderState] = useState(EMPTY_FOLDER_STATE);
   useEffect(() => {
     if (tree === null) return;
-    setFolderState(tree.getFolderState());
-    return tree.subscribe(() => {
+    const sync = () => {
       setFolderState(tree.getFolderState());
-    });
+      setTreeCreationCleared(tree.isCreationTargetCleared());
+    };
+    sync();
+    return tree.subscribe(sync);
   }, [tree]);
 
   useEffect(() => {

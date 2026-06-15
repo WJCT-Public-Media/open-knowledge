@@ -137,6 +137,7 @@ mock.module('@/components/FileTree', () => ({
         createFromTemplate: treeCalls.createFromTemplate,
         expandAll: treeCalls.expandAll,
         getFolderState: () => folderState,
+        isCreationTargetCleared: () => false,
         startCreating: treeCalls.startCreating,
         startCreatingFromTemplate: treeCalls.startCreatingFromTemplate,
         subscribe: (listener: () => void) => {
