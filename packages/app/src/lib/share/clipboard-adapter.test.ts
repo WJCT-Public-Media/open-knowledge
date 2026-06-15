@@ -174,3 +174,180 @@ describe('scheduleClipboardWrite — no clipboard API available', () => {
     );
   });
 });
+
+describe('isPermissionsPolicyRefusal — Chromium permissions-policy wording', () => {
+  test('matches "blocked because of a permissions policy" (current Chromium iframe block)', () => {
+    const error = new Error(
+      "Failed to execute 'writeText' on 'Clipboard': The Clipboard API has been blocked because of a permissions policy applied to the current document.",
+    );
+    error.name = 'NotAllowedError';
+    expect(isPermissionsPolicyRefusal(error)).toBe(true);
+  });
+});
+
+describe('scheduleClipboardWrite — document.execCommand("copy") fallback', () => {
+  interface FakeTextArea {
+    value: string;
+    style: Record<string, string>;
+    attributes: Record<string, string>;
+    focused: boolean;
+    selected: boolean;
+    removed: boolean;
+    setAttribute(name: string, value: string): void;
+    focus(): void;
+    select(): void;
+    remove(): void;
+  }
+
+  function makeFakeDocument(opts: { execResult?: boolean; execThrows?: boolean } = {}) {
+    const created: FakeTextArea[] = [];
+    const appended: FakeTextArea[] = [];
+    const execCalls: string[] = [];
+    const doc = {
+      activeElement: null,
+      body: {
+        appendChild(el: FakeTextArea) {
+          appended.push(el);
+        },
+      },
+      createElement(_tag: string): FakeTextArea {
+        const ta: FakeTextArea = {
+          value: '',
+          style: {},
+          attributes: {},
+          focused: false,
+          selected: false,
+          removed: false,
+          setAttribute(name, value) {
+            ta.attributes[name] = value;
+          },
+          focus() {
+            ta.focused = true;
+          },
+          select() {
+            ta.selected = true;
+          },
+          remove() {
+            ta.removed = true;
+          },
+        };
+        created.push(ta);
+        return ta;
+      },
+      execCommand(command: string): boolean {
+        execCalls.push(command);
+        if (opts.execThrows) throw new Error('execCommand exploded');
+        return opts.execResult ?? true;
+      },
+    };
+    return { doc, created, appended, execCalls };
+  }
+
+  function policyRefusal(): Error {
+    const error = new Error(
+      "Failed to execute 'writeText' on 'Clipboard': The Clipboard API has been blocked because of a permissions policy applied to the current document.",
+    );
+    error.name = 'NotAllowedError';
+    return error;
+  }
+
+  let savedDocument: unknown;
+  const docHolder = globalThis as { document?: unknown };
+
+  beforeEach(() => {
+    savedDocument = docHolder.document;
+  });
+
+  afterEach(() => {
+    if (savedDocument === undefined) delete docHolder.document;
+    else docHolder.document = savedDocument;
+  });
+
+  test('writeText rejection falls back to execCommand and resolves', async () => {
+    const { doc, created, execCalls } = makeFakeDocument({ execResult: true });
+    docHolder.document = doc;
+    setGlobals({
+      windowOkDesktop: undefined,
+      navigatorClipboardWriteText: async () => {
+        throw policyRefusal();
+      },
+    });
+
+    await scheduleClipboardWrite('https://openknowledge.ai/d/CCC');
+
+    expect(execCalls).toEqual(['copy']);
+    expect(created).toHaveLength(1);
+    expect(created[0]?.value).toBe('https://openknowledge.ai/d/CCC');
+    expect(created[0]?.selected).toBe(true);
+    expect(created[0]?.removed).toBe(true);
+  });
+
+  test('missing navigator.clipboard falls back to execCommand and resolves', async () => {
+    const { doc, execCalls } = makeFakeDocument({ execResult: true });
+    docHolder.document = doc;
+    setGlobals({
+      windowOkDesktop: undefined,
+      navigatorClipboardWriteText: undefined,
+    });
+
+    await scheduleClipboardWrite('https://openknowledge.ai/d/DDD');
+    expect(execCalls).toEqual(['copy']);
+  });
+
+  test('execCommand returning false rejects with the ORIGINAL writeText error', async () => {
+    const { doc } = makeFakeDocument({ execResult: false });
+    docHolder.document = doc;
+    setGlobals({
+      windowOkDesktop: undefined,
+      navigatorClipboardWriteText: async () => {
+        throw policyRefusal();
+      },
+    });
+
+    await expect(scheduleClipboardWrite('https://openknowledge.ai/d/EEE')).rejects.toThrow(
+      /permissions policy/,
+    );
+  });
+
+  test('execCommand throwing rejects with the original writeText error', async () => {
+    const { doc, created } = makeFakeDocument({ execThrows: true });
+    docHolder.document = doc;
+    setGlobals({
+      windowOkDesktop: undefined,
+      navigatorClipboardWriteText: async () => {
+        throw policyRefusal();
+      },
+    });
+
+    await expect(scheduleClipboardWrite('https://openknowledge.ai/d/FFF')).rejects.toThrow(
+      /permissions policy/,
+    );
+    expect(created[0]?.removed).toBe(true);
+  });
+
+  test('no document available + writeText rejects → original error propagates', async () => {
+    delete docHolder.document;
+    setGlobals({
+      windowOkDesktop: undefined,
+      navigatorClipboardWriteText: async () => {
+        throw policyRefusal();
+      },
+    });
+
+    await expect(scheduleClipboardWrite('https://openknowledge.ai/d/GGG')).rejects.toThrow(
+      /permissions policy/,
+    );
+  });
+
+  test('okDesktop bridge path never touches execCommand', async () => {
+    const { doc, execCalls } = makeFakeDocument({ execResult: true });
+    docHolder.document = doc;
+    setGlobals({
+      windowOkDesktop: { clipboard: { writeText: async () => undefined } },
+      navigatorClipboardWriteText: undefined,
+    });
+
+    await scheduleClipboardWrite('https://openknowledge.ai/d/HHH');
+    expect(execCalls).toEqual([]);
+  });
+});

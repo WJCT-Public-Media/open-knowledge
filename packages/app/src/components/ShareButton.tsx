@@ -102,6 +102,7 @@ export function ShareButton({ input, onClickWhenNoRemote }: ShareButtonProps) {
           value={clipboardFailedUrl ?? ''}
           onFocus={(e) => e.currentTarget.select()}
           onClick={(e) => e.currentTarget.select()}
+          onContextMenu={(e) => e.currentTarget.select()}
           className="font-mono text-xs"
           data-testid="share-button-fallback-url"
           aria-label={t`Share URL`}

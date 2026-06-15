@@ -587,6 +587,7 @@ function PublishSuccessView({
                 value={shareUrl}
                 onFocus={(e) => e.currentTarget.select()}
                 onClick={(e) => e.currentTarget.select()}
+                onContextMenu={(e) => e.currentTarget.select()}
                 className="font-mono text-xs"
               />
             ) : (
