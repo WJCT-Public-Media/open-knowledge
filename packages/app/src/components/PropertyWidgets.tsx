@@ -38,6 +38,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { dispatchTagClickEvent } from '@/editor/extensions/tag-click-plugin';
 import { dispatchExternalLinkClick } from '@/lib/external-link';
 import { cn } from '@/lib/utils';
+import { PropertyInlineLinks } from './PropertyInlineLinks';
+import { hasInlineLinks } from './property-inline-link-tokens';
 
 export interface CommonWidgetProps<T extends FrontmatterValue> {
   keyName: string;
@@ -64,8 +66,9 @@ export function TextWidget({ keyName, value, onCommit }: CommonWidgetProps<strin
   }, [isEditing]);
 
   const trimmedValue = value.trim();
-  const isLinkValue = !isEditing && trimmedValue.length > 0 && /^https?:\/\//i.test(trimmedValue);
-  if (isLinkValue) {
+  const isPureUrl = !isEditing && trimmedValue.length > 0 && /^https?:\/\/\S+$/i.test(trimmedValue);
+  const hasMixedLinks = !isEditing && !isPureUrl && hasInlineLinks(value);
+  if (isPureUrl) {
     return (
       <div data-testid="link-widget" data-key={keyName} className="group flex items-center gap-1">
         <a
@@ -89,6 +92,35 @@ export function TextWidget({ keyName, value, onCommit }: CommonWidgetProps<strin
           aria-label={t`Edit ${keyName}`}
           onClick={() => setIsEditing(true)}
           data-testid="link-widget-edit"
+          className="text-muted-foreground/0 hover:text-foreground focus-visible:text-muted-foreground group-hover:text-muted-foreground/60"
+        >
+          <Pencil className="size-3.5" aria-hidden />
+        </Button>
+      </div>
+    );
+  }
+
+  if (hasMixedLinks) {
+    return (
+      <div
+        data-testid="mixed-link-widget"
+        data-key={keyName}
+        className="group flex items-center gap-1"
+      >
+        <div
+          data-testid="mixed-link-widget-display"
+          title={value}
+          className="block min-w-0 flex-1 truncate px-2 py-1 text-sm leading-tight"
+        >
+          <PropertyInlineLinks text={value} />
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t`Edit ${keyName}`}
+          onClick={() => setIsEditing(true)}
+          data-testid="mixed-link-widget-edit"
           className="text-muted-foreground/0 hover:text-foreground focus-visible:text-muted-foreground group-hover:text-muted-foreground/60"
         >
           <Pencil className="size-3.5" aria-hidden />
@@ -394,7 +426,7 @@ export function ListWidget({ keyName, value, onCommit }: CommonWidgetProps<strin
                 #{chip}
               </button>
             ) : (
-              <span>{chip}</span>
+              <PropertyInlineLinks text={chip} />
             )}
             <button
               type="button"
