@@ -1543,6 +1543,14 @@ msgstr "Couldn't remove <0>{targetGitPath}</0>: {removeGitError}"
 msgid "Couldn't resolve the conflict for {filePath}."
 msgstr "Couldn't resolve the conflict for {filePath}."
 
+#: src/lib/install-server-drift-listener.ts
+msgid "Couldn't restart the server — it's running under a different account. Restart your computer to clear it, then reopen this project."
+msgstr "Couldn't restart the server — it's running under a different account. Restart your computer to clear it, then reopen this project."
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Couldn't restart the server automatically. Try running `ok stop all` in a terminal, then reopen this project — or restart your computer if it persists."
+msgstr "Couldn't restart the server automatically. Try running `ok stop all` in a terminal, then reopen this project — or restart your computer if it persists."
+
 #: src/components/TemplateForm.tsx
 msgid "Couldn't save template: {error}"
 msgstr "Couldn't save template: {error}"
@@ -3628,6 +3636,10 @@ msgstr "Not detected"
 msgid "Not installed"
 msgstr "Not installed"
 
+#: src/lib/install-server-drift-listener.ts
+msgid "Not now"
+msgstr "Not now"
+
 #: src/components/FolderPropertiesCard.tsx
 msgid "Nothing set yet."
 msgstr "Nothing set yet."
@@ -4585,6 +4597,22 @@ msgstr "Resolving deltas"
 msgid "Resources"
 msgstr "Resources"
 
+#: src/lib/install-server-drift-listener.ts
+msgid "Restart with this app's version"
+msgstr "Restart with this app's version"
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Restarted — now running v{appRuntime}."
+msgstr "Restarted — now running v{appRuntime}."
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Restarting closes this project's server. Connected agents (Claude Code, Codex, Cursor) will see their Open Knowledge MCP connection close unexpectedly — you may need to restart the agent, or toggle its Open Knowledge MCP server off and on, to reconnect."
+msgstr "Restarting closes this project's server. Connected agents (Claude Code, Codex, Cursor) will see their Open Knowledge MCP connection close unexpectedly — you may need to restart the agent, or toggle its Open Knowledge MCP server off and on, to reconnect."
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Restarting the server…"
+msgstr "Restarting the server…"
+
 #: src/components/TimelinePanel.tsx
 msgid "Restore"
 msgstr "Restore"
@@ -5159,6 +5187,10 @@ msgstr "Start source completion"
 msgid "Start writing to create this page"
 msgstr "Start writing to create this page"
 
+#: src/lib/install-server-drift-listener.ts
+msgid "Started a fresh Open Knowledge server (v{appRuntime}) for this dev session — the server already running for this project was terminated. Connected agents (Claude Code, Codex, Cursor) just lost their Open Knowledge MCP connection; restart the agent, or toggle its Open Knowledge MCP server off and on, to reconnect."
+msgstr "Started a fresh Open Knowledge server (v{appRuntime}) for this dev session — the server already running for this project was terminated. Connected agents (Claude Code, Codex, Cursor) just lost their Open Knowledge MCP connection; restart the agent, or toggle its Open Knowledge MCP server off and on, to reconnect."
+
 #: src/components/TemplateBody.tsx
 msgid "Starter content"
 msgstr "Starter content"
@@ -5527,6 +5559,17 @@ msgstr "This project"
 msgid "This project has no git repository — sharing mode does not apply. Initialize a repo to enable the toggle."
 msgstr "This project has no git repository — sharing mode does not apply. Initialize a repo to enable the toggle."
 
+#. placeholder {0}: info.appRuntime
+#: src/lib/install-server-drift-listener.ts
+msgid "This project is running a different, incompatible build of Open Knowledge than this app (v{0})."
+msgstr "This project is running a different, incompatible build of Open Knowledge than this app (v{0})."
+
+#. placeholder {0}: info.serverRuntime
+#. placeholder {1}: info.appRuntime
+#: src/lib/install-server-drift-listener.ts
+msgid "This project is running an older version of Open Knowledge (v{0}) than this app (v{1})."
+msgstr "This project is running an older version of Open Knowledge (v{0}) than this app (v{1})."
+
 #: src/components/settings/SettingsDialogBody.tsx
 msgid "This project lives only on this computer. Connect it to GitHub to back it up and share it with other people."
 msgstr "This project lives only on this computer. Connect it to GitHub to back it up and share it with other people."
@@ -5534,6 +5577,12 @@ msgstr "This project lives only on this computer. Connect it to GitHub to back i
 #: src/components/DocumentErrorBoundary.tsx
 msgid "This project's running server doesn't support live editing. Restart Open Knowledge to fix."
 msgstr "This project's running server doesn't support live editing. Restart Open Knowledge to fix."
+
+#. placeholder {0}: info.serverRuntime
+#. placeholder {1}: info.appRuntime
+#: src/lib/install-server-drift-listener.ts
+msgid "This project's server (v{0}) is newer than this app (v{1})."
+msgstr "This project's server (v{0}) is newer than this app (v{1})."
 
 #: src/components/settings/SearchSection.tsx
 msgid "This sends content off your machine"

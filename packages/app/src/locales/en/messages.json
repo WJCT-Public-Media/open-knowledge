@@ -90,6 +90,7 @@
     "2VHJG0": ["Share OK config with my team?"],
     "2XQ8Ww": ["Open preview when agent edits"],
     "2Xs2jo": ["Switch Project"],
+    "2YOwme": ["Restarted — now running v", ["appRuntime"], "."],
     "2YZwPB": ["Forward-links response did not match expected shape."],
     "2Znqb1": ["  (missing)"],
     "2fkdnR": ["Nothing to undo on this file"],
@@ -225,6 +226,13 @@
     "5rJ0w2": ["Open Knowledge is using this GitHub account."],
     "5wV2qQ": ["and more"],
     "5y_9lO": ["Waiting for authorization"],
+    "5z2tUG": [
+      "This project is running an older version of Open Knowledge (v",
+      ["0"],
+      ") than this app (v",
+      ["1"],
+      ")."
+    ],
     "62Pc08": ["Install for Claude Chat & Cowork (Desktop App)"],
     "636K3K": ["Delete adjacent chip"],
     "67f-3g": ["Duplicate succeeded but the sidebar may be out of date — refresh to resync"],
@@ -642,6 +650,7 @@
     "K_vT1F": ["Upstream sync"],
     "K_wz1u": ["Show Hidden Files"],
     "KaFCD3": ["Open this link in a new tab and collapse the graph."],
+    "Kf7GG5": ["Restarting the server…"],
     "Kgdbkt": ["Switch to local-only refused"],
     "Kh1n4a": [
       "<",
@@ -656,6 +665,11 @@
     "L-rMC9": ["Reset to default"],
     "L1ZE3M": ["Document statistics"],
     "L3CEC1": ["this item"],
+    "L5Xu8C": [
+      "This project is running a different, incompatible build of Open Knowledge than this app (v",
+      ["0"],
+      ")."
+    ],
     "L6Hhh6": ["(root)"],
     "L8fKuc": ["Run this in your terminal"],
     "L9Y9Om": ["Top linked pages"],
@@ -779,9 +793,13 @@
     "P47EWZ": ["Could not update sidebar settings"],
     "P6gXB-": ["Replace ", ["keyName"]],
     "P6lAT3": ["Folder target: ", ["linkTitle"], ". Click to open the overview."],
+    "P8jws3": [
+      "Restarting closes this project's server. Connected agents (Claude Code, Codex, Cursor) will see their Open Knowledge MCP connection close unexpectedly — you may need to restart the agent, or toggle its Open Knowledge MCP server off and on, to reconnect."
+    ],
     "P8yDjG": ["Name can’t be empty, \".\", \"..\", or contain / or \\"],
     "PB4upl": ["Find previous match"],
     "PBwmDJ": ["Searching by meaning"],
+    "PBxg_E": ["Not now"],
     "PKLY-1": ["Opening..."],
     "PMyJ9C": ["No edit session yet"],
     "PQCdtv": ["\"", ["docName"], "\" doesn't exist."],
@@ -793,6 +811,9 @@
     "PgzIpb": ["Move to the previous visual-editor find result."],
     "PkeYXL": ["Expanded graph mode"],
     "Pkw7J9": ["This folder is empty."],
+    "PqYWiC": [
+      "Couldn't restart the server automatically. Try running `ok stop all` in a terminal, then reopen this project — or restart your computer if it persists."
+    ],
     "Pyp1NA": ["Restore to this point?"],
     "Q5fqMz": ["Connection error — try again"],
     "Q6hhn8": ["Preferences"],
@@ -926,6 +947,11 @@
     "VbqhBI": ["Already at ", ["assetContentPath"], " — reusing."],
     "VdXv4D": ["Clone from GitHub"],
     "Vlc75q": ["Keep file deleted"],
+    "VsBxkh": [
+      "Started a fresh Open Knowledge server (v",
+      ["appRuntime"],
+      ") for this dev session — the server already running for this project was terminated. Connected agents (Claude Code, Codex, Cursor) just lost their Open Knowledge MCP connection; restart the agent, or toggle its Open Knowledge MCP server off and on, to reconnect."
+    ],
     "VuxVSP": ["Start source completion"],
     "VvS_k_": ["Config sharing is now local-only."],
     "W-ntoW": ["heading-slug"],
@@ -1556,6 +1582,7 @@
     "pkAft1": ["Search failed."],
     "pmKdif": ["Failed: ", ["loadError"]],
     "pmUArF": ["Workspace"],
+    "ppDgFi": ["Restart with this app's version"],
     "prHfed": ["Each selected tool gets an Open Knowledge MCP entry."],
     "pzutoc": ["Italic"],
     "q2kXMG": ["Inline Math"],
@@ -1693,6 +1720,9 @@
     "uM6jnS": ["Restore failed"],
     "uO9WLl": ["Push"],
     "uQNW00": ["Detached HEAD — checkout a branch to resume"],
+    "uQewpR": [
+      "Couldn't restart the server — it's running under a different account. Restart your computer to clear it, then reopen this project."
+    ],
     "uWtdQR": [
       "No templates yet. Add one in this folder's Templates section, or in Settings → Templates."
     ],
@@ -1804,6 +1834,7 @@
     "yUxR-Q": ["Expand ", ["keyName"]],
     "yWWThY": ["Asset reference"],
     "yYR6za": ["Display text"],
+    "yZmvQ4": ["This project's server (v", ["0"], ") is newer than this app (v", ["1"], ")."],
     "y_5CE8": ["Item ", ["0"]],
     "yf5r22": [
       ["keyName"],
