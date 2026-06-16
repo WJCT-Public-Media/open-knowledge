@@ -90,6 +90,7 @@
     "2VHJG0": ["Share OK config with my team?"],
     "2XQ8Ww": ["Open preview when agent edits"],
     "2Xs2jo": ["Switch Project"],
+    "2YOwme": ["Restarted — now running v", ["appRuntime"], "."],
     "2YZwPB": ["Forward-links response did not match expected shape."],
     "2Znqb1": ["  (missing)"],
     "2fkdnR": ["Nothing to undo on this file"],
@@ -140,9 +141,6 @@
     "438Fca": ["Cloned successfully, but could not open the project."],
     "44DSl0": [
       "Already have a git repository? Add it with <0>git remote add origin <url></0> in this project's folder. This page updates automatically once a remote is detected."
-    ],
-    "44_vJP": [
-      ["deleteCount", "plural", { "one": ["Delete"], "other": ["Delete ", "#", " Items"] }]
     ],
     "45MZFs": ["Commands"],
     "484LKL": ["Remove link"],
@@ -225,6 +223,13 @@
     "5rJ0w2": ["Open Knowledge is using this GitHub account."],
     "5wV2qQ": ["and more"],
     "5y_9lO": ["Waiting for authorization"],
+    "5z2tUG": [
+      "This project is running an older version of Open Knowledge (v",
+      ["0"],
+      ") than this app (v",
+      ["1"],
+      ")."
+    ],
     "62Pc08": ["Install for Claude Chat & Cowork (Desktop App)"],
     "636K3K": ["Delete adjacent chip"],
     "67f-3g": ["Duplicate succeeded but the sidebar may be out of date — refresh to resync"],
@@ -390,7 +395,6 @@
       ]
     ],
     "BAH4qX": ["Selected graph item"],
-    "BBtVak": ["Collapse All"],
     "BD0XSC": ["Failed to load project templates"],
     "BEkF-P": [
       ["userName"],
@@ -640,8 +644,8 @@
     "KYcZ6Y": ["Above"],
     "KZLdgR": ["See <0>#design-docs</0> for the latest specs."],
     "K_vT1F": ["Upstream sync"],
-    "K_wz1u": ["Show Hidden Files"],
     "KaFCD3": ["Open this link in a new tab and collapse the graph."],
+    "Kf7GG5": ["Restarting the server…"],
     "Kgdbkt": ["Switch to local-only refused"],
     "Kh1n4a": [
       "<",
@@ -656,6 +660,11 @@
     "L-rMC9": ["Reset to default"],
     "L1ZE3M": ["Document statistics"],
     "L3CEC1": ["this item"],
+    "L5Xu8C": [
+      "This project is running a different, incompatible build of Open Knowledge than this app (v",
+      ["0"],
+      ")."
+    ],
     "L6Hhh6": ["(root)"],
     "L8fKuc": ["Run this in your terminal"],
     "L9Y9Om": ["Top linked pages"],
@@ -680,7 +689,6 @@
     "LpB85N": ["Plain"],
     "LtI9AS": ["Owner"],
     "LtSYdi": ["Reveal in Finder"],
-    "Lu_dOh": ["Tree View Options"],
     "M1OfV9": ["Next source diagnostic"],
     "M3ytY_": [
       "This looks like a drive root (e.g., C:\\). Scaffolding here will scan an entire drive."
@@ -698,7 +706,6 @@
     "MUBR8r": ["Rename succeeded but the tabstrip may be out of date — refresh to resync"],
     "MV-Dkb": ["Found ", ["countDisplay"], " markdown files"],
     "MVxpbf": ["Find and replace"],
-    "MW64zN": ["New File"],
     "MWrUEd": ["Undo all"],
     "MZSBsh": [
       "No templates yet. Add one to give new docs in this folder a ready-made starting point."
@@ -779,9 +786,13 @@
     "P47EWZ": ["Could not update sidebar settings"],
     "P6gXB-": ["Replace ", ["keyName"]],
     "P6lAT3": ["Folder target: ", ["linkTitle"], ". Click to open the overview."],
+    "P8jws3": [
+      "Restarting closes this project's server. Connected agents (Claude Code, Codex, Cursor) will see their Open Knowledge MCP connection close unexpectedly — you may need to restart the agent, or toggle its Open Knowledge MCP server off and on, to reconnect."
+    ],
     "P8yDjG": ["Name can’t be empty, \".\", \"..\", or contain / or \\"],
     "PB4upl": ["Find previous match"],
     "PBwmDJ": ["Searching by meaning"],
+    "PBxg_E": ["Not now"],
     "PKLY-1": ["Opening..."],
     "PMyJ9C": ["No edit session yet"],
     "PQCdtv": ["\"", ["docName"], "\" doesn't exist."],
@@ -793,6 +804,9 @@
     "PgzIpb": ["Move to the previous visual-editor find result."],
     "PkeYXL": ["Expanded graph mode"],
     "Pkw7J9": ["This folder is empty."],
+    "PqYWiC": [
+      "Couldn't restart the server automatically. Try running `ok stop all` in a terminal, then reopen this project — or restart your computer if it persists."
+    ],
     "Pyp1NA": ["Restore to this point?"],
     "Q5fqMz": ["Connection error — try again"],
     "Q6hhn8": ["Preferences"],
@@ -836,6 +850,7 @@
     "RlCInP": ["Slash commands"],
     "RmBY0A": ["No git remote"],
     "RobAKV": ["Update the destination and optional section anchor."],
+    "Rq1vFD": ["Tree view options"],
     "Ruuu3v": ["Open with built-in text editor"],
     "Rx5ReQ": ["Rename ", ["keyName"]],
     "S33tz3": ["Not connected"],
@@ -853,7 +868,6 @@
       ["docName"],
       "\" could not be cleared in time. Reload to retry."
     ],
-    "ScUTHW": ["Open Containing Folder, ", ["hint"]],
     "ScwcF2": ["A project already exists at this location. Pick a different parent folder."],
     "Sfh6zL": ["The file on disk, and the id agents use. It can't be changed later."],
     "SgKLfA": ["Not connected to GitHub."],
@@ -926,6 +940,11 @@
     "VbqhBI": ["Already at ", ["assetContentPath"], " — reusing."],
     "VdXv4D": ["Clone from GitHub"],
     "Vlc75q": ["Keep file deleted"],
+    "VsBxkh": [
+      "Started a fresh Open Knowledge server (v",
+      ["appRuntime"],
+      ") for this dev session — the server already running for this project was terminated. Connected agents (Claude Code, Codex, Cursor) just lost their Open Knowledge MCP connection; restart the agent, or toggle its Open Knowledge MCP server off and on, to reconnect."
+    ],
     "VuxVSP": ["Start source completion"],
     "VvS_k_": ["Config sharing is now local-only."],
     "W-ntoW": ["heading-slug"],
@@ -976,6 +995,7 @@
     "XU0OXn": ["Enable auto-sync"],
     "XW18jo": ["Page headings response did not match success schema"],
     "XYlJJT": ["Setting up"],
+    "XcGbim": ["Show hidden files"],
     "Xet9MX": ["Failed to load backlinks"],
     "XfzqjK": ["template \"", ["name"], "\""],
     "Xl-UUg": ["guides/install or https://example.com"],
@@ -1119,7 +1139,6 @@
     "ajz9F8": ["Couldn't load conflict content for ", ["filePath"], ". Try reloading the page."],
     "aoa6xA": ["network error (is `ok ui` running?)"],
     "av_PD9": ["you"],
-    "b392Dr": ["Expand All"],
     "b3Thhd": ["Upload failed"],
     "b4AQFK": ["Open activity panel for ", ["tooltipName"], ", editing ", ["realCurrentDoc"]],
     "b4itZn": ["Working"],
@@ -1191,10 +1210,14 @@
     "dbhUX1": ["Hide this file"],
     "dbtjJh": ["(opens in new tab)"],
     "djc1l9": ["More than ", ["0"], " requests were blocked by the preview's security policy"],
+    "djjdjr": [
+      ["deleteCount", "plural", { "one": ["Delete"], "other": ["Delete ", "#", " items"] }]
+    ],
     "dprWmL": ["Anchor in this page"],
     "dr1vFs": ["Replace all matches"],
     "dw_dUJ": ["Failed to duplicate path"],
     "e0NrBM": ["Project"],
+    "e1Rn_k": ["Open containing folder"],
     "e1hptq": ["Embed a video with native player controls."],
     "e4GHWP": ["Pull"],
     "e8L17t": ["A non-empty folder already exists at this path. Pick a different folder."],
@@ -1304,7 +1327,6 @@
     "hxEUVJ": ["Initialize ", ["selectedPackName"]],
     "hyCxJY": ["Open that worktree instead"],
     "hynz2K": ["Download started"],
-    "hz7n6T": ["Open Containing Folder"],
     "i1flq_": ["Wiki link suggestions"],
     "i3f2kh": ["No matching commands."],
     "i8dKs-": ["Show all files"],
@@ -1517,8 +1539,10 @@
       "This setting is per-machine and isn't shared with collaborators. It needs an API key set with <0>ok embeddings set-key</0>."
     ],
     "oBXkm2": ["Delete code block"],
+    "oCZkaG": ["Copy path"],
     "oJl7eO": ["Unknown component: ", ["componentName"], " — source editable below"],
     "oKBnk5": ["More requests were blocked."],
+    "oQA-cA": ["Full path"],
     "oS1YpJ": ["Open the Project Navigator."],
     "oXKEsy": ["Delete an adjacent wiki-link or tag chip."],
     "ogAuyr": ["Back to document view"],
@@ -1556,6 +1580,7 @@
     "pkAft1": ["Search failed."],
     "pmKdif": ["Failed: ", ["loadError"]],
     "pmUArF": ["Workspace"],
+    "ppDgFi": ["Restart with this app's version"],
     "prHfed": ["Each selected tool gets an Open Knowledge MCP entry."],
     "pzutoc": ["Italic"],
     "q2kXMG": ["Inline Math"],
@@ -1624,6 +1649,7 @@
     "rwrPbS": ["Component boundary navigation"],
     "s-MGs7": ["Resources"],
     "s-XOaI": ["File name"],
+    "s061i4": ["Relative path"],
     "s0IDhW": ["This file could not be found."],
     "s0J_k9": [["0", "plural", { "one": ["#", " key"], "other": ["#", " keys"] }]],
     "s1c0ja": ["Bullet List"],
@@ -1671,7 +1697,6 @@
     "tP5DDk": ["Apply link"],
     "tUvUfp": ["Use a folder you already have."],
     "tW_yvQ": ["Expand ", ["docName"]],
-    "tX5yOZ": ["New Folder"],
     "tXkhj_": ["Start"],
     "t_YqKh": ["Remove"],
     "tfDRzk": ["Save"],
@@ -1693,6 +1718,9 @@
     "uM6jnS": ["Restore failed"],
     "uO9WLl": ["Push"],
     "uQNW00": ["Detached HEAD — checkout a branch to resume"],
+    "uQewpR": [
+      "Couldn't restart the server — it's running under a different account. Restart your computer to clear it, then reopen this project."
+    ],
     "uWtdQR": [
       "No templates yet. Add one in this folder's Templates section, or in Settings → Templates."
     ],
@@ -1784,7 +1812,6 @@
     "xeiujy": ["Text"],
     "xhlFsx": ["Inherited — set a value here to replace it."],
     "xiv-dW": ["No files yet."],
-    "xloBjn": ["Relative Path"],
     "xsZhu-": ["Page number"],
     "xzktOa": ["Edit wiki link"],
     "y1t8bQ": ["Settings sections"],
@@ -1804,6 +1831,7 @@
     "yUxR-Q": ["Expand ", ["keyName"]],
     "yWWThY": ["Asset reference"],
     "yYR6za": ["Display text"],
+    "yZmvQ4": ["This project's server (v", ["0"], ") is newer than this app (v", ["1"], ")."],
     "y_5CE8": ["Item ", ["0"]],
     "yf5r22": [
       ["keyName"],
@@ -1833,7 +1861,6 @@
       "</1>. Click Browse to pick a safer name."
     ],
     "z2JdQ-": ["Config sharing unchanged — see details below."],
-    "z2funE": ["Full Path"],
     "z5pqI8": ["Cannot upload: no document is open"],
     "z60Lgn": [
       "Saves the file to <0>~/Downloads/openknowledge.skill</0> and opens the Claude Desktop App. Requires Node.js or Bun on your PATH."
@@ -1846,6 +1873,7 @@
     "zLGXna": ["No starter packs available."],
     "zLak8b": ["Activate new tab"],
     "zQBg2C": ["Move the current block up or down one position."],
+    "zUhPuR": ["Open containing folder, ", ["hint"]],
     "zXZ0sB": [
       "Open Knowledge initializes at <0>",
       ["projectDir"],
@@ -1859,7 +1887,6 @@
       "The properties block at the top of this doc has a formatting error. Switch to source mode to fix it."
     ],
     "zbymaY": [["0"], "m ago"],
-    "zd00pH": ["Copy Path"],
     "zgSFyG": ["External link"],
     "zkz0Fg": ["Set up syncing"],
     "zlErBl": ["Page headings error response did not match RFC 9457"],

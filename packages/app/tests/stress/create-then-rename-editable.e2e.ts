@@ -48,7 +48,7 @@ test.describe('create → inline-rename → click → type', () => {
     const sidebar = page.locator('[data-slot="sidebar-container"]');
     await expect(sidebar.getByRole('treeitem').first()).toBeVisible({ timeout: 15_000 });
 
-    await page.getByRole('button', { name: 'New File', exact: true }).click();
+    await page.getByRole('button', { name: 'New file', exact: true }).click();
     const renameInput = page.getByRole('textbox', { name: /rename Untitled/i });
     await expect(renameInput).toBeVisible({ timeout: 10_000 });
 

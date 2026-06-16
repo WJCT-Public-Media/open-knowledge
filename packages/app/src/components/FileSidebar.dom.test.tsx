@@ -487,28 +487,28 @@ describe('FileSidebar runtime behavior', () => {
     await renderSidebar();
     await waitFor(() => expect(treeListeners.size).toBe(1));
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'New File' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'New file' })[0]);
     fireEvent.click(screen.getAllByRole('button', { name: 'New from template' })[0]);
     fireEvent.click(screen.getByRole('button', { name: 'Daily' }));
-    fireEvent.click(screen.getAllByRole('button', { name: 'New Folder' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'New folder' })[0]);
     expect(treeCalls.startCreating).toHaveBeenCalledWith('file', 'docs');
     expect(treeCalls.createFromTemplate).toHaveBeenCalledWith('docs', 'daily');
     expect(treeCalls.startCreating).toHaveBeenCalledWith('folder', 'docs');
 
-    expect(screen.getByRole('button', { name: 'Expand All' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Collapse All' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Expand All' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse All' }));
+    expect(screen.getByRole('button', { name: 'Expand all' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Collapse all' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Expand all' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse all' }));
     expect(treeCalls.expandAll).toHaveBeenCalledTimes(1);
     expect(treeCalls.collapseAll).toHaveBeenCalledTimes(1);
 
     act(() => setFolderState({ folderCount: 2, expandedCount: 2 }));
-    expect(screen.queryByRole('button', { name: 'Expand All' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Collapse All' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Expand all' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Collapse all' })).toBeTruthy();
 
     act(() => setFolderState({ folderCount: 2, expandedCount: 0 }));
-    expect(screen.getByRole('button', { name: 'Expand All' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Collapse All' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Expand all' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Collapse all' })).toBeNull();
   });
 
   test('empty-space menu renders ordered project-root actions and routes each runtime effect', async () => {

@@ -205,7 +205,7 @@ msgid "{days, plural, one {# day ago} other {# days ago}}"
 msgstr ""
 
 #: src/components/FileTree.tsx
-msgid "{deleteCount, plural, one {Delete} other {Delete # Items}}"
+msgid "{deleteCount, plural, one {Delete} other {Delete # items}}"
 msgstr ""
 
 #: src/editor/extensions/JsxComponentView.tsx
@@ -1107,12 +1107,8 @@ msgid "Collapse {keyName}"
 msgstr ""
 
 #: src/components/FileSidebar.tsx
-msgid "Collapse all"
-msgstr ""
-
-#: src/components/FileSidebar.tsx
 #: src/components/FileTree.tsx
-msgid "Collapse All"
+msgid "Collapse all"
 msgstr ""
 
 #: src/components/ActivityPanelBurstRow.tsx
@@ -1319,7 +1315,7 @@ msgid "Copy full path, No workspace"
 msgstr ""
 
 #: src/components/FileTree.tsx
-msgid "Copy Path"
+msgid "Copy path"
 msgstr ""
 
 #: src/components/PublishToGitHubDialog.tsx
@@ -1536,6 +1532,14 @@ msgstr ""
 
 #: src/components/DiffViewBoundary.tsx
 msgid "Couldn't resolve the conflict for {filePath}."
+msgstr ""
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Couldn't restart the server — it's running under a different account. Restart your computer to clear it, then reopen this project."
+msgstr ""
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Couldn't restart the server automatically. Try running `ok stop all` in a terminal, then reopen this project — or restart your computer if it persists."
 msgstr ""
 
 #: src/components/TemplateForm.tsx
@@ -2065,12 +2069,8 @@ msgid "Expand {keyName}"
 msgstr ""
 
 #: src/components/FileSidebar.tsx
-msgid "Expand all"
-msgstr ""
-
-#: src/components/FileSidebar.tsx
 #: src/components/FileTree.tsx
-msgid "Expand All"
+msgid "Expand all"
 msgstr ""
 
 #: src/components/ActivityPanelBurstRow.tsx
@@ -2478,7 +2478,7 @@ msgid "Full guide"
 msgstr ""
 
 #: src/components/FileTree.tsx
-msgid "Full Path"
+msgid "Full path"
 msgstr ""
 
 #: src/lib/keyboard-shortcuts.ts
@@ -3342,14 +3342,11 @@ msgstr ""
 
 #: src/components/CommandPalette.tsx
 #: src/components/empty-state/CreateView.tsx
+#: src/components/FileSidebar.tsx
+#: src/components/FileTree.tsx
 #: src/components/NewItemDialog.tsx
 #: src/lib/keyboard-shortcuts.ts
 msgid "New file"
-msgstr ""
-
-#: src/components/FileSidebar.tsx
-#: src/components/FileTree.tsx
-msgid "New File"
 msgstr ""
 
 #: src/components/empty-state/CreateView.tsx
@@ -3361,13 +3358,10 @@ msgid "New file from template \"{displayTitle}\" ({fileName}) in the project roo
 msgstr ""
 
 #: src/components/CommandPalette.tsx
-#: src/components/NewItemDialog.tsx
-msgid "New folder"
-msgstr ""
-
 #: src/components/FileSidebar.tsx
 #: src/components/FileTree.tsx
-msgid "New Folder"
+#: src/components/NewItemDialog.tsx
+msgid "New folder"
 msgstr ""
 
 #: src/components/FileSidebar.tsx
@@ -3623,6 +3617,10 @@ msgstr ""
 msgid "Not installed"
 msgstr ""
 
+#: src/lib/install-server-drift-listener.ts
+msgid "Not now"
+msgstr ""
+
 #: src/components/FolderPropertiesCard.tsx
 msgid "Nothing set yet."
 msgstr ""
@@ -3757,11 +3755,11 @@ msgid "Open CodeMirror's lint diagnostics panel."
 msgstr ""
 
 #: src/components/FileTree.tsx
-msgid "Open Containing Folder"
+msgid "Open containing folder"
 msgstr ""
 
 #: src/components/FileTree.tsx
-msgid "Open Containing Folder, {hint}"
+msgid "Open containing folder, {hint}"
 msgstr ""
 
 #: src/components/PropertyWidgets.tsx
@@ -4411,7 +4409,7 @@ msgid "Reject"
 msgstr ""
 
 #: src/components/FileTree.tsx
-msgid "Relative Path"
+msgid "Relative path"
 msgstr ""
 
 #: src/components/settings/SettingsDialogShell.tsx
@@ -4578,6 +4576,22 @@ msgstr ""
 
 #: src/components/HelpPopover.tsx
 msgid "Resources"
+msgstr ""
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Restart with this app's version"
+msgstr ""
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Restarted — now running v{appRuntime}."
+msgstr ""
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Restarting closes this project's server. Connected agents (Claude Code, Codex, Cursor) will see their Open Knowledge MCP connection close unexpectedly — you may need to restart the agent, or toggle its Open Knowledge MCP server off and on, to reconnect."
+msgstr ""
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Restarting the server…"
 msgstr ""
 
 #: src/components/TimelinePanel.tsx
@@ -4993,7 +5007,7 @@ msgstr ""
 
 #: src/components/FileSidebar.tsx
 #: src/components/FileTree.tsx
-msgid "Show Hidden Files"
+msgid "Show hidden files"
 msgstr ""
 
 #: src/editor/extensions/CodeBlockView.tsx
@@ -5152,6 +5166,10 @@ msgstr ""
 
 #: src/components/EditorArea.tsx
 msgid "Start writing to create this page"
+msgstr ""
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Started a fresh Open Knowledge server (v{appRuntime}) for this dev session — the server already running for this project was terminated. Connected agents (Claude Code, Codex, Cursor) just lost their Open Knowledge MCP connection; restart the agent, or toggle its Open Knowledge MCP server off and on, to reconnect."
 msgstr ""
 
 #: src/components/TemplateBody.tsx
@@ -5522,12 +5540,29 @@ msgstr ""
 msgid "This project has no git repository — sharing mode does not apply. Initialize a repo to enable the toggle."
 msgstr ""
 
+#. placeholder {0}: info.appRuntime
+#: src/lib/install-server-drift-listener.ts
+msgid "This project is running a different, incompatible build of Open Knowledge than this app (v{0})."
+msgstr ""
+
+#. placeholder {0}: info.serverRuntime
+#. placeholder {1}: info.appRuntime
+#: src/lib/install-server-drift-listener.ts
+msgid "This project is running an older version of Open Knowledge (v{0}) than this app (v{1})."
+msgstr ""
+
 #: src/components/settings/SettingsDialogBody.tsx
 msgid "This project lives only on this computer. Connect it to GitHub to back it up and share it with other people."
 msgstr ""
 
 #: src/components/DocumentErrorBoundary.tsx
 msgid "This project's running server doesn't support live editing. Restart Open Knowledge to fix."
+msgstr ""
+
+#. placeholder {0}: info.serverRuntime
+#. placeholder {1}: info.appRuntime
+#: src/lib/install-server-drift-listener.ts
+msgid "This project's server (v{0}) is newer than this app (v{1})."
 msgstr ""
 
 #: src/components/settings/SearchSection.tsx
@@ -5636,7 +5671,7 @@ msgid "Top linked pages"
 msgstr ""
 
 #: src/components/FileSidebar.tsx
-msgid "Tree View Options"
+msgid "Tree view options"
 msgstr ""
 
 #: src/components/DocumentErrorBoundary.tsx

@@ -579,14 +579,14 @@ describe('FileTree duplicate action runtime behavior', () => {
 
     await screen.findByRole('menuitem', { name: /duplicate/i });
     expectMenuOrder([
-      /New File/,
+      /New file/,
       /New from template/,
-      /New Folder/,
+      /New folder/,
       /Open with AI/,
-      /Copy Path/,
-      /Show Hidden Files/,
+      /Copy path/,
+      /Show hidden files/,
       /Show all files/,
-      /Expand All/,
+      /Expand all/,
       /Duplicate/,
       /Rename/,
       /Hide folder/,

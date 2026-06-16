@@ -505,26 +505,26 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
                  * Smart-hide: trigger only renders when the tree has folders
                  * (no folders → both menu items would be no-ops, so the entire
                  * trigger is wasted screen real estate). Individual items hide
-                 * when their action would no-op: "Expand All" hides when every
-                 * folder is already expanded; "Collapse All" hides when none
+                 * when their action would no-op: "Expand all" hides when every
+                 * folder is already expanded; "Collapse all" hides when none
                  * are expanded. Mixed states show both items.
                  */}
                 {hasFolders ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <ToolbarButton icon={ListCollapse} label={t`Tree View Options`} />
+                      <ToolbarButton icon={ListCollapse} label={t`Tree view options`} />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       {!allExpanded ? (
                         <DropdownMenuItem onSelect={() => tree?.expandAll()}>
                           <UnfoldVertical aria-hidden="true" />
-                          <Trans>Expand All</Trans>
+                          <Trans>Expand all</Trans>
                         </DropdownMenuItem>
                       ) : null}
                       {!noneExpanded ? (
                         <DropdownMenuItem onSelect={() => tree?.collapseAll()}>
                           <FoldVertical aria-hidden="true" />
-                          <Trans>Collapse All</Trans>
+                          <Trans>Collapse all</Trans>
                         </DropdownMenuItem>
                       ) : null}
                     </DropdownMenuContent>
@@ -532,7 +532,7 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
                 ) : null}
                 <ToolbarButton
                   icon={SquarePen}
-                  label={t`New File`}
+                  label={t`New file`}
                   onClick={() => tree?.startCreating('file', initialCreateDir)}
                 />
                 {activeFolderHasTemplates ? (
@@ -553,7 +553,7 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
                 ) : null}
                 <ToolbarButton
                   icon={FolderPlus}
-                  label={t`New Folder`}
+                  label={t`New folder`}
                   onClick={() => tree?.startCreating('folder', initialCreateDir)}
                 />
               </div>
@@ -697,7 +697,7 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
             data-testid="empty-space-menu-new-file"
           >
             <SquarePen aria-hidden="true" />
-            <Trans>New File</Trans>
+            <Trans>New file</Trans>
           </ContextMenuItem>
           {rootHasTemplates ? (
             <ContextMenuSub>
@@ -723,7 +723,7 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
             data-testid="empty-space-menu-new-folder"
           >
             <FolderPlus aria-hidden="true" />
-            <Trans>New Folder</Trans>
+            <Trans>New folder</Trans>
           </ContextMenuItem>
           <ContextMenuSeparator />
           {bridge ? (
@@ -791,7 +791,7 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
             disabled={projectLocalBinding === null}
             data-testid="empty-space-menu-show-hidden-files"
           >
-            <Trans>Show Hidden Files</Trans>
+            <Trans>Show hidden files</Trans>
           </ContextMenuCheckboxItem>
           <ContextMenuCheckboxItem
             checked={showAllFiles}

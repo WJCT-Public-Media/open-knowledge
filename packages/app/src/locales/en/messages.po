@@ -205,8 +205,8 @@ msgid "{days, plural, one {# day ago} other {# days ago}}"
 msgstr "{days, plural, one {# day ago} other {# days ago}}"
 
 #: src/components/FileTree.tsx
-msgid "{deleteCount, plural, one {Delete} other {Delete # Items}}"
-msgstr "{deleteCount, plural, one {Delete} other {Delete # Items}}"
+msgid "{deleteCount, plural, one {Delete} other {Delete # items}}"
+msgstr "{deleteCount, plural, one {Delete} other {Delete # items}}"
 
 #: src/editor/extensions/JsxComponentView.tsx
 msgid "{descriptorLabel} — render error, source editable below"
@@ -1112,13 +1112,9 @@ msgid "Collapse {keyName}"
 msgstr "Collapse {keyName}"
 
 #: src/components/FileSidebar.tsx
+#: src/components/FileTree.tsx
 msgid "Collapse all"
 msgstr "Collapse all"
-
-#: src/components/FileSidebar.tsx
-#: src/components/FileTree.tsx
-msgid "Collapse All"
-msgstr "Collapse All"
 
 #: src/components/ActivityPanelBurstRow.tsx
 msgid "Collapse burst {burstNumber} diff"
@@ -1324,8 +1320,8 @@ msgid "Copy full path, No workspace"
 msgstr "Copy full path, No workspace"
 
 #: src/components/FileTree.tsx
-msgid "Copy Path"
-msgstr "Copy Path"
+msgid "Copy path"
+msgstr "Copy path"
 
 #: src/components/PublishToGitHubDialog.tsx
 msgid "Copy share link"
@@ -1542,6 +1538,14 @@ msgstr "Couldn't remove <0>{targetGitPath}</0>: {removeGitError}"
 #: src/components/DiffViewBoundary.tsx
 msgid "Couldn't resolve the conflict for {filePath}."
 msgstr "Couldn't resolve the conflict for {filePath}."
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Couldn't restart the server — it's running under a different account. Restart your computer to clear it, then reopen this project."
+msgstr "Couldn't restart the server — it's running under a different account. Restart your computer to clear it, then reopen this project."
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Couldn't restart the server automatically. Try running `ok stop all` in a terminal, then reopen this project — or restart your computer if it persists."
+msgstr "Couldn't restart the server automatically. Try running `ok stop all` in a terminal, then reopen this project — or restart your computer if it persists."
 
 #: src/components/TemplateForm.tsx
 msgid "Couldn't save template: {error}"
@@ -2070,13 +2074,9 @@ msgid "Expand {keyName}"
 msgstr "Expand {keyName}"
 
 #: src/components/FileSidebar.tsx
+#: src/components/FileTree.tsx
 msgid "Expand all"
 msgstr "Expand all"
-
-#: src/components/FileSidebar.tsx
-#: src/components/FileTree.tsx
-msgid "Expand All"
-msgstr "Expand All"
 
 #: src/components/ActivityPanelBurstRow.tsx
 msgid "Expand burst {burstNumber} diff"
@@ -2483,8 +2483,8 @@ msgid "Full guide"
 msgstr "Full guide"
 
 #: src/components/FileTree.tsx
-msgid "Full Path"
-msgstr "Full Path"
+msgid "Full path"
+msgstr "Full path"
 
 #: src/lib/keyboard-shortcuts.ts
 msgid "General"
@@ -3347,15 +3347,12 @@ msgstr "New"
 
 #: src/components/CommandPalette.tsx
 #: src/components/empty-state/CreateView.tsx
+#: src/components/FileSidebar.tsx
+#: src/components/FileTree.tsx
 #: src/components/NewItemDialog.tsx
 #: src/lib/keyboard-shortcuts.ts
 msgid "New file"
 msgstr "New file"
-
-#: src/components/FileSidebar.tsx
-#: src/components/FileTree.tsx
-msgid "New File"
-msgstr "New File"
 
 #: src/components/empty-state/CreateView.tsx
 msgid "New file from template \"{displayTitle}\" ({fileName}) in {targetLabel}"
@@ -3366,14 +3363,11 @@ msgid "New file from template \"{displayTitle}\" ({fileName}) in the project roo
 msgstr "New file from template \"{displayTitle}\" ({fileName}) in the project root"
 
 #: src/components/CommandPalette.tsx
+#: src/components/FileSidebar.tsx
+#: src/components/FileTree.tsx
 #: src/components/NewItemDialog.tsx
 msgid "New folder"
 msgstr "New folder"
-
-#: src/components/FileSidebar.tsx
-#: src/components/FileTree.tsx
-msgid "New Folder"
-msgstr "New Folder"
 
 #: src/components/FileSidebar.tsx
 #: src/components/FileTree.tsx
@@ -3628,6 +3622,10 @@ msgstr "Not detected"
 msgid "Not installed"
 msgstr "Not installed"
 
+#: src/lib/install-server-drift-listener.ts
+msgid "Not now"
+msgstr "Not now"
+
 #: src/components/FolderPropertiesCard.tsx
 msgid "Nothing set yet."
 msgstr "Nothing set yet."
@@ -3762,12 +3760,12 @@ msgid "Open CodeMirror's lint diagnostics panel."
 msgstr "Open CodeMirror's lint diagnostics panel."
 
 #: src/components/FileTree.tsx
-msgid "Open Containing Folder"
-msgstr "Open Containing Folder"
+msgid "Open containing folder"
+msgstr "Open containing folder"
 
 #: src/components/FileTree.tsx
-msgid "Open Containing Folder, {hint}"
-msgstr "Open Containing Folder, {hint}"
+msgid "Open containing folder, {hint}"
+msgstr "Open containing folder, {hint}"
 
 #: src/components/PropertyWidgets.tsx
 msgid "Open date picker for {keyName}"
@@ -4416,8 +4414,8 @@ msgid "Reject"
 msgstr "Reject"
 
 #: src/components/FileTree.tsx
-msgid "Relative Path"
-msgstr "Relative Path"
+msgid "Relative path"
+msgstr "Relative path"
 
 #: src/components/settings/SettingsDialogShell.tsx
 msgid "Release notes"
@@ -4584,6 +4582,22 @@ msgstr "Resolving deltas"
 #: src/components/HelpPopover.tsx
 msgid "Resources"
 msgstr "Resources"
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Restart with this app's version"
+msgstr "Restart with this app's version"
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Restarted — now running v{appRuntime}."
+msgstr "Restarted — now running v{appRuntime}."
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Restarting closes this project's server. Connected agents (Claude Code, Codex, Cursor) will see their Open Knowledge MCP connection close unexpectedly — you may need to restart the agent, or toggle its Open Knowledge MCP server off and on, to reconnect."
+msgstr "Restarting closes this project's server. Connected agents (Claude Code, Codex, Cursor) will see their Open Knowledge MCP connection close unexpectedly — you may need to restart the agent, or toggle its Open Knowledge MCP server off and on, to reconnect."
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Restarting the server…"
+msgstr "Restarting the server…"
 
 #: src/components/TimelinePanel.tsx
 msgid "Restore"
@@ -4998,8 +5012,8 @@ msgstr "Show Files ({sidebarShortcutLabel})"
 
 #: src/components/FileSidebar.tsx
 #: src/components/FileTree.tsx
-msgid "Show Hidden Files"
-msgstr "Show Hidden Files"
+msgid "Show hidden files"
+msgstr "Show hidden files"
 
 #: src/editor/extensions/CodeBlockView.tsx
 msgid "Show HTML preview"
@@ -5158,6 +5172,10 @@ msgstr "Start source completion"
 #: src/components/EditorArea.tsx
 msgid "Start writing to create this page"
 msgstr "Start writing to create this page"
+
+#: src/lib/install-server-drift-listener.ts
+msgid "Started a fresh Open Knowledge server (v{appRuntime}) for this dev session — the server already running for this project was terminated. Connected agents (Claude Code, Codex, Cursor) just lost their Open Knowledge MCP connection; restart the agent, or toggle its Open Knowledge MCP server off and on, to reconnect."
+msgstr "Started a fresh Open Knowledge server (v{appRuntime}) for this dev session — the server already running for this project was terminated. Connected agents (Claude Code, Codex, Cursor) just lost their Open Knowledge MCP connection; restart the agent, or toggle its Open Knowledge MCP server off and on, to reconnect."
 
 #: src/components/TemplateBody.tsx
 msgid "Starter content"
@@ -5527,6 +5545,17 @@ msgstr "This project"
 msgid "This project has no git repository — sharing mode does not apply. Initialize a repo to enable the toggle."
 msgstr "This project has no git repository — sharing mode does not apply. Initialize a repo to enable the toggle."
 
+#. placeholder {0}: info.appRuntime
+#: src/lib/install-server-drift-listener.ts
+msgid "This project is running a different, incompatible build of Open Knowledge than this app (v{0})."
+msgstr "This project is running a different, incompatible build of Open Knowledge than this app (v{0})."
+
+#. placeholder {0}: info.serverRuntime
+#. placeholder {1}: info.appRuntime
+#: src/lib/install-server-drift-listener.ts
+msgid "This project is running an older version of Open Knowledge (v{0}) than this app (v{1})."
+msgstr "This project is running an older version of Open Knowledge (v{0}) than this app (v{1})."
+
 #: src/components/settings/SettingsDialogBody.tsx
 msgid "This project lives only on this computer. Connect it to GitHub to back it up and share it with other people."
 msgstr "This project lives only on this computer. Connect it to GitHub to back it up and share it with other people."
@@ -5534,6 +5563,12 @@ msgstr "This project lives only on this computer. Connect it to GitHub to back i
 #: src/components/DocumentErrorBoundary.tsx
 msgid "This project's running server doesn't support live editing. Restart Open Knowledge to fix."
 msgstr "This project's running server doesn't support live editing. Restart Open Knowledge to fix."
+
+#. placeholder {0}: info.serverRuntime
+#. placeholder {1}: info.appRuntime
+#: src/lib/install-server-drift-listener.ts
+msgid "This project's server (v{0}) is newer than this app (v{1})."
+msgstr "This project's server (v{0}) is newer than this app (v{1})."
 
 #: src/components/settings/SearchSection.tsx
 msgid "This sends content off your machine"
@@ -5641,8 +5676,8 @@ msgid "Top linked pages"
 msgstr "Top linked pages"
 
 #: src/components/FileSidebar.tsx
-msgid "Tree View Options"
-msgstr "Tree View Options"
+msgid "Tree view options"
+msgstr "Tree view options"
 
 #: src/components/DocumentErrorBoundary.tsx
 #: src/components/InstallInClaudeDesktopDialog.tsx

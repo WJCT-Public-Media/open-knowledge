@@ -356,7 +356,7 @@ interface WorkspaceInfo {
 function revealInFileManagerLabel(platform: 'darwin' | 'win32' | 'linux'): string {
   if (platform === 'darwin') return t`Reveal in Finder`;
   if (platform === 'win32') return t`Reveal in File Explorer`;
-  return t`Open Containing Folder`;
+  return t`Open containing folder`;
 }
 
 function RevealInFileManagerMenuItem({
@@ -384,8 +384,8 @@ function RevealInFileManagerMenuItem({
           ? t`Reveal in File Explorer, ${hint}`
           : t`Reveal in File Explorer`
         : hint
-          ? t`Open Containing Folder, ${hint}`
-          : t`Open Containing Folder`;
+          ? t`Open containing folder, ${hint}`
+          : t`Open containing folder`;
   return (
     <DropdownMenuItem
       disabled={!workspace}
@@ -461,7 +461,7 @@ interface FileTreeMenuProps {
   };
   model: PierreFileTreeModel;
   okignoreBinding: OkignoreBinding | null;
-  /** Project-local config binding for the `Show Hidden Files` / `Show all files`
+  /** Project-local config binding for the `Show hidden files` / `Show all files`
    *  folder-menu toggles. Patched directly here (mirrors the okignore Hide
    *  flow); `null` during cold-start disables the toggle items. */
   projectLocalBinding: ConfigBinding | null;
@@ -615,7 +615,7 @@ function FileTreeMenu({
     : [];
   const deleteTargets = selectedDeleteTargets.length > 1 ? selectedDeleteTargets : [target];
   const deleteCount = deleteTargets.length;
-  const deleteLabel = plural(deleteCount, { one: 'Delete', other: 'Delete # Items' });
+  const deleteLabel = plural(deleteCount, { one: 'Delete', other: 'Delete # items' });
   const folderAbsPath =
     isFolder && workspace
       ? joinWorkspacePath(
@@ -718,7 +718,7 @@ function FileTreeMenu({
               }}
             >
               <SquarePen aria-hidden="true" />
-              <Trans>New File</Trans>
+              <Trans>New file</Trans>
             </DropdownMenuItem>
             {folderHasTemplates ? (
               <DropdownMenuSub>
@@ -746,7 +746,7 @@ function FileTreeMenu({
               }}
             >
               <FolderPlus aria-hidden="true" />
-              <Trans>New Folder</Trans>
+              <Trans>New folder</Trans>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <RevealInFileManagerMenuItem item={item} workspace={workspace} onClose={close} />
@@ -761,7 +761,7 @@ function FileTreeMenu({
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
                 <Copy aria-hidden="true" />
-                <Trans>Copy Path</Trans>
+                <Trans>Copy path</Trans>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuItem
@@ -777,7 +777,7 @@ function FileTreeMenu({
                     void copyToClipboard(full, 'full');
                   }}
                 >
-                  <Trans>Full Path</Trans>
+                  <Trans>Full path</Trans>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => {
@@ -785,7 +785,7 @@ function FileTreeMenu({
                     void copyToClipboard(relativePathForTreeItem(item), 'relative');
                   }}
                 >
-                  <Trans>Relative Path</Trans>
+                  <Trans>Relative path</Trans>
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
@@ -799,7 +799,7 @@ function FileTreeMenu({
               disabled={!canToggleVisibility}
               data-testid="file-tree-menu-show-hidden-files"
             >
-              <Trans>Show Hidden Files</Trans>
+              <Trans>Show hidden files</Trans>
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
               checked={showAllFiles}
@@ -822,7 +822,7 @@ function FileTreeMenu({
                 }}
               >
                 <UnfoldVertical aria-hidden="true" />
-                <Trans>Expand All</Trans>
+                <Trans>Expand all</Trans>
               </DropdownMenuItem>
             ) : null}
             {showSubtreeCollapseAll ? (
@@ -833,7 +833,7 @@ function FileTreeMenu({
                 }}
               >
                 <FoldVertical aria-hidden="true" />
-                <Trans>Collapse All</Trans>
+                <Trans>Collapse all</Trans>
               </DropdownMenuItem>
             ) : null}
             {/* Destructive section. Rename sits with Hide/Delete here (not at
@@ -911,7 +911,7 @@ function FileTreeMenu({
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
                 <Copy aria-hidden="true" />
-                <Trans>Copy Path</Trans>
+                <Trans>Copy path</Trans>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuItem
@@ -927,7 +927,7 @@ function FileTreeMenu({
                     void copyToClipboard(full, 'full');
                   }}
                 >
-                  <Trans>Full Path</Trans>
+                  <Trans>Full path</Trans>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => {
@@ -935,7 +935,7 @@ function FileTreeMenu({
                     void copyToClipboard(relativePathForTreeItem(item), 'relative');
                   }}
                 >
-                  <Trans>Relative Path</Trans>
+                  <Trans>Relative path</Trans>
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>

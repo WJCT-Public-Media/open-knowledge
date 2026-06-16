@@ -29,7 +29,7 @@ async function createFileAndGetDocName(
   baseURL: string,
   name: string,
 ): Promise<string[]> {
-  await page.getByRole('button', { name: 'New File', exact: true }).click();
+  await page.getByRole('button', { name: 'New file', exact: true }).click();
   const input = page.getByRole('textbox', { name: /rename Untitled\.md/i });
   await expect(input).toBeVisible({ timeout: 10_000 });
   await input.fill(name);

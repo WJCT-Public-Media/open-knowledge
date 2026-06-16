@@ -23,7 +23,7 @@ function activeEditorTabButton(page: Page, name: string): Locator {
 const CREATE_CONVERGED_TIMEOUT = process.env.CI ? 15_000 : 10_000;
 
 export async function createFolderViaSidebar(page: Page, name: string): Promise<void> {
-  await page.getByRole('button', { name: 'New Folder', exact: true }).click();
+  await page.getByRole('button', { name: 'New folder', exact: true }).click();
   const input = page.getByRole('textbox', { name: /rename New Folder/i });
   await expect(input).toBeVisible({ timeout: CREATE_CONVERGED_TIMEOUT });
   await input.fill(name);
@@ -39,7 +39,7 @@ export async function createFolderViaSidebar(page: Page, name: string): Promise<
 }
 
 export async function createFileViaSidebar(page: Page, name: string): Promise<void> {
-  await page.getByRole('button', { name: 'New File', exact: true }).click();
+  await page.getByRole('button', { name: 'New file', exact: true }).click();
   const input = page.getByRole('textbox', { name: /rename Untitled\.md/i });
   await expect(input).toBeVisible({ timeout: CREATE_CONVERGED_TIMEOUT });
   await input.fill(name);

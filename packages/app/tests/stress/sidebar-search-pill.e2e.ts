@@ -209,7 +209,7 @@ test.describe('sidebar-search-pill — discovery, click, keyboard, semantics', (
     await page.goto('/#/q006');
     await page.waitForSelector('[role="treeitem"]', { timeout: 15_000 });
 
-    await expect(page.getByRole('button', { name: 'Tree View Options' })).toBeVisible({
+    await expect(page.getByRole('button', { name: 'Tree view options' })).toBeVisible({
       timeout: 15_000,
     });
 
@@ -217,13 +217,13 @@ test.describe('sidebar-search-pill — discovery, click, keyboard, semantics', (
     await expect(searchInsideHeader).toHaveCount(0);
 
     await expect(
-      sidebarHeader(page).getByRole('button', { name: 'Tree View Options' }),
+      sidebarHeader(page).getByRole('button', { name: 'Tree view options' }),
     ).toBeVisible();
-    await expect(sidebarHeader(page).getByRole('button', { name: 'New File' })).toBeVisible();
+    await expect(sidebarHeader(page).getByRole('button', { name: 'New file' })).toBeVisible();
     await expect(
       sidebarHeader(page).getByRole('button', { name: 'New from template' }),
     ).toBeVisible();
-    await expect(sidebarHeader(page).getByRole('button', { name: 'New Folder' })).toBeVisible();
+    await expect(sidebarHeader(page).getByRole('button', { name: 'New folder' })).toBeVisible();
   });
 
   test('pill has accessible name "Search" with no aria-label override; lucide icon is aria-hidden', async ({
@@ -605,7 +605,7 @@ test.describe('sidebar-search-pill — Electron host & sidebar-state', () => {
       .toBe('expanded');
   });
 
-  test('empty workspace — pill renders alongside the 3-button toolbar (Tree View Options hidden by hasFolders gate)', async ({
+  test('empty workspace — pill renders alongside the 3-button toolbar (Tree view options hidden by hasFolders gate)', async ({
     page,
     api,
     workerServer,
@@ -631,18 +631,18 @@ test.describe('sidebar-search-pill — Electron host & sidebar-state', () => {
       await page.setViewportSize(DESKTOP_VIEWPORT);
       await page.goto('/');
 
-      await expect(sidebarHeader(page).getByRole('button', { name: 'New File' })).toBeVisible({
+      await expect(sidebarHeader(page).getByRole('button', { name: 'New file' })).toBeVisible({
         timeout: 15_000,
       });
       await expect(
         sidebarHeader(page).getByRole('button', { name: 'New from template' }),
       ).toBeVisible();
-      await expect(sidebarHeader(page).getByRole('button', { name: 'New Folder' })).toBeVisible();
+      await expect(sidebarHeader(page).getByRole('button', { name: 'New folder' })).toBeVisible();
 
       await expect
         .poll(
           async () =>
-            await sidebarHeader(page).getByRole('button', { name: 'Tree View Options' }).count(),
+            await sidebarHeader(page).getByRole('button', { name: 'Tree view options' }).count(),
           { timeout: 10_000 },
         )
         .toBe(0);
