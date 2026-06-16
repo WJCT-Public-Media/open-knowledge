@@ -82,6 +82,7 @@ const loggerName = 'desktop';
 const logFileName = `${loggerName}.${todayDateString()}.log`;
 
 let rootLogger: pino.Logger | undefined;
+let rootDest: { flushSync: () => void } | undefined;
 
 function getRootLogger(): pino.Logger {
   if (rootLogger) return rootLogger;
@@ -91,6 +92,7 @@ function getRootLogger(): pino.Logger {
 
   const filePath = join(OK_LOGS_DIR, logFileName);
   const dest = pino.destination({ dest: filePath, append: true, sync: false });
+  rootDest = dest as unknown as { flushSync: () => void };
 
   rootLogger = pino(
     {
@@ -132,4 +134,10 @@ export function getLogger(subsystem: string): DesktopLogger {
 
 export function getRootDesktopLogger(): pino.Logger {
   return getRootLogger();
+}
+
+export function flushDesktopLogger(): void {
+  try {
+    rootDest?.flushSync();
+  } catch {}
 }

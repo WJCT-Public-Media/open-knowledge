@@ -64,6 +64,7 @@ import {
   BrowserWindow,
   clipboard,
   dialog,
+  autoUpdater as electronAutoUpdater,
   ipcMain,
   Menu,
   nativeImage,
@@ -117,7 +118,7 @@ import {
   runCreateNew,
 } from './create-new-project.ts';
 import { createDebugIpc, type DebugIpcHandle } from './debug-ipc.ts';
-import { getLogger, getRootDesktopLogger } from './desktop-logger.ts';
+import { flushDesktopLogger, getLogger, getRootDesktopLogger } from './desktop-logger.ts';
 import { promptForExistingFolder } from './dialog-helpers.ts';
 import {
   type DriverUtilityLike,
@@ -2573,6 +2574,16 @@ function bootPrimaryInstance(): void {
       });
 
       autoUpdaterHandle = await bootAutoUpdater(() => import('electron-updater'), {
+        logger: {
+          info: (msg: string, ctx?: object) =>
+            getLogger('updater').info((ctx ?? {}) as Record<string, unknown>, msg),
+          warn: (msg: string, ctx?: object) =>
+            getLogger('updater').warn((ctx ?? {}) as Record<string, unknown>, msg),
+          error: (msg: string, ctx?: object) =>
+            getLogger('updater').error((ctx ?? {}) as Record<string, unknown>, msg),
+          debug: (msg: string, ctx?: object) =>
+            getLogger('updater').debug((ctx ?? {}) as Record<string, unknown>, msg),
+        },
         ipcMain,
         readState: () => appState,
         writeState: (next) => {
@@ -2622,6 +2633,7 @@ function bootPrimaryInstance(): void {
             });
           }
           await wm?.stopAllOwnedServers();
+          flushDesktopLogger();
         },
         showCheckNowResult: (result) => {
           const target = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
@@ -2675,13 +2687,24 @@ function bootPrimaryInstance(): void {
       console.error(JSON.stringify({ event: 'whenReady-unhandled-rejection', message, stack }));
     });
 
+  app.on('before-quit', () => {
+    getLogger('lifecycle').info({}, 'before-quit');
+    flushDesktopLogger();
+  });
+  electronAutoUpdater.on('before-quit-for-update', () => {
+    getLogger('updater').info({}, 'before-quit-for-update — update install will relaunch the app');
+    flushDesktopLogger();
+  });
+
   app.on('will-quit', () => {
+    getLogger('lifecycle').info({}, 'will-quit');
     autoUpdaterHandle?.destroy();
     autoUpdaterHandle = null;
     bundleReplaceWatcherHandle?.stop();
     bundleReplaceWatcherHandle = null;
     mcpWiringHandle?.destroy();
     mcpWiringHandle = null;
+    flushDesktopLogger();
   });
 
   app.on('window-all-closed', () => {

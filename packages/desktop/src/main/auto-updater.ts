@@ -361,10 +361,6 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
 
   const onUpdateAvailable = (info: { version?: string }): void => {
     logger.info('update-available', { version: info.version });
-    try {
-      const { logger: fl } = require('./desktop-logger.ts');
-      fl.child('updater').info({ version: info.version ?? 'unknown' }, 'update available');
-    } catch {}
     const offerClass = classifyOffer(info.version);
     if (offerClass !== 'same-channel') {
       logger.warn('update-available vetoed', {
@@ -407,10 +403,6 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
 
   const onUpdateNotAvailable = (info: { version?: string }): void => {
     logger.info('update-not-available', { version: info.version });
-    try {
-      const { logger: fl } = require('./desktop-logger.ts');
-      fl.child('updater').info({ version: info.version ?? 'unknown' }, 'no update available');
-    } catch {}
     markCheckSucceeded();
     if (menuCheckPending) {
       menuCheckPending = false;
@@ -429,10 +421,7 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
   };
 
   const onUpdateDownloaded = (info: { version?: string }): void => {
-    try {
-      const { logger: fl } = require('./desktop-logger.ts');
-      fl.child('updater').info({ version: info.version ?? 'unknown' }, 'update downloaded');
-    } catch {}
+    logger.info('update-downloaded', { version: info.version });
     const version = typeof info.version === 'string' ? info.version : '';
     if (!version) {
       logger.warn('update-downloaded with empty version — skipping dispatch');
