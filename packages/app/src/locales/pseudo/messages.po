@@ -5216,13 +5216,10 @@ msgstr ""
 msgid "Suggestion menu open"
 msgstr ""
 
-#: src/lib/keyboard-shortcuts.ts
-msgid "Switch project"
-msgstr ""
-
 #: src/components/CommandPalette.tsx
 #: src/components/ProjectSwitcher.tsx
-msgid "Switch Project"
+#: src/lib/keyboard-shortcuts.ts
+msgid "Switch project"
 msgstr ""
 
 #: src/components/settings/SharingSection.tsx

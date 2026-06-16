@@ -5221,14 +5221,11 @@ msgstr "Suggestion menu navigation"
 msgid "Suggestion menu open"
 msgstr "Suggestion menu open"
 
+#: src/components/CommandPalette.tsx
+#: src/components/ProjectSwitcher.tsx
 #: src/lib/keyboard-shortcuts.ts
 msgid "Switch project"
 msgstr "Switch project"
-
-#: src/components/CommandPalette.tsx
-#: src/components/ProjectSwitcher.tsx
-msgid "Switch Project"
-msgstr "Switch Project"
 
 #: src/components/settings/SharingSection.tsx
 msgid "Switch to local-only refused"

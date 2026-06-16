@@ -477,7 +477,7 @@ export function CommandPalette({ bridge = null, open, onOpenChange }: CommandPal
     !inExclusiveMode &&
     !singleFile &&
     bridge !== null &&
-    matchesCommandQuery(t`Switch Project`, deferredQuery, ['switch project navigator projects']);
+    matchesCommandQuery(t`Switch project`, deferredQuery, ['switch project navigator projects']);
   const showSettings =
     !inExclusiveMode &&
     !singleFile &&
@@ -1084,7 +1084,7 @@ export function CommandPalette({ bridge = null, open, onOpenChange }: CommandPal
                 >
                   <LayoutGrid />
                   <span>
-                    <Trans>Switch Project</Trans>
+                    <Trans>Switch project</Trans>
                   </span>
                   <CommandShortcut>{formatShortcut('switch-project')}</CommandShortcut>
                 </CommandItem>

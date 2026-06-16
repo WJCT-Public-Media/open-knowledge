@@ -215,7 +215,7 @@ export function ProjectSwitcher({ bridge }: ProjectSwitcherProps) {
             data-testid="project-switcher-switch-project"
           >
             <LayoutGrid aria-hidden="true" className="text-muted-foreground" />
-            <Trans>Switch Project</Trans>
+            <Trans>Switch project</Trans>
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={onCreateProject} data-testid="project-switcher-new-project">
             <Plus aria-hidden="true" className="text-muted-foreground" />

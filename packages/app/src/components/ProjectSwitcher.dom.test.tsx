@@ -126,7 +126,7 @@ describe('ProjectSwitcher dropdown behavior', () => {
 
     const menuText = screen.getByTestId('project-switcher-menu').textContent ?? '';
     const openFolderIndex = menuText.indexOf('Open folder');
-    const switchProjectIndex = menuText.indexOf('Switch Project');
+    const switchProjectIndex = menuText.indexOf('Switch project');
     const newProjectIndex = menuText.indexOf('New project');
     expect(openFolderIndex).toBeGreaterThan(-1);
     expect(switchProjectIndex).toBeGreaterThan(openFolderIndex);

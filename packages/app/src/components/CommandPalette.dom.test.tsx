@@ -270,7 +270,7 @@ describe('CommandPalette DOM behavior', () => {
     expect(refreshInstallStatesCalls).toBeGreaterThan(0);
 
     const switchProject = screen.getByTestId('command-palette-switch-project');
-    expect(switchProject.textContent).toContain('Switch Project');
+    expect(switchProject.textContent).toContain('Switch project');
     expect(switchProject.textContent).toMatch(/⌘⇧N|Ctrl Shift P/);
     expect(switchProject.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
     expect(document.body.textContent).not.toContain('Start fresh in a new folder');

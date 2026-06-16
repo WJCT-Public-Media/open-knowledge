@@ -48,33 +48,33 @@ function findByLabel(
 }
 
 describe('buildMenuTemplate', () => {
-  test('empty recents → "No Recent Projects" disabled placeholder', () => {
+  test('empty recents → "No recent projects" disabled placeholder', () => {
     const deps = makeDeps();
     const template = buildMenuTemplate(deps);
-    const openRecent = findByLabel(template, 'Open Recent');
+    const openRecent = findByLabel(template, 'Open recent');
     expect(openRecent).toBeDefined();
     const sub = openRecent?.submenu as MenuItemConstructorOptions[] | undefined;
     expect(Array.isArray(sub)).toBe(true);
     expect(sub?.length).toBe(1);
-    expect(sub?.[0]?.label).toBe('No Recent Projects');
+    expect(sub?.[0]?.label).toBe('No recent projects');
     expect(sub?.[0]?.enabled).toBe(false);
   });
 
-  test('populated recents → N entries + separator + Clear Menu', () => {
+  test('populated recents → N entries + separator + Clear menu', () => {
     const recents: RecentRow[] = [
       { path: '/tmp/a', name: 'alpha' },
       { path: '/tmp/b', name: 'beta' },
     ];
     const deps = makeDeps({ getRecentProjects: () => recents });
     const template = buildMenuTemplate(deps);
-    const openRecent = findByLabel(template, 'Open Recent');
+    const openRecent = findByLabel(template, 'Open recent');
     const sub = openRecent?.submenu as MenuItemConstructorOptions[] | undefined;
     expect(sub?.length).toBe(4);
     expect(sub?.[0]?.label).toBe('alpha');
     expect(sub?.[0]?.sublabel).toBe('/tmp/a');
     expect(sub?.[1]?.label).toBe('beta');
     expect(sub?.[2]?.type).toBe('separator');
-    expect(sub?.[3]?.label).toBe('Clear Menu');
+    expect(sub?.[3]?.label).toBe('Clear menu');
   });
 
   test('clamps at 10 entries even when more are present', () => {
@@ -84,13 +84,13 @@ describe('buildMenuTemplate', () => {
     }));
     const deps = makeDeps({ getRecentProjects: () => recents });
     const template = buildMenuTemplate(deps);
-    const openRecent = findByLabel(template, 'Open Recent');
+    const openRecent = findByLabel(template, 'Open recent');
     const sub = openRecent?.submenu as MenuItemConstructorOptions[] | undefined;
     expect(sub?.length).toBe(12);
     expect(sub?.[0]?.label).toBe('project-0');
     expect(sub?.[9]?.label).toBe('project-9');
     expect(sub?.[10]?.type).toBe('separator');
-    expect(sub?.[11]?.label).toBe('Clear Menu');
+    expect(sub?.[11]?.label).toBe('Clear menu');
   });
 
   test('recent-row click dispatches deps.openProject(path, "recents")', () => {
@@ -100,14 +100,14 @@ describe('buildMenuTemplate', () => {
       openProject,
     });
     const template = buildMenuTemplate(deps);
-    const openRecent = findByLabel(template, 'Open Recent');
+    const openRecent = findByLabel(template, 'Open recent');
     const sub = openRecent?.submenu as MenuItemConstructorOptions[] | undefined;
     const row = sub?.[0];
     (row?.click as (() => void) | undefined)?.();
     expect(openProject).toHaveBeenCalledWith('/tmp/foo', 'recents');
   });
 
-  test('File → Open Folder click dispatches deps.openProject(path, "pick-existing")', async () => {
+  test('File → Open folder click dispatches deps.openProject(path, "pick-existing")', async () => {
     const openProject = mock(() => Promise.resolve());
     const showOpenDialog = mock(() =>
       Promise.resolve({ canceled: false, filePaths: ['/tmp/picked'] }),
@@ -117,38 +117,38 @@ describe('buildMenuTemplate', () => {
       dialog: { showOpenDialog } as unknown as MenuDeps['dialog'],
     });
     const template = buildMenuTemplate(deps);
-    const openFolder = findByLabel(template, 'Open Folder…');
+    const openFolder = findByLabel(template, 'Open folder…');
     expect(openFolder).toBeDefined();
     await (openFolder?.click as (() => Promise<void>) | undefined)?.();
     expect(openProject).toHaveBeenCalledWith('/tmp/picked', 'pick-existing');
   });
 
-  test('Clear Menu click dispatches deps.clearRecentProjects()', () => {
+  test('Clear menu click dispatches deps.clearRecentProjects()', () => {
     const clearRecentProjects = mock(() => {});
     const deps = makeDeps({
       getRecentProjects: () => [{ path: '/tmp/foo', name: 'foo' }],
       clearRecentProjects,
     });
     const template = buildMenuTemplate(deps);
-    const clearMenu = findByLabel(template, 'Clear Menu');
+    const clearMenu = findByLabel(template, 'Clear menu');
     expect(clearMenu).toBeDefined();
     (clearMenu?.click as (() => void) | undefined)?.();
     expect(clearRecentProjects).toHaveBeenCalledTimes(1);
   });
 
-  test('Switch Project click dispatches deps.openNavigator()', () => {
+  test('Switch project click dispatches deps.openNavigator()', () => {
     const openNavigator = mock(() => {});
     const deps = makeDeps({ openNavigator });
     const template = buildMenuTemplate(deps);
-    const switchProject = findByLabel(template, 'Switch Project…');
+    const switchProject = findByLabel(template, 'Switch project…');
     expect(switchProject).toBeDefined();
     (switchProject?.click as (() => void) | undefined)?.();
     expect(openNavigator).toHaveBeenCalledTimes(1);
   });
 
-  test('Switch Project rebound to Cmd+Shift+P (FR19 / D39 — Cmd+Shift+N now owns New Folder)', () => {
+  test('Switch project rebound to Cmd+Shift+P (FR19 / D39 — Cmd+Shift+N now owns New folder)', () => {
     const template = buildMenuTemplate(makeDeps());
-    const switchProject = findByLabel(template, 'Switch Project…');
+    const switchProject = findByLabel(template, 'Switch project…');
     expect(switchProject?.accelerator).toBe('CmdOrCtrl+Shift+P');
   });
 
@@ -271,13 +271,13 @@ describe('buildMenuTemplate', () => {
     }
   });
 
-  describe('Check for Updates… menu item', () => {
+  describe('Check for updates… menu item', () => {
     const isMac = process.platform === 'darwin';
 
     test('omitted entirely when onCheckForUpdates dep is undefined (dev mode / boot failure)', () => {
       const deps = makeDeps();
       const template = buildMenuTemplate(deps);
-      expect(findByLabel(template, 'Check for Updates…')).toBeUndefined();
+      expect(findByLabel(template, 'Check for updates…')).toBeUndefined();
     });
 
     if (isMac) {
@@ -289,7 +289,7 @@ describe('buildMenuTemplate', () => {
         const sub = appMenu?.submenu as MenuItemConstructorOptions[] | undefined;
         if (!sub) throw new Error('App submenu missing');
         const aboutIdx = sub.findIndex((i) => i.role === 'about');
-        const checkIdx = sub.findIndex((i) => i.label === 'Check for Updates…');
+        const checkIdx = sub.findIndex((i) => i.label === 'Check for updates…');
         const settingsIdx = sub.findIndex((i) => i.label === 'Settings…');
         expect(aboutIdx).toBeGreaterThanOrEqual(0);
         expect(checkIdx).toBeGreaterThan(aboutIdx);
@@ -303,7 +303,7 @@ describe('buildMenuTemplate', () => {
         const helpMenu = template.find((t) => t.label === 'Help');
         const sub = helpMenu?.submenu as MenuItemConstructorOptions[] | undefined;
         if (!sub) throw new Error('Help submenu missing');
-        expect(sub.find((i) => i.label === 'Check for Updates…')).toBeDefined();
+        expect(sub.find((i) => i.label === 'Check for updates…')).toBeDefined();
       });
     } else {
       test('non-mac: appears in Help menu only (no App menu on these platforms)', () => {
@@ -313,7 +313,7 @@ describe('buildMenuTemplate', () => {
         const helpMenu = template.find((t) => t.label === 'Help');
         const sub = helpMenu?.submenu as MenuItemConstructorOptions[] | undefined;
         if (!sub) throw new Error('Help submenu missing');
-        expect(sub.find((i) => i.label === 'Check for Updates…')).toBeDefined();
+        expect(sub.find((i) => i.label === 'Check for updates…')).toBeDefined();
       });
     }
 
@@ -321,9 +321,9 @@ describe('buildMenuTemplate', () => {
       const onCheckForUpdates = mock(() => {});
       const deps = makeDeps({ onCheckForUpdates });
       const template = buildMenuTemplate(deps);
-      const item = findByLabel(template, 'Check for Updates…');
+      const item = findByLabel(template, 'Check for updates…');
       if (!item || typeof item.click !== 'function')
-        throw new Error('Check for Updates… click missing');
+        throw new Error('Check for updates… click missing');
       (item.click as () => void)();
       expect(onCheckForUpdates).toHaveBeenCalledTimes(1);
     });
@@ -336,7 +336,7 @@ describe('buildMenuTemplate', () => {
     const last = fileSub?.[fileSub.length - 1];
     expect(last).toBeDefined();
     if (process.platform === 'darwin') {
-      expect(last?.label).toBe('Close Tab');
+      expect(last?.label).toBe('Close tab');
       expect(last?.accelerator).toBe('CmdOrCtrl+W');
       expect(last?.role).toBeUndefined();
     } else {
@@ -355,11 +355,11 @@ describe('buildMenuTemplate', () => {
     expect(roles).toContain('minimize');
   });
 
-  test('Close Tab click dispatches deps.onCloseActiveTabOrWindow on macOS', () => {
+  test('Close tab click dispatches deps.onCloseActiveTabOrWindow on macOS', () => {
     if (process.platform !== 'darwin') return;
     const onCloseActiveTabOrWindow = mock(() => {});
     const template = buildMenuTemplate(makeDeps({ onCloseActiveTabOrWindow }));
-    const closeTab = findByLabel(template, 'Close Tab');
+    const closeTab = findByLabel(template, 'Close tab');
     expect(closeTab?.enabled).toBe(true);
     (closeTab?.click as (() => void) | undefined)?.();
     expect(onCloseActiveTabOrWindow).toHaveBeenCalledTimes(1);
@@ -367,16 +367,16 @@ describe('buildMenuTemplate', () => {
 });
 
 describe('buildMenuTemplate — File menu state-aware items (US-020 / FR16 + FR19)', () => {
-  test('New File renders with Cmd+N accelerator (FR19 — was unbound today)', () => {
+  test('New file renders with Cmd+N accelerator (FR19 — was unbound today)', () => {
     const template = buildMenuTemplate(makeDeps({ onNewFile: mock(() => {}) }));
-    const newFile = findByLabel(template, 'New File');
+    const newFile = findByLabel(template, 'New file');
     expect(newFile).toBeDefined();
     expect(newFile?.accelerator).toBe('CmdOrCtrl+N');
   });
 
-  test('New Folder renders with Cmd+Shift+N accelerator (FR19 — rebound from Switch Project)', () => {
+  test('New folder renders with Cmd+Shift+N accelerator (FR19 — rebound from Switch project)', () => {
     const template = buildMenuTemplate(makeDeps({ onNewFolder: mock(() => {}) }));
-    const newFolder = findByLabel(template, 'New Folder');
+    const newFolder = findByLabel(template, 'New folder');
     expect(newFolder).toBeDefined();
     expect(newFolder?.accelerator).toBe('CmdOrCtrl+Shift+N');
   });
@@ -472,45 +472,45 @@ describe('buildMenuTemplate — File menu state-aware items (US-020 / FR16 + FR1
         onCopyRelativePath: mock(() => {}),
       }),
     );
-    expect(findByLabel(template, 'New File')?.enabled).toBe(true);
-    expect(findByLabel(template, 'New Folder')?.enabled).toBe(true);
-    expect(findByLabel(template, 'New from Template…')?.enabled).toBe(true);
+    expect(findByLabel(template, 'New file')?.enabled).toBe(true);
+    expect(findByLabel(template, 'New folder')?.enabled).toBe(true);
+    expect(findByLabel(template, 'New from template…')?.enabled).toBe(true);
     expect(findByLabel(template, 'Reveal in Finder')?.enabled).toBe(true);
     expect(findByLabel(template, 'Open in Terminal')?.enabled).toBe(true);
     expect(findByLabel(template, 'Open with AI')?.enabled).toBe(true);
-    expect(findByLabel(template, 'Copy Path')?.enabled).toBe(true);
+    expect(findByLabel(template, 'Copy path')?.enabled).toBe(true);
   });
 
   test('Items DISABLED when their handler dep is undefined (unit-test default = unwired)', () => {
     const template = buildMenuTemplate(makeDeps());
-    expect(findByLabel(template, 'New File')?.enabled).toBe(false);
-    expect(findByLabel(template, 'New Folder')?.enabled).toBe(false);
-    expect(findByLabel(template, 'New from Template…')?.enabled).toBe(false);
+    expect(findByLabel(template, 'New file')?.enabled).toBe(false);
+    expect(findByLabel(template, 'New folder')?.enabled).toBe(false);
+    expect(findByLabel(template, 'New from template…')?.enabled).toBe(false);
     expect(findByLabel(template, 'Duplicate')?.enabled).toBe(false);
     expect(findByLabel(template, 'Reveal in Finder')?.enabled).toBe(false);
     expect(findByLabel(template, 'Open in Terminal')?.enabled).toBe(false);
     expect(findByLabel(template, 'Open with AI')?.enabled).toBe(false);
-    expect(findByLabel(template, 'Copy Path')?.enabled).toBe(false);
+    expect(findByLabel(template, 'Copy path')?.enabled).toBe(false);
     if (process.platform === 'darwin') {
-      expect(findByLabel(template, 'Close Tab')?.enabled).toBe(false);
+      expect(findByLabel(template, 'Close tab')?.enabled).toBe(false);
     }
   });
 
-  test('Copy Path submenu renders Full Path + Relative Path (FR9 parity with sidebar)', () => {
+  test('Copy path submenu renders Full path + Relative path (FR9 parity with sidebar)', () => {
     const template = buildMenuTemplate(
       makeDeps({
         onCopyFullPath: mock(() => {}),
         onCopyRelativePath: mock(() => {}),
       }),
     );
-    const copyPath = findByLabel(template, 'Copy Path');
+    const copyPath = findByLabel(template, 'Copy path');
     expect(copyPath).toBeDefined();
     const sub = copyPath?.submenu as MenuItemConstructorOptions[] | undefined;
-    expect(sub?.[0]?.label).toBe('Full Path');
-    expect(sub?.[1]?.label).toBe('Relative Path');
+    expect(sub?.[0]?.label).toBe('Full path');
+    expect(sub?.[1]?.label).toBe('Relative path');
   });
 
-  test('click handlers dispatch to deps (e.g. New File → onNewFile)', () => {
+  test('click handlers dispatch to deps (e.g. New file → onNewFile)', () => {
     const onNewFile = mock(() => {});
     const onDuplicate = mock(() => {});
     const onMoveToTrash = mock(() => {});
@@ -524,13 +524,13 @@ describe('buildMenuTemplate — File menu state-aware items (US-020 / FR16 + FR1
         onCopyFullPath,
       }),
     );
-    (findByLabel(template, 'New File')?.click as (() => void) | undefined)?.();
+    (findByLabel(template, 'New file')?.click as (() => void) | undefined)?.();
     expect(onNewFile).toHaveBeenCalledTimes(1);
     (findByLabel(template, 'Duplicate')?.click as (() => void) | undefined)?.();
     expect(onDuplicate).toHaveBeenCalledTimes(1);
     (findByLabel(template, 'Move to Trash')?.click as (() => void) | undefined)?.();
     expect(onMoveToTrash).toHaveBeenCalledTimes(1);
-    (findByLabel(template, 'Full Path')?.click as (() => void) | undefined)?.();
+    (findByLabel(template, 'Full path')?.click as (() => void) | undefined)?.();
     expect(onCopyFullPath).toHaveBeenCalledTimes(1);
   });
 
@@ -545,47 +545,47 @@ describe('buildMenuTemplate — File menu state-aware items (US-020 / FR16 + FR1
   });
 });
 
-describe('buildMenuTemplate — Create New Project… menu item', () => {
+describe('buildMenuTemplate — Create new project… menu item', () => {
   test('renders enabled when onNewProject dep is provided', () => {
     const template = buildMenuTemplate(makeDeps({ onNewProject: mock(() => {}) }));
-    const item = findByLabel(template, 'Create New Project…');
+    const item = findByLabel(template, 'Create new project…');
     expect(item).toBeDefined();
     expect(item?.enabled).toBe(true);
   });
 
   test('DISABLED when onNewProject dep is omitted (unit-test default = unwired)', () => {
     const template = buildMenuTemplate(makeDeps());
-    expect(findByLabel(template, 'Create New Project…')?.enabled).toBe(false);
+    expect(findByLabel(template, 'Create new project…')?.enabled).toBe(false);
   });
 
   test('enabled regardless of activeTarget scope (project-scope-independent)', () => {
     const template = buildMenuTemplate(
       makeDeps({ activeTarget: { kind: null }, onNewProject: mock(() => {}) }),
     );
-    expect(findByLabel(template, 'Create New Project…')?.enabled).toBe(true);
+    expect(findByLabel(template, 'Create new project…')?.enabled).toBe(true);
   });
 
   test('click dispatches deps.onNewProject()', () => {
     const onNewProject = mock(() => {});
     const template = buildMenuTemplate(makeDeps({ onNewProject }));
-    const item = findByLabel(template, 'Create New Project…');
+    const item = findByLabel(template, 'Create new project…');
     (item?.click as (() => void) | undefined)?.();
     expect(onNewProject).toHaveBeenCalledTimes(1);
   });
 
   test('click is a safe no-op when onNewProject dep is omitted', () => {
     const template = buildMenuTemplate(makeDeps());
-    const item = findByLabel(template, 'Create New Project…');
+    const item = findByLabel(template, 'Create new project…');
     expect(() => (item?.click as (() => void) | undefined)?.()).not.toThrow();
   });
 
-  test('heads the project cluster — appears before Switch Project… in the File submenu', () => {
+  test('heads the project cluster — appears before Switch project… in the File submenu', () => {
     const template = buildMenuTemplate(makeDeps({ onNewProject: mock(() => {}) }));
     const fileMenu = template.find((t) => t.label === 'File');
     const sub = fileMenu?.submenu as MenuItemConstructorOptions[] | undefined;
     if (!sub) throw new Error('File submenu missing');
-    const createIdx = sub.findIndex((i) => i.label === 'Create New Project…');
-    const switchIdx = sub.findIndex((i) => i.label === 'Switch Project…');
+    const createIdx = sub.findIndex((i) => i.label === 'Create new project…');
+    const switchIdx = sub.findIndex((i) => i.label === 'Switch project…');
     expect(createIdx).toBeGreaterThanOrEqual(0);
     expect(switchIdx).toBeGreaterThan(createIdx);
   });
@@ -593,64 +593,64 @@ describe('buildMenuTemplate — Create New Project… menu item', () => {
   test('does NOT reintroduce the ambiguous "New Project…" label (regression guard)', () => {
     const template = buildMenuTemplate(makeDeps({ onNewProject: mock(() => {}) }));
     expect(findByLabel(template, 'New Project…')).toBeUndefined();
-    expect(findByLabel(template, 'Create New Project…')).toBeDefined();
+    expect(findByLabel(template, 'Create new project…')).toBeDefined();
   });
 });
 
 describe('buildMenuTemplate — View menu visibility toggles + tree-scoped expand/collapse', () => {
-  test('Show Hidden Files renders as a checkbox-type item', () => {
+  test('Show hidden files renders as a checkbox-type item', () => {
     const template = buildMenuTemplate(
       makeDeps({ onToggleShowHiddenFiles: mock(() => {}), showHiddenFilesChecked: false }),
     );
-    const item = findByLabel(template, 'Show Hidden Files');
+    const item = findByLabel(template, 'Show hidden files');
     expect(item).toBeDefined();
     expect(item?.type).toBe('checkbox');
     expect(item?.checked).toBe(false);
     expect(item?.enabled).toBe(true);
   });
 
-  test('Show Hidden Files binds Cmd+Shift+. accelerator (Finder convention)', () => {
+  test('Show hidden files binds Cmd+Shift+. accelerator (Finder convention)', () => {
     const template = buildMenuTemplate(
       makeDeps({ onToggleShowHiddenFiles: mock(() => {}), showHiddenFilesChecked: false }),
     );
-    expect(findByLabel(template, 'Show Hidden Files')?.accelerator).toBe('CmdOrCtrl+Shift+.');
+    expect(findByLabel(template, 'Show hidden files')?.accelerator).toBe('CmdOrCtrl+Shift+.');
   });
 
-  test('Show All Files renders as a checkbox-type item with checked state from deps', () => {
+  test('Show all files renders as a checkbox-type item with checked state from deps', () => {
     const template = buildMenuTemplate(
       makeDeps({ onToggleShowAllFiles: mock(() => {}), showAllFilesChecked: true }),
     );
-    const item = findByLabel(template, 'Show All Files');
+    const item = findByLabel(template, 'Show all files');
     expect(item?.type).toBe('checkbox');
     expect(item?.checked).toBe(true);
   });
 
-  test('Show Hidden Files DISABLED when toggle handler missing (unit-test default)', () => {
+  test('Show hidden files DISABLED when toggle handler missing (unit-test default)', () => {
     const template = buildMenuTemplate(makeDeps());
-    expect(findByLabel(template, 'Show Hidden Files')?.enabled).toBe(false);
-    expect(findByLabel(template, 'Show All Files')?.enabled).toBe(false);
+    expect(findByLabel(template, 'Show hidden files')?.enabled).toBe(false);
+    expect(findByLabel(template, 'Show all files')?.enabled).toBe(false);
   });
 
-  test('Expand All / Collapse All render with visible=true by default', () => {
+  test('Expand all / Collapse all render with visible=true by default', () => {
     const template = buildMenuTemplate(
       makeDeps({ onExpandAll: mock(() => {}), onCollapseAll: mock(() => {}) }),
     );
-    expect(findByLabel(template, 'Expand All')?.visible).toBe(true);
-    expect(findByLabel(template, 'Collapse All')?.visible).toBe(true);
+    expect(findByLabel(template, 'Expand all')?.visible).toBe(true);
+    expect(findByLabel(template, 'Collapse all')?.visible).toBe(true);
   });
 
-  test('Expand All HIDDEN when canExpandAll === false (smart-hide per D15)', () => {
+  test('Expand all HIDDEN when canExpandAll === false (smart-hide per D15)', () => {
     const template = buildMenuTemplate(
       makeDeps({ onExpandAll: mock(() => {}), canExpandAll: false }),
     );
-    expect(findByLabel(template, 'Expand All')?.visible).toBe(false);
+    expect(findByLabel(template, 'Expand all')?.visible).toBe(false);
   });
 
-  test('Collapse All HIDDEN when canCollapseAll === false', () => {
+  test('Collapse all HIDDEN when canCollapseAll === false', () => {
     const template = buildMenuTemplate(
       makeDeps({ onCollapseAll: mock(() => {}), canCollapseAll: false }),
     );
-    expect(findByLabel(template, 'Collapse All')?.visible).toBe(false);
+    expect(findByLabel(template, 'Collapse all')?.visible).toBe(false);
   });
 
   test('View menu click handlers dispatch to deps', () => {
@@ -666,13 +666,13 @@ describe('buildMenuTemplate — View menu visibility toggles + tree-scoped expan
         onCollapseAll,
       }),
     );
-    (findByLabel(template, 'Show Hidden Files')?.click as (() => void) | undefined)?.();
+    (findByLabel(template, 'Show hidden files')?.click as (() => void) | undefined)?.();
     expect(onToggleShowHiddenFiles).toHaveBeenCalledTimes(1);
-    (findByLabel(template, 'Show All Files')?.click as (() => void) | undefined)?.();
+    (findByLabel(template, 'Show all files')?.click as (() => void) | undefined)?.();
     expect(onToggleShowAllFiles).toHaveBeenCalledTimes(1);
-    (findByLabel(template, 'Expand All')?.click as (() => void) | undefined)?.();
+    (findByLabel(template, 'Expand all')?.click as (() => void) | undefined)?.();
     expect(onExpandAll).toHaveBeenCalledTimes(1);
-    (findByLabel(template, 'Collapse All')?.click as (() => void) | undefined)?.();
+    (findByLabel(template, 'Collapse all')?.click as (() => void) | undefined)?.();
     expect(onCollapseAll).toHaveBeenCalledTimes(1);
   });
 
@@ -699,8 +699,8 @@ describe('buildMenuTemplate — View menu visibility toggles + tree-scoped expan
     const sub = view?.submenu as MenuItemConstructorOptions[] | undefined;
     expect(sub).toBeDefined();
     const labels = sub?.map((i) => i.label ?? `[role:${i.role ?? 'sep'}]`) ?? [];
-    const showHiddenFilesIdx = labels.indexOf('Show Hidden Files');
-    const expandAllIdx = labels.indexOf('Expand All');
+    const showHiddenFilesIdx = labels.indexOf('Show hidden files');
+    const expandAllIdx = labels.indexOf('Expand all');
     const resetZoomIdx = labels.indexOf('[role:resetZoom]');
     expect(showHiddenFilesIdx).toBeGreaterThan(-1);
     expect(resetZoomIdx).toBeGreaterThan(showHiddenFilesIdx);
@@ -708,57 +708,57 @@ describe('buildMenuTemplate — View menu visibility toggles + tree-scoped expan
   });
 });
 
-describe('buildMenuTemplate — View → Show/Hide Sidebar', () => {
-  test('renders "Hide Sidebar" when sidebarVisible is true (or undefined default)', () => {
+describe('buildMenuTemplate — View → Show/Hide sidebar', () => {
+  test('renders "Hide sidebar" when sidebarVisible is true (or undefined default)', () => {
     const expanded = buildMenuTemplate(
       makeDeps({ onToggleSidebar: mock(() => {}), sidebarVisible: true }),
     );
-    expect(findByLabel(expanded, 'Hide Sidebar')).toBeDefined();
-    expect(findByLabel(expanded, 'Show Sidebar')).toBeUndefined();
+    expect(findByLabel(expanded, 'Hide sidebar')).toBeDefined();
+    expect(findByLabel(expanded, 'Show sidebar')).toBeUndefined();
 
     const defaultDeps = buildMenuTemplate(makeDeps({ onToggleSidebar: mock(() => {}) }));
-    expect(findByLabel(defaultDeps, 'Hide Sidebar')).toBeDefined();
-    expect(findByLabel(defaultDeps, 'Show Sidebar')).toBeUndefined();
+    expect(findByLabel(defaultDeps, 'Hide sidebar')).toBeDefined();
+    expect(findByLabel(defaultDeps, 'Show sidebar')).toBeUndefined();
   });
 
-  test('renders "Show Sidebar" when sidebarVisible is false', () => {
+  test('renders "Show sidebar" when sidebarVisible is false', () => {
     const collapsed = buildMenuTemplate(
       makeDeps({ onToggleSidebar: mock(() => {}), sidebarVisible: false }),
     );
-    expect(findByLabel(collapsed, 'Show Sidebar')).toBeDefined();
-    expect(findByLabel(collapsed, 'Hide Sidebar')).toBeUndefined();
+    expect(findByLabel(collapsed, 'Show sidebar')).toBeDefined();
+    expect(findByLabel(collapsed, 'Hide sidebar')).toBeUndefined();
   });
 
   test('binds CmdOrCtrl+Alt+S accelerator (⌥⌘S on macOS, Apple HIG sidebar convention)', () => {
     const template = buildMenuTemplate(makeDeps({ onToggleSidebar: mock(() => {}) }));
-    expect(findByLabel(template, 'Hide Sidebar')?.accelerator).toBe('CmdOrCtrl+Alt+S');
+    expect(findByLabel(template, 'Hide sidebar')?.accelerator).toBe('CmdOrCtrl+Alt+S');
 
     const collapsed = buildMenuTemplate(
       makeDeps({ onToggleSidebar: mock(() => {}), sidebarVisible: false }),
     );
-    expect(findByLabel(collapsed, 'Show Sidebar')?.accelerator).toBe('CmdOrCtrl+Alt+S');
+    expect(findByLabel(collapsed, 'Show sidebar')?.accelerator).toBe('CmdOrCtrl+Alt+S');
   });
 
   test('DISABLED when toggle handler missing (unit-test default)', () => {
     const template = buildMenuTemplate(makeDeps());
-    expect(findByLabel(template, 'Hide Sidebar')?.enabled).toBe(false);
+    expect(findByLabel(template, 'Hide sidebar')?.enabled).toBe(false);
   });
 
   test('click dispatches deps.onToggleSidebar', () => {
     const onToggleSidebar = mock(() => {});
     const template = buildMenuTemplate(makeDeps({ onToggleSidebar, sidebarVisible: true }));
-    (findByLabel(template, 'Hide Sidebar')?.click as (() => void) | undefined)?.();
+    (findByLabel(template, 'Hide sidebar')?.click as (() => void) | undefined)?.();
     expect(onToggleSidebar).toHaveBeenCalledTimes(1);
 
     const onToggleSidebar2 = mock(() => {});
     const collapsed = buildMenuTemplate(
       makeDeps({ onToggleSidebar: onToggleSidebar2, sidebarVisible: false }),
     );
-    (findByLabel(collapsed, 'Show Sidebar')?.click as (() => void) | undefined)?.();
+    (findByLabel(collapsed, 'Show sidebar')?.click as (() => void) | undefined)?.();
     expect(onToggleSidebar2).toHaveBeenCalledTimes(1);
   });
 
-  test('Show/Hide Sidebar precedes Show Hidden Files in the View submenu', () => {
+  test('Show/Hide sidebar precedes Show hidden files in the View submenu', () => {
     const template = buildMenuTemplate(
       makeDeps({
         onToggleSidebar: mock(() => {}),
@@ -768,63 +768,63 @@ describe('buildMenuTemplate — View → Show/Hide Sidebar', () => {
     const view = findByLabel(template, 'View');
     const sub = view?.submenu as MenuItemConstructorOptions[] | undefined;
     const labels = sub?.map((i) => i.label ?? `[role:${i.role ?? 'sep'}]`) ?? [];
-    const sidebarIdx = labels.indexOf('Hide Sidebar');
-    const showHiddenFilesIdx = labels.indexOf('Show Hidden Files');
+    const sidebarIdx = labels.indexOf('Hide sidebar');
+    const showHiddenFilesIdx = labels.indexOf('Show hidden files');
     expect(sidebarIdx).toBeGreaterThan(-1);
     expect(showHiddenFilesIdx).toBeGreaterThan(sidebarIdx);
   });
 
-  test('renders "Hide Document Panel" when docPanelVisible is unset or true', () => {
+  test('renders "Hide document panel" when docPanelVisible is unset or true', () => {
     const unsetDeps = buildMenuTemplate(makeDeps({ onToggleDocPanel: mock(() => {}) }));
-    expect(findByLabel(unsetDeps, 'Hide Document Panel')).toBeDefined();
-    expect(findByLabel(unsetDeps, 'Show Document Panel')).toBeUndefined();
+    expect(findByLabel(unsetDeps, 'Hide document panel')).toBeDefined();
+    expect(findByLabel(unsetDeps, 'Show document panel')).toBeUndefined();
 
     const visible = buildMenuTemplate(
       makeDeps({ onToggleDocPanel: mock(() => {}), docPanelVisible: true }),
     );
-    expect(findByLabel(visible, 'Hide Document Panel')).toBeDefined();
-    expect(findByLabel(visible, 'Show Document Panel')).toBeUndefined();
+    expect(findByLabel(visible, 'Hide document panel')).toBeDefined();
+    expect(findByLabel(visible, 'Show document panel')).toBeUndefined();
   });
 
-  test('renders "Show Document Panel" when docPanelVisible is false', () => {
+  test('renders "Show document panel" when docPanelVisible is false', () => {
     const collapsed = buildMenuTemplate(
       makeDeps({ onToggleDocPanel: mock(() => {}), docPanelVisible: false }),
     );
-    expect(findByLabel(collapsed, 'Show Document Panel')).toBeDefined();
-    expect(findByLabel(collapsed, 'Hide Document Panel')).toBeUndefined();
+    expect(findByLabel(collapsed, 'Show document panel')).toBeDefined();
+    expect(findByLabel(collapsed, 'Hide document panel')).toBeUndefined();
   });
 
-  test('Document Panel binds CmdOrCtrl+Alt+B accelerator (⌥⌘B on macOS, VS Code Secondary Side Bar convention)', () => {
+  test('Document panel binds CmdOrCtrl+Alt+B accelerator (⌥⌘B on macOS, VS Code Secondary Side Bar convention)', () => {
     const visible = buildMenuTemplate(makeDeps({ onToggleDocPanel: mock(() => {}) }));
-    expect(findByLabel(visible, 'Hide Document Panel')?.accelerator).toBe('CmdOrCtrl+Alt+B');
+    expect(findByLabel(visible, 'Hide document panel')?.accelerator).toBe('CmdOrCtrl+Alt+B');
 
     const collapsed = buildMenuTemplate(
       makeDeps({ onToggleDocPanel: mock(() => {}), docPanelVisible: false }),
     );
-    expect(findByLabel(collapsed, 'Show Document Panel')?.accelerator).toBe('CmdOrCtrl+Alt+B');
+    expect(findByLabel(collapsed, 'Show document panel')?.accelerator).toBe('CmdOrCtrl+Alt+B');
   });
 
-  test('Document Panel DISABLED when toggle handler missing (unit-test default)', () => {
+  test('Document panel DISABLED when toggle handler missing (unit-test default)', () => {
     const template = buildMenuTemplate(makeDeps());
-    expect(findByLabel(template, 'Hide Document Panel')?.enabled).toBe(false);
+    expect(findByLabel(template, 'Hide document panel')?.enabled).toBe(false);
   });
 
-  test('Document Panel click dispatches deps.onToggleDocPanel', () => {
+  test('Document panel click dispatches deps.onToggleDocPanel', () => {
     const onToggleDocPanel = mock(() => {});
     const template = buildMenuTemplate(makeDeps({ onToggleDocPanel, docPanelVisible: true }));
-    (findByLabel(template, 'Hide Document Panel')?.click as (() => void) | undefined)?.();
+    (findByLabel(template, 'Hide document panel')?.click as (() => void) | undefined)?.();
     expect(onToggleDocPanel).toHaveBeenCalledTimes(1);
 
     const onToggleDocPanel2 = mock(() => {});
     const collapsed = buildMenuTemplate(
       makeDeps({ onToggleDocPanel: onToggleDocPanel2, docPanelVisible: false }),
     );
-    (findByLabel(collapsed, 'Show Document Panel')?.click as (() => void) | undefined)?.();
+    (findByLabel(collapsed, 'Show document panel')?.click as (() => void) | undefined)?.();
     expect(onToggleDocPanel2).toHaveBeenCalledTimes(1);
   });
 });
 
-describe('buildMenuTemplate — Edit → Check Spelling While Typing', () => {
+describe('buildMenuTemplate — Edit → Check spelling while typing', () => {
   function editSubmenu(deps: MenuDeps): MenuItemConstructorOptions[] {
     const edit = findByLabel(buildMenuTemplate(deps), 'Edit');
     const sub = edit?.submenu as MenuItemConstructorOptions[] | undefined;
@@ -835,7 +835,7 @@ describe('buildMenuTemplate — Edit → Check Spelling While Typing', () => {
   test('renders as a checkbox-type item, checked when spellCheckEnabled is true', () => {
     const item = findByLabel(
       buildMenuTemplate(makeDeps({ spellCheckEnabled: true, onToggleSpellCheck: mock(() => {}) })),
-      'Check Spelling While Typing',
+      'Check spelling while typing',
     );
     expect(item).toBeDefined();
     expect(item?.type).toBe('checkbox');
@@ -845,7 +845,7 @@ describe('buildMenuTemplate — Edit → Check Spelling While Typing', () => {
   test('renders unchecked when spellCheckEnabled is false', () => {
     const item = findByLabel(
       buildMenuTemplate(makeDeps({ spellCheckEnabled: false, onToggleSpellCheck: mock(() => {}) })),
-      'Check Spelling While Typing',
+      'Check spelling while typing',
     );
     expect(item?.checked).toBe(false);
   });
@@ -853,7 +853,7 @@ describe('buildMenuTemplate — Edit → Check Spelling While Typing', () => {
   test('defaults to checked when spellCheckEnabled dep is omitted (matches the on-by-default persistence default)', () => {
     const item = findByLabel(
       buildMenuTemplate(makeDeps({ onToggleSpellCheck: mock(() => {}) })),
-      'Check Spelling While Typing',
+      'Check spelling while typing',
     );
     expect(item?.checked).toBe(true);
   });
@@ -861,13 +861,13 @@ describe('buildMenuTemplate — Edit → Check Spelling While Typing', () => {
   test('ENABLED when onToggleSpellCheck handler is provided', () => {
     const item = findByLabel(
       buildMenuTemplate(makeDeps({ onToggleSpellCheck: mock(() => {}) })),
-      'Check Spelling While Typing',
+      'Check spelling while typing',
     );
     expect(item?.enabled).toBe(true);
   });
 
   test('DISABLED when onToggleSpellCheck handler is missing (unit-test default = unwired)', () => {
-    const item = findByLabel(buildMenuTemplate(makeDeps()), 'Check Spelling While Typing');
+    const item = findByLabel(buildMenuTemplate(makeDeps()), 'Check spelling while typing');
     expect(item?.enabled).toBe(false);
   });
 
@@ -875,21 +875,21 @@ describe('buildMenuTemplate — Edit → Check Spelling While Typing', () => {
     const onToggleSpellCheck = mock(() => {});
     const item = findByLabel(
       buildMenuTemplate(makeDeps({ onToggleSpellCheck })),
-      'Check Spelling While Typing',
+      'Check spelling while typing',
     );
     (item?.click as (() => void) | undefined)?.();
     expect(onToggleSpellCheck).toHaveBeenCalledTimes(1);
   });
 
   test('click is a safe no-op when onToggleSpellCheck dep is omitted', () => {
-    const item = findByLabel(buildMenuTemplate(makeDeps()), 'Check Spelling While Typing');
+    const item = findByLabel(buildMenuTemplate(makeDeps()), 'Check spelling while typing');
     expect(() => (item?.click as (() => void) | undefined)?.()).not.toThrow();
   });
 
   test('lives in the Edit submenu after the Select All role', () => {
     const sub = editSubmenu(makeDeps({ onToggleSpellCheck: mock(() => {}) }));
     const selectAllIdx = sub.findIndex((i) => i.role === 'selectAll');
-    const spellIdx = sub.findIndex((i) => i.label === 'Check Spelling While Typing');
+    const spellIdx = sub.findIndex((i) => i.label === 'Check spelling while typing');
     expect(selectAllIdx).toBeGreaterThanOrEqual(0);
     expect(spellIdx).toBeGreaterThan(selectAllIdx);
   });

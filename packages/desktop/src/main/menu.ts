@@ -1,4 +1,4 @@
-import { SHOW_INSTALL_SKILL } from '@inkeep/open-knowledge-core';
+import { MENU_LABELS, SHOW_INSTALL_SKILL } from '@inkeep/open-knowledge-core';
 import type { Dialog, MenuItemConstructorOptions } from 'electron';
 import type { EntryPoint } from '../shared/entry-point.ts';
 import type { EditorActiveTargetSnapshot } from '../shared/ipc-channels.ts';
@@ -8,7 +8,7 @@ import { promptForExistingFolder } from './dialog-helpers.ts';
 export interface MenuDeps {
   appName: string;
   showDevToolsMenu: boolean;
-  /** `electron.dialog` — injected so the File → Open Folder click handler
+  /** `electron.dialog` — injected so the File → Open folder click handler
    *  can call `promptForExistingFolder(dialog)` without importing `dialog`
    *  at module scope (breaks Bun-test module load; see file header). */
   dialog: Dialog;
@@ -63,7 +63,7 @@ export function buildMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] 
 
   const recentSubmenu: MenuItemConstructorOptions[] =
     recents.length === 0
-      ? [{ label: 'No Recent Projects', enabled: false }]
+      ? [{ label: 'No recent projects', enabled: false }]
       : [
           ...recents.slice(0, 10).map((row) => ({
             label: row.name,
@@ -74,7 +74,7 @@ export function buildMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] 
           })),
           { type: 'separator' as const },
           {
-            label: 'Clear Menu',
+            label: 'Clear menu',
             click: () => deps.clearRecentProjects(),
           },
         ];
@@ -90,7 +90,7 @@ export function buildMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] 
               ...(deps.onCheckForUpdates
                 ? ([
                     {
-                      label: 'Check for Updates…',
+                      label: 'Check for updates…',
                       click: deps.onCheckForUpdates,
                     },
                     { type: 'separator' as const },
@@ -118,25 +118,25 @@ export function buildMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] 
       label: 'File',
       submenu: [
         {
-          label: 'New File',
+          label: MENU_LABELS.newFile,
           accelerator: 'CmdOrCtrl+N',
           enabled: deps.onNewFile !== undefined,
           click: () => deps.onNewFile?.(),
         },
         {
-          label: 'New Folder',
+          label: MENU_LABELS.newFolder,
           accelerator: 'CmdOrCtrl+Shift+N',
           enabled: deps.onNewFolder !== undefined,
           click: () => deps.onNewFolder?.(),
         },
         {
-          label: 'New from Template\u2026',
+          label: `${MENU_LABELS.newFromTemplate}\u2026`,
           enabled: deps.onNewFromTemplate !== undefined,
           click: () => deps.onNewFromTemplate?.(),
         },
         { type: 'separator' },
         {
-          label: 'Duplicate',
+          label: MENU_LABELS.duplicate,
           accelerator: 'CmdOrCtrl+D',
           enabled:
             deps.onDuplicate !== undefined &&
@@ -145,7 +145,7 @@ export function buildMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] 
           click: () => deps.onDuplicate?.(),
         },
         {
-          label: 'Rename',
+          label: MENU_LABELS.rename,
           enabled:
             deps.onRename !== undefined &&
             deps.activeTarget !== undefined &&
@@ -163,31 +163,31 @@ export function buildMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] 
         },
         { type: 'separator' },
         {
-          label: 'Reveal in Finder',
+          label: MENU_LABELS.revealInFinder,
           enabled: deps.onRevealInFinder !== undefined,
           click: () => deps.onRevealInFinder?.(),
         },
         {
-          label: 'Open in Terminal',
+          label: MENU_LABELS.openInTerminal,
           enabled: deps.onOpenInTerminal !== undefined,
           click: () => deps.onOpenInTerminal?.(),
         },
         {
-          label: 'Open with AI',
+          label: MENU_LABELS.openWithAi,
           enabled: deps.onSendToAi !== undefined && deps.activeTarget?.kind !== 'asset',
           click: () => deps.onSendToAi?.(),
         },
         {
-          label: 'Copy Path',
+          label: MENU_LABELS.copyPath,
           enabled: deps.onCopyFullPath !== undefined || deps.onCopyRelativePath !== undefined,
           submenu: [
             {
-              label: 'Full Path',
+              label: MENU_LABELS.fullPath,
               enabled: deps.onCopyFullPath !== undefined,
               click: () => deps.onCopyFullPath?.(),
             },
             {
-              label: 'Relative Path',
+              label: MENU_LABELS.relativePath,
               enabled: deps.onCopyRelativePath !== undefined,
               click: () => deps.onCopyRelativePath?.(),
             },
@@ -195,7 +195,7 @@ export function buildMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] 
         },
         { type: 'separator' },
         {
-          label: 'Create New Project…',
+          label: 'Create new project…',
           enabled: deps.onNewProject !== undefined,
           click: () => deps.onNewProject?.(),
         },
@@ -205,7 +205,7 @@ export function buildMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] 
           click: () => deps.openNavigator(),
         },
         {
-          label: 'Open Folder\u2026',
+          label: 'Open folder\u2026',
           accelerator: 'CmdOrCtrl+O',
           click: async () => {
             const picked = await promptForExistingFolder(deps.dialog);
@@ -216,14 +216,14 @@ export function buildMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] 
         },
         { type: 'separator' },
         {
-          label: 'Open Recent',
+          label: 'Open recent',
           submenu: recentSubmenu,
         },
         { type: 'separator' },
         ...(deps.reconfigureMcpWiring
           ? ([
               {
-                label: 'Configure AI Tool Integrations…',
+                label: 'Configure AI tool integrations…',
                 click: () => {
                   void deps.reconfigureMcpWiring?.();
                 },
@@ -243,7 +243,7 @@ export function buildMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] 
           : []),
         isMac
           ? {
-              label: 'Close Tab',
+              label: 'Close tab',
               accelerator: 'CmdOrCtrl+W',
               enabled: deps.onCloseActiveTabOrWindow !== undefined,
               click: () => deps.onCloseActiveTabOrWindow?.(),
@@ -264,7 +264,7 @@ export function buildMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] 
         { role: 'selectAll' },
         { type: 'separator' },
         {
-          label: 'Check Spelling While Typing',
+          label: 'Check spelling while typing',
           type: 'checkbox',
           checked: deps.spellCheckEnabled ?? true,
           enabled: deps.onToggleSpellCheck !== undefined,
@@ -285,20 +285,20 @@ export function buildMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] 
             ] satisfies MenuItemConstructorOptions[])
           : []),
         {
-          label: deps.sidebarVisible === false ? 'Show Sidebar' : 'Hide Sidebar',
+          label: deps.sidebarVisible === false ? 'Show sidebar' : 'Hide sidebar',
           accelerator: 'CmdOrCtrl+Alt+S',
           enabled: deps.onToggleSidebar !== undefined,
           click: () => deps.onToggleSidebar?.(),
         },
         {
-          label: deps.docPanelVisible === false ? 'Show Document Panel' : 'Hide Document Panel',
+          label: deps.docPanelVisible === false ? 'Show document panel' : 'Hide document panel',
           accelerator: 'CmdOrCtrl+Alt+B',
           enabled: deps.onToggleDocPanel !== undefined,
           click: () => deps.onToggleDocPanel?.(),
         },
         { type: 'separator' },
         {
-          label: 'Show Hidden Files',
+          label: MENU_LABELS.showHiddenFiles,
           accelerator: 'CmdOrCtrl+Shift+.',
           type: 'checkbox',
           checked: deps.showHiddenFilesChecked ?? false,
@@ -306,7 +306,7 @@ export function buildMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] 
           click: () => deps.onToggleShowHiddenFiles?.(),
         },
         {
-          label: 'Show All Files',
+          label: MENU_LABELS.showAllFiles,
           type: 'checkbox',
           checked: deps.showAllFilesChecked ?? false,
           enabled: deps.onToggleShowAllFiles !== undefined,
@@ -314,13 +314,13 @@ export function buildMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] 
         },
         { type: 'separator' },
         {
-          label: 'Expand All',
+          label: MENU_LABELS.expandAll,
           visible: deps.canExpandAll ?? true,
           enabled: deps.onExpandAll !== undefined,
           click: () => deps.onExpandAll?.(),
         },
         {
-          label: 'Collapse All',
+          label: MENU_LABELS.collapseAll,
           visible: deps.canCollapseAll ?? true,
           enabled: deps.onCollapseAll !== undefined,
           click: () => deps.onCollapseAll?.(),
@@ -354,7 +354,7 @@ export function buildMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] 
         ...(SHOW_INSTALL_SKILL
           ? ([
               {
-                label: 'Install for Claude Chat & Cowork (Desktop App)…',
+                label: 'Install for Claude Chat & Cowork (desktop app)…',
                 click: () => deps.openInstallSkillDialog?.(),
               },
               { type: 'separator' as const },
@@ -368,7 +368,7 @@ export function buildMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] 
           ? ([
               { type: 'separator' as const },
               {
-                label: 'Check for Updates…',
+                label: 'Check for updates…',
                 click: deps.onCheckForUpdates,
               },
             ] satisfies MenuItemConstructorOptions[])
