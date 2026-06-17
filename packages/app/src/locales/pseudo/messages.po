@@ -1893,6 +1893,7 @@ msgstr ""
 
 #: src/components/InstallInClaudeDesktopDialog.tsx
 #: src/components/PublishToGitHubDialog.tsx
+#: src/editor/extensions/JsxComponentView.tsx
 #: src/editor/slash-command/items.tsx
 msgid "Done"
 msgstr ""

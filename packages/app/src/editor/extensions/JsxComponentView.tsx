@@ -62,6 +62,7 @@ import {
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
+import { Button } from '@/components/ui/button';
 import { hashFromDocName } from '@/lib/doc-hash';
 import {
   Popover,
@@ -1067,7 +1068,7 @@ export function JsxComponentView({ node, editor, extension, getPos, selected }: 
           side={showPlaceholder ? 'bottom' : 'right'}
           align={showPlaceholder ? 'center' : 'start'}
           sideOffset={showPlaceholder ? -4 : 8}
-          className="w-64 p-3 z-[60] overflow-y-auto subtle-scrollbar max-h-[calc(100vh-2rem)] overscroll-contain"
+          className="w-64 p-3 z-[60] overflow-y-auto subtle-scrollbar max-h-[var(--radix-popper-available-height)] overscroll-contain"
           onCloseAutoFocus={
             isSelfClosingLeaf
               ? (e) => {
@@ -1121,6 +1122,28 @@ export function JsxComponentView({ node, editor, extension, getPos, selected }: 
               markUserTyping();
             }}
           />
+          {/* Explicit confirmation affordance. PropPanel auto-saves on
+              every keystroke / select change (`onChange` above runs the
+              `setNodeMarkup` dispatch) — the button doesn't gate the
+              save, it gives users the psychological closure UX research
+              flagged was missing (PRD-7058 #1: "I just write, and it
+              just, like, disappears" — without a confirm affordance
+              authors interpret the auto-dismiss-on-outside-click as
+              losing their changes, even though the changes already
+              landed). Click closes the popover; the
+              `onCloseAutoFocus`-driven editor refocus above handles
+              the focus restore. */}
+          <div className="mt-3 flex justify-end border-t border-border pt-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setPopoverOpen(false)}
+              className="h-7 px-3 text-xs"
+            >
+              <Trans>Done</Trans>
+            </Button>
+          </div>
         </PopoverContent>
       )}
     </Popover>
