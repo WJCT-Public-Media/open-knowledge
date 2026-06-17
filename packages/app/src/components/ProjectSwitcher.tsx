@@ -185,17 +185,22 @@ export function ProjectSwitcher({ bridge }: ProjectSwitcherProps) {
                   <Trans>No matching projects.</Trans>
                 </DropdownMenuLabel>
               ) : (
-                <div className="max-h-64 overflow-y-auto overscroll-contain subtle-scrollbar scroll-fade-mask">
+                <div className="max-h-64 overflow-x-hidden overflow-y-auto overscroll-contain subtle-scrollbar scroll-fade-mask">
                   {filtered.slice(0, 10).map((row) => (
                     <DropdownMenuItem
                       key={row.path}
                       disabled={row.missing}
                       onSelect={() => openProject(row.path)}
-                      className="flex flex-col items-start gap-0.5"
+                      className="flex w-full min-w-0 flex-col items-start gap-0.5"
                       data-testid={`project-switcher-recent-${row.path}`}
                     >
-                      <span className="font-medium text-sm">{row.name}</span>
-                      <span className="max-w-[240px] truncate text-muted-foreground text-xs">
+                      <span className="w-full truncate font-medium text-sm" title={row.name}>
+                        {row.name}
+                      </span>
+                      <span
+                        className="w-full truncate text-muted-foreground text-xs"
+                        title={row.path}
+                      >
                         {row.path}
                         {row.missing ? t`  (missing)` : ''}
                       </span>
