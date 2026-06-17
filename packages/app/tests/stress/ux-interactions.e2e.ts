@@ -415,7 +415,17 @@ test('LINK-CLICK-EXTERNAL: bare click on external link opens new tab via window.
   const chip = page.locator('span[data-link]').first();
   await expect(chip).toBeVisible({ timeout: 10_000 });
 
-  const pagePromise = context.waitForEvent('page', { timeout: 5_000 });
+  await context.route(
+    (url) => url.hostname === 'example.com',
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: '<!doctype html><title>example.com stub</title>',
+      }),
+  );
+
+  const pagePromise = context.waitForEvent('page', { timeout: 15_000 });
   await chip.click();
   const opened = await pagePromise;
   expect(opened.url()).toContain('example.com');
