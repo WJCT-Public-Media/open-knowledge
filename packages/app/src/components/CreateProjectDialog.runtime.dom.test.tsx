@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { ALL_EDITOR_IDS, EDITOR_LABELS } from '@inkeep/open-knowledge-core';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+
+const toastErrorSpy = mock((_message: string) => {});
+mock.module('sonner', () => ({
+  toast: { error: toastErrorSpy, success: () => {}, warning: () => {}, message: () => {} },
+}));
+
 import type {
   OkDesktopBridge,
   OkFolderState,
@@ -143,6 +149,9 @@ describe('CreateProjectDialog runtime wiring', () => {
     expect(submit.getAttribute('form')).toBe(form.id);
     expect(browse.type).toBe('button');
 
+    expect(screen.queryByTestId('create-editor-cursor')).toBeNull();
+    fireEvent.click(screen.getByTestId('create-advanced-trigger'));
+
     for (const id of ALL_EDITOR_IDS) {
       const checkbox = screen.getByTestId(`create-editor-${id}`);
       expect(checkbox.closest('label')?.textContent).toContain(EDITOR_LABELS[id]);
@@ -173,6 +182,33 @@ describe('CreateProjectDialog runtime wiring', () => {
       ]);
     });
     expect(stub.onOpenChange).toHaveBeenLastCalledWith(false);
+  });
+
+  test('Create stays enabled with no folder picked; click toasts and does not submit', async () => {
+    toastErrorSpy.mockClear();
+    const stub = await renderDialog();
+
+    const submit = screen.getByTestId('create-submit') as HTMLButtonElement;
+    expect(submit.disabled).toBe(false);
+
+    fireEvent.click(submit);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(toastErrorSpy).toHaveBeenCalledWith('Please select a folder');
+    expect(stub.createNewCalls).toEqual([]);
+    expect(stub.onOpenChange).not.toHaveBeenCalled();
+  });
+
+  test('clicking the config-sharing info tooltip does not submit the form', async () => {
+    const stub = await renderDialog();
+
+    fireEvent.click(screen.getByTestId('create-advanced-trigger'));
+    const info = screen.getByTestId('config-sharing-info') as HTMLButtonElement;
+    expect(info.type).toBe('button');
+
+    fireEvent.click(info);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(stub.createNewCalls).toEqual([]);
+    expect(stub.onOpenChange).not.toHaveBeenCalled();
   });
 
   test('subfolder rescue sticks through a free re-probe and resets on a fresh Browse pick', async () => {

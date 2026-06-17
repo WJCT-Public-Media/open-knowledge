@@ -24,6 +24,12 @@ const DARWIN = process.platform === 'darwin';
 const BUILD_EXISTS = existsSync(MAIN_ENTRY);
 const DESKTOP_PRODUCT_NAME = '@inkeep/open-knowledge-desktop';
 
+async function expandCreateAdvanced(page: Page): Promise<void> {
+  const trigger = page.locator('[data-testid="create-advanced-trigger"]');
+  await expect(trigger).toBeVisible({ timeout: 15_000 });
+  await trigger.click();
+}
+
 function seedTmpHome(prefix: string, stateOverride?: Record<string, unknown>): string {
   const tmpHome = realpathSync(mkdtempSync(join(tmpdir(), `ok-qa-${prefix}-`)));
   const userDataDir = join(tmpHome, 'Library', 'Application Support', DESKTOP_PRODUCT_NAME);
@@ -139,6 +145,7 @@ test.describe('QA extended create-new-project', () => {
       timeout: 15_000,
     });
 
+    await expandCreateAdvanced(navigator);
     await navigator.locator('[data-testid="create-editor-cursor"]').click();
     await navigator.locator('[data-testid="create-editor-codex"]').click();
     await expect(navigator.locator('[data-testid="create-editor-claude"]')).toBeChecked();
@@ -184,6 +191,7 @@ test.describe('QA extended create-new-project', () => {
     const ariaLive = await caption.getAttribute('aria-live');
     expect(ariaLive).toBe('polite');
 
+    await expandCreateAdvanced(navigator);
     await expect(navigator.locator('[data-testid="create-editor-claude"]')).toBeChecked();
     await expect(navigator.locator('[data-testid="create-editor-claude-desktop"]')).toBeChecked();
     await expect(navigator.locator('[data-testid="create-editor-cursor"]')).toBeChecked();
@@ -255,17 +263,20 @@ test.describe('QA extended create-new-project', () => {
     });
     await expect(navigator2.locator('[data-testid="create-name"]')).toHaveCount(0);
     const caption2 = navigator2.locator('[data-testid="create-target-caption"]');
-    await expect(caption2).toContainText('Click Browse to pick or create a project folder', {
+    await expect(caption2).toContainText('Select or create a folder for your new project', {
       timeout: 5_000,
     });
+    await expandCreateAdvanced(navigator2);
     await expect(navigator2.locator('[data-testid="create-editor-claude"]')).toBeChecked();
     await expect(navigator2.locator('[data-testid="create-editor-claude-desktop"]')).toBeChecked();
     await expect(navigator2.locator('[data-testid="create-editor-cursor"]')).toBeChecked();
     await expect(navigator2.locator('[data-testid="create-editor-codex"]')).toBeChecked();
   });
 
-  test('submit is disabled until Browse picks a target', async ({ captureStderrFor }) => {
-    const tmpHome = seedTmpHome('disabled-when-empty');
+  test('submit with no folder does not create; Browse enables creation', async ({
+    captureStderrFor,
+  }) => {
+    const tmpHome = seedTmpHome('toast-when-empty');
     const parent = join(tmpHome, 'projects-san');
     mkdirSync(parent, { recursive: true });
     trackForCleanup(tmpHome);
@@ -279,15 +290,21 @@ test.describe('QA extended create-new-project', () => {
     });
 
     await expect(navigator.locator('[data-testid="create-name"]')).toHaveCount(0);
-    await expect(navigator.locator('[data-testid="create-submit"]')).toBeDisabled();
+    const submit = navigator.locator('[data-testid="create-submit"]');
+    await expect(submit).toBeEnabled();
     const caption = navigator.locator('[data-testid="create-target-caption"]');
-    await expect(caption).toContainText('Click Browse to pick or create a project folder', {
+    await expect(caption).toContainText('Select or create a folder for your new project', {
       timeout: 5_000,
     });
 
+    await submit.click();
+    await navigator.waitForTimeout(2_000);
+    await expect(navigator.locator('[data-testid="create-project-dialog"]')).toBeVisible();
+    expect(await countWindowsByMode(app, 'editor')).toBe(0);
+
     await navigator.locator('[data-testid="create-browse"]').click();
     await expect(caption).toHaveText(join(parent, 'AfterPick'), { timeout: 15_000 });
-    await expect(navigator.locator('[data-testid="create-submit"]')).toBeEnabled();
+    await expect(submit).toBeEnabled();
   });
 
   test('QA-019 — double-click Create produces exactly one project', async ({

@@ -9,9 +9,13 @@ import {
 import type { MessageDescriptor } from '@lingui/core';
 import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
+import { ChevronRight } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { ConfigSharingInfoTooltip } from '@/components/ConfigSharingInfoTooltip';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Dialog,
   DialogBody,
@@ -165,6 +169,7 @@ export function CreateProjectDialog({ open, onOpenChange, bridge }: CreateProjec
     () => new Set(ALL_EDITOR_IDS),
   );
   const [sharing, setSharing] = useState<'shared' | 'local-only'>('shared');
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [cascade, setCascade] = useState<SettledCascade>({ kind: 'idle' });
   const [probeLifecycle, setProbeLifecycle] = useState<ProbeLifecycle>('idle');
   const [busy, setBusy] = useState(false);
@@ -190,6 +195,7 @@ export function CreateProjectDialog({ open, onOpenChange, bridge }: CreateProjec
     setPicked('');
     setEditorIds(new Set(ALL_EDITOR_IDS));
     setSharing('shared');
+    setAdvancedOpen(false);
     setRemoveGitState({ kind: 'idle' });
     setNeedsSubfolder(false);
     setSubfolderName('');
@@ -343,6 +349,7 @@ export function CreateProjectDialog({ open, onOpenChange, bridge }: CreateProjec
     sanitized !== '' &&
     probeLifecycle === 'idle' &&
     (cascade.kind === 'free' || cascade.kind === 'confirm-git');
+  const submitDisabled = busy || (picked !== '' && !canSubmit);
 
   function toggleEditor(id: OkMcpWiringEditorId) {
     setEditorIds((prev) => {
@@ -371,6 +378,11 @@ export function CreateProjectDialog({ open, onOpenChange, bridge }: CreateProjec
 
   async function onSubmit(e: React.SyntheticEvent<HTMLFormElement, SubmitEvent>) {
     e.preventDefault();
+    if (busy) return;
+    if (picked === '') {
+      toast.error(t`Please select a folder`);
+      return;
+    }
     if (!canSubmit) return;
     setBusy(true);
     setSubmitError(null);
@@ -450,36 +462,37 @@ export function CreateProjectDialog({ open, onOpenChange, bridge }: CreateProjec
             data-testid="create-project-form"
             className="space-y-6"
           >
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="create-location">
-                <Trans>Location</Trans>
-              </Label>
-              <div className="flex items-stretch gap-2">
-                <Button
-                  id="create-location"
-                  ref={browseButtonRef}
-                  type="button"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => void onBrowse()}
-                  aria-describedby="create-target-caption"
-                  data-testid="create-browse"
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex min-w-0 flex-col gap-1">
+                <Label htmlFor="create-location">
+                  <Trans>Location</Trans>
+                </Label>
+                <p
+                  id="create-target-caption"
+                  className="text-1sm text-muted-foreground wrap-break-word"
+                  aria-live="polite"
+                  data-testid="create-target-caption"
                 >
-                  <Trans>Browse</Trans>
-                </Button>
+                  {previewPath === '' ? (
+                    <Trans>Select or create a folder for your new project</Trans>
+                  ) : (
+                    previewPath
+                  )}
+                </p>
               </div>
-              <p
-                id="create-target-caption"
-                className="text-1sm text-muted-foreground"
-                aria-live="polite"
-                data-testid="create-target-caption"
+              <Button
+                id="create-location"
+                ref={browseButtonRef}
+                type="button"
+                variant="outline"
+                className="shrink-0"
+                disabled={busy}
+                onClick={() => void onBrowse()}
+                aria-describedby="create-target-caption"
+                data-testid="create-browse"
               >
-                {previewPath === '' ? (
-                  <Trans>Click Browse to pick or create a project folder.</Trans>
-                ) : (
-                  previewPath
-                )}
-              </p>
+                <Trans>Browse</Trans>
+              </Button>
             </div>
 
             {needsSubfolder ? (
@@ -582,91 +595,112 @@ export function CreateProjectDialog({ open, onOpenChange, bridge }: CreateProjec
               onConfirmRemoveGit={onConfirmRemoveGit}
             />
 
-            <fieldset className="flex flex-col space-y-2 pb-2">
-              <legend className="text-sm font-medium">
-                <Trans>Connect to AI tools</Trans>
-              </legend>
-              <p className="text-1sm text-muted-foreground">
-                <Trans>Each selected tool gets an Open Knowledge MCP entry.</Trans>
-              </p>
-              {ALL_EDITOR_IDS.map((id) => {
-                const inputId = `create-editor-${id}`;
-                return (
-                  <Label key={id} htmlFor={inputId} className="text-sm font-normal">
-                    <Checkbox
-                      id={inputId}
-                      checked={editorIds.has(id)}
-                      onCheckedChange={() => toggleEditor(id)}
-                      disabled={busy}
-                      data-testid={`create-editor-${id}`}
-                    />
-                    <span>{EDITOR_LABELS[id]}</span>
-                  </Label>
-                );
-              })}
-            </fieldset>
-
-            <fieldset className="flex flex-col space-y-2 pb-2" data-testid="create-sharing">
-              <legend className="text-sm font-medium">
-                <Trans>Share OK config with my team?</Trans>
-              </legend>
-              <p className="text-1sm text-muted-foreground">
-                <Trans>
-                  <code>.ok/</code>, <code>.mcp.json</code> (and per-editor variants), project
-                  skills, and <code>.claude/launch.json</code>. Switch later in Settings → Config
-                  sharing, or from the command line with{' '}
-                  <code>ok config-sharing share|unshare</code>.
-                </Trans>
-              </p>
-              <RadioGroup
-                value={sharing}
-                onValueChange={(v) => setSharing(v as 'shared' | 'local-only')}
-                disabled={busy}
-                className="gap-2"
+            <Collapsible
+              open={advancedOpen}
+              onOpenChange={setAdvancedOpen}
+              className="rounded-md border border-border"
+              data-testid="create-advanced"
+            >
+              <CollapsibleTrigger
+                className="group flex w-full items-center justify-between gap-2 px-3 py-2 text-sm font-medium hover:bg-muted/50"
+                data-testid="create-advanced-trigger"
               >
-                <Label
-                  htmlFor="create-sharing-shared"
-                  className="flex items-start gap-2 text-sm font-normal"
-                >
-                  <RadioGroupItem
-                    id="create-sharing-shared"
-                    value="shared"
-                    data-testid="create-sharing-shared"
-                    className="mt-1"
-                  />
-                  <span>
-                    <span className="font-medium">
-                      <Trans>Share with my team</Trans>
-                    </span>
-                    <span className="block text-1sm text-muted-foreground">
-                      <Trans>OK config is committed alongside content (default).</Trans>
-                    </span>
-                  </span>
-                </Label>
-                <Label
-                  htmlFor="create-sharing-local-only"
-                  className="flex items-start gap-2 text-sm font-normal"
-                >
-                  <RadioGroupItem
-                    id="create-sharing-local-only"
-                    value="local-only"
-                    data-testid="create-sharing-local-only"
-                    className="mt-1"
-                  />
-                  <span>
-                    <span className="font-medium">
-                      <Trans>Local only on this machine</Trans>
-                    </span>
-                    <span className="block text-1sm text-muted-foreground">
-                      <Trans>
-                        OK config stays on this machine via <code>.git/info/exclude</code>
-                        (per-clone, not committed).
-                      </Trans>
-                    </span>
-                  </span>
-                </Label>
-              </RadioGroup>
-            </fieldset>
+                <Trans>Advanced settings</Trans>
+                <ChevronRight
+                  className="size-4 transition-transform group-data-[state=open]:rotate-90 motion-reduce:transition-none"
+                  aria-hidden
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-6 border-t border-border px-3 py-4">
+                <fieldset className="flex flex-col space-y-2 pb-2">
+                  <legend className="text-sm font-medium">
+                    <Trans>Connect to AI tools</Trans>
+                  </legend>
+                  <p className="text-1sm text-muted-foreground">
+                    <Trans>Each selected tool gets an Open Knowledge MCP entry.</Trans>
+                  </p>
+                  {ALL_EDITOR_IDS.map((id) => {
+                    const inputId = `create-editor-${id}`;
+                    return (
+                      <Label key={id} htmlFor={inputId} className="text-sm font-normal">
+                        <Checkbox
+                          id={inputId}
+                          checked={editorIds.has(id)}
+                          onCheckedChange={() => toggleEditor(id)}
+                          disabled={busy}
+                          data-testid={`create-editor-${id}`}
+                        />
+                        <span>{EDITOR_LABELS[id]}</span>
+                      </Label>
+                    );
+                  })}
+                </fieldset>
+
+                <fieldset className="flex flex-col space-y-2 pb-2" data-testid="create-sharing">
+                  <legend className="flex items-center gap-1.5 text-sm font-medium">
+                    <Trans>Share this setup with your team?</Trans>
+                    <ConfigSharingInfoTooltip />
+                  </legend>
+                  <p className="text-1sm text-muted-foreground">
+                    <Trans>
+                      Choose whether this project's Open Knowledge setup, including its AI-tool
+                      connections, is saved with the project so teammates get it too, or kept only
+                      on your computer. You can change this anytime in Settings.
+                    </Trans>
+                  </p>
+                  <RadioGroup
+                    value={sharing}
+                    onValueChange={(v) => setSharing(v as 'shared' | 'local-only')}
+                    disabled={busy}
+                    className="gap-2"
+                  >
+                    <Label
+                      htmlFor="create-sharing-shared"
+                      className="flex items-start gap-2 text-sm font-normal"
+                    >
+                      <RadioGroupItem
+                        id="create-sharing-shared"
+                        value="shared"
+                        data-testid="create-sharing-shared"
+                        className="mt-1"
+                      />
+                      <span>
+                        <span className="font-medium">
+                          <Trans>Share with my team</Trans>
+                        </span>
+                        <span className="block text-1sm text-muted-foreground">
+                          <Trans>
+                            Saved with the project so everyone who opens it gets the same setup
+                            (default).
+                          </Trans>
+                        </span>
+                      </span>
+                    </Label>
+                    <Label
+                      htmlFor="create-sharing-local-only"
+                      className="flex items-start gap-2 text-sm font-normal"
+                    >
+                      <RadioGroupItem
+                        id="create-sharing-local-only"
+                        value="local-only"
+                        data-testid="create-sharing-local-only"
+                        className="mt-1"
+                      />
+                      <span>
+                        <span className="font-medium">
+                          <Trans>Local only on this machine</Trans>
+                        </span>
+                        <span className="block text-1sm text-muted-foreground">
+                          <Trans>
+                            Stays on this computer only. Teammates won't get this setup.
+                          </Trans>
+                        </span>
+                      </span>
+                    </Label>
+                  </RadioGroup>
+                </fieldset>
+              </CollapsibleContent>
+            </Collapsible>
 
             {submitError !== null ? (
               <div
@@ -691,7 +725,7 @@ export function CreateProjectDialog({ open, onOpenChange, bridge }: CreateProjec
           >
             <Trans>Cancel</Trans>
           </Button>
-          <Button type="submit" form={formId} disabled={!canSubmit} data-testid="create-submit">
+          <Button type="submit" form={formId} disabled={submitDisabled} data-testid="create-submit">
             {busy ? <Trans>Creating</Trans> : <Trans>Create</Trans>}
           </Button>
         </DialogFooter>

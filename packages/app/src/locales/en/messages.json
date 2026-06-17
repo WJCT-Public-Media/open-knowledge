@@ -59,7 +59,6 @@
     "1EcCom": [["keyName"], " value"],
     "1GhYxC": ["of ", ["totalPages"]],
     "1HBhDS": ["Checking out files"],
-    "1L-NBV": ["OK config is committed alongside content (default)."],
     "1QfxQT": ["Dismiss"],
     "1RluQD": ["Show replace"],
     "1TNIig": ["Open"],
@@ -87,7 +86,6 @@
     "2IXDgU": ["Upload file"],
     "2QM24L": ["All tags"],
     "2RBzMG": ["Network error — check your connection and try again"],
-    "2VHJG0": ["Share OK config with my team?"],
     "2XQ8Ww": ["Open preview when agent edits"],
     "2YOwme": ["Restarted — now running v", ["appRuntime"], "."],
     "2YZwPB": ["Forward-links response did not match expected shape."],
@@ -167,9 +165,6 @@
     "4xtLTl": ["Hidden folder “", ["basename"], "”"],
     "4zGlN_": ["Paste image URL or click upload"],
     "5-FeN2": ["Share URL"],
-    "5310It": [
-      "<0>.ok/</0>, <1>.mcp.json</1> (and per-editor variants), project skills, and <2>.claude/launch.json</2>. Switch later in Settings → Config sharing, or from the command line with <3>ok config-sharing share|unshare</3>."
-    ],
     "54Y6Fg": ["Could not load templates. Try again later."],
     "56WWtu": ["Couldn't load starter packs: ", ["error"]],
     "56xUL1": ["Property name"],
@@ -282,6 +277,7 @@
       "Open Knowledge is using a GitHub account provided by the gh CLI. There's no separate Open Knowledge credential to disconnect."
     ],
     "7qRHf0": ["Install for Claude Chat & Cowork"],
+    "7wPFtg": ["Please select a folder"],
     "80c4-P": ["Code copied to clipboard"],
     "81H_23": ["Add properties"],
     "881Uwh": ["Delete selected table"],
@@ -868,6 +864,7 @@
     "RmBY0A": ["No git remote"],
     "RobAKV": ["Update the destination and optional section anchor."],
     "Rq1vFD": ["Tree view options"],
+    "RrAIZx": ["What config sharing covers"],
     "Ruuu3v": ["Open with built-in text editor"],
     "Rx5ReQ": ["Rename ", ["keyName"]],
     "S33tz3": ["Not connected"],
@@ -949,9 +946,7 @@
     "V48OUT": ["You deleted <0>", ["filePath"], "</0> locally, but it was modified upstream."],
     "V7QxyT": ["Connection dropped"],
     "VAHWL_": ["Connected as <0>@", ["signedInLogin"], "</0>"],
-    "VPLC6o": [
-      "OK config stays on this machine via <0>.git/info/exclude</0>(per-clone, not committed)."
-    ],
+    "VNgKZz": ["Advanced settings"],
     "VU3Nrn": ["Missing"],
     "VUijjF": ["Embed an image with optional alt text."],
     "VYd_YA": ["Open an existing project folder from disk."],
@@ -971,6 +966,9 @@
     "VvS_k_": ["Config sharing is now local-only."],
     "W-ntoW": ["heading-slug"],
     "W0i24j": ["Object"],
+    "W1LDev": [
+      "Setup files include: <0>.ok/</0>, AI-tool MCP configs (<1>.mcp.json</1> and per-tool files), project skills, and <2>.claude/launch.json</2>.<3/><4>Share with my team</4> commits them to git, so anyone who clones the repo gets the same setup. <5/><6>Local only</6> keeps them out of git (via <7>.git/info/exclude</7>)."
+    ],
     "W1qRuM": ["This document is already active in the editor. Use Open to collapse the graph."],
     "W5A0Ly": ["An unexpected error occurred."],
     "W8uemY": ["Pick a starter pack to scaffold folders, templates, and AI-readable rules."],
@@ -1055,9 +1053,6 @@
     "YlDuro": ["Fit height"],
     "YsEYYS": [
       ["behind", "plural", { "one": ["#", " commit behind"], "other": ["#", " commits behind"] }]
-    ],
-    "Ys_XGi": [
-      "Choose whether to commit <0>.ok/</0>, <1>.mcp.json</1> (and per-editor variants), project skills, and <2>.claude/launch.json</2> alongside content — or keep them on this machine only via <3>.git/info/exclude</3>."
     ],
     "YwPUUP": ["This pack is already set up here."],
     "YyXtnN": ["Underline"],
@@ -1211,6 +1206,9 @@
     "cdmk8A": ["Uncommitted changes"],
     "cklVjM": ["Timeline"],
     "cnGeoo": ["Delete"],
+    "coIbL2": [
+      "Choose whether this project's Open Knowledge setup, including its AI-tool connections, is saved with the project so teammates get it too, or kept only on your computer."
+    ],
     "cqQyPB": ["Folder name"],
     "cs4mps": ["Config sharing"],
     "csDS2L": ["Available"],
@@ -1245,6 +1243,7 @@
     "e1Rn_k": ["Open containing folder"],
     "e1hptq": ["Embed a video with native player controls."],
     "e4GHWP": ["Pull"],
+    "e5zxGP": ["Saved with the project so everyone who opens it gets the same setup (default)."],
     "e8L17t": ["A non-empty folder already exists at this path. Pick a different folder."],
     "e8zRrb": ["Show Files"],
     "eBIT9h": ["Paste failed.", ["restoreSuffix"]],
@@ -1272,11 +1271,11 @@
     "fJgQHX": ["Failed to create file"],
     "fNr-MX": ["Disable semantic search"],
     "fRv-ei": ["Start a new Open Knowledge project."],
+    "fTY4yt": [
+      "Choose whether this project's Open Knowledge setup, including its AI-tool connections, is saved with the project so teammates get it too, or kept only on your computer. You can change this anytime in Settings."
+    ],
     "fVcm9t": [["0", "plural", { "one": ["#", " doc"], "other": ["#", " docs"] }]],
     "fWi7pn": ["Initialize starter pack"],
-    "fX82Jn": [
-      "Open Knowledge will create a <0>.ok/</0> folder here to track this project's metadata."
-    ],
     "fYKgzG": ["Failed to load recent projects."],
     "fYjgXu": ["Unordered list of items."],
     "fbdLmk": ["Toggle bold formatting."],
@@ -1318,6 +1317,7 @@
     "gp3I7-": ["Before syncing, set your identity for git commits:"],
     "gtEbeW": ["Highlight"],
     "h06R3C": ["No pages are missing outgoing graph links."],
+    "h29Sd6": ["Select or create a folder for your new project"],
     "h6EvY-": [
       "This will replace the current document content with the version from <0>",
       ["relative"],
@@ -1370,9 +1370,6 @@
     "iMkWoF": ["Turn on"],
     "iNFKkm": ["No diff."],
     "iOHg1t": ["Open embedded URL in new tab"],
-    "iRbdVc": [
-      "OK config stays on this machine via <0>.git/info/exclude</0> (per-clone, not committed)."
-    ],
     "iSQTsg": ["Ordered list"],
     "iSnkwB": ["Failed to open cloned project."],
     "iTlqm3": [
@@ -1380,7 +1377,6 @@
     ],
     "iTylMl": ["Templates"],
     "iXTp5j": ["Scope: "],
-    "i_grbe": ["Click Browse to pick or create a project folder."],
     "idD8Ev": ["Saved"],
     "ig5vUe": ["Failed to load file"],
     "iilQXA": ["Folder duplicated"],
@@ -1516,6 +1512,7 @@
     "mk2poV": ["e.g. server.ts"],
     "mmpzAq": ["Wrap long lines in the markdown source editor."],
     "mo22UP": ["Toggle inline code formatting."],
+    "mpCJcI": ["Stays on this computer only. Teammates won't get this setup."],
     "mqSwZH": [
       "<0>Mirror anchor not found.</0> No <1>",
       ["mirrorSourceTag"],
@@ -1565,6 +1562,9 @@
     "o4dcAf": ["Reveal in File Explorer, ", ["hint"]],
     "o5gfs1": [
       "This setting is per-machine and isn't shared with collaborators. It needs an API key set with <0>ok embeddings set-key</0>."
+    ],
+    "o7htA-": [
+      "Open Knowledge will create a <0>.ok/</0> folder here to track this project's metadata and index the folder's markdown files. Review or change the details under <1>Advanced settings</1> before you start."
     ],
     "oBXkm2": ["Delete code block"],
     "oCZkaG": ["Copy path"],
@@ -1819,6 +1819,7 @@
     ],
     "wndeIl": ["Project-level pages with neither incoming nor outgoing graph edges."],
     "wt8OSk": ["Requires a git repository — pick a different folder or enable git init."],
+    "wtcxiD": ["Share this setup with your team?"],
     "wvbc1r": ["Couldn't open document"],
     "x2fr_j": ["Graph"],
     "x3-2ta": [

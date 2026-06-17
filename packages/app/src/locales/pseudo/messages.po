@@ -398,11 +398,6 @@ msgstr ""
 msgid "<{descriptorLabel}> failed to render (likely a bad prop). Copy the source to see what went wrong, or delete the block."
 msgstr ""
 
-#: src/components/ConsentDialogBody.tsx
-#: src/components/CreateProjectDialog.tsx
-msgid "<0>.ok/</0>, <1>.mcp.json</1> (and per-editor variants), project skills, and <2>.claude/launch.json</2>. Switch later in Settings → Config sharing, or from the command line with <3>ok config-sharing share|unshare</3>."
-msgstr ""
-
 #: src/components/CreateProjectDialog.tsx
 msgid "<0>{rawName}</0> has characters unsafe for the on-disk identifier, so the project will be created as <1>{sanitized}</1>. Click Browse to pick a safer name."
 msgstr ""
@@ -590,6 +585,11 @@ msgstr ""
 
 #: src/editor/components/PropPanel.tsx
 msgid "Advanced"
+msgstr ""
+
+#: src/components/ConsentDialogBody.tsx
+#: src/components/CreateProjectDialog.tsx
+msgid "Advanced settings"
 msgstr ""
 
 #: src/presence/PresenceBar.tsx
@@ -953,7 +953,12 @@ msgid "Checklist with checkboxes."
 msgstr ""
 
 #: src/components/settings/SharingSection.tsx
-msgid "Choose whether to commit <0>.ok/</0>, <1>.mcp.json</1> (and per-editor variants), project skills, and <2>.claude/launch.json</2> alongside content — or keep them on this machine only via <3>.git/info/exclude</3>."
+msgid "Choose whether this project's Open Knowledge setup, including its AI-tool connections, is saved with the project so teammates get it too, or kept only on your computer."
+msgstr ""
+
+#: src/components/ConsentDialogBody.tsx
+#: src/components/CreateProjectDialog.tsx
+msgid "Choose whether this project's Open Knowledge setup, including its AI-tool connections, is saved with the project so teammates get it too, or kept only on your computer. You can change this anytime in Settings."
 msgstr ""
 
 #: src/components/handoff/OpenInAgentContextSubmenu.tsx
@@ -1001,10 +1006,6 @@ msgstr ""
 
 #: src/components/ActivityModeContent.tsx
 msgid "Click an agent's avatar in the presence bar to view their session."
-msgstr ""
-
-#: src/components/CreateProjectDialog.tsx
-msgid "Click Browse to pick or create a project folder."
 msgstr ""
 
 #: src/components/CloneDialog.tsx
@@ -3736,21 +3737,6 @@ msgstr ""
 msgid "Offline"
 msgstr ""
 
-#: src/components/ConsentDialogBody.tsx
-#: src/components/CreateProjectDialog.tsx
-#: src/components/settings/SharingSection.tsx
-msgid "OK config is committed alongside content (default)."
-msgstr ""
-
-#: src/components/ConsentDialogBody.tsx
-msgid "OK config stays on this machine via <0>.git/info/exclude</0> (per-clone, not committed)."
-msgstr ""
-
-#: src/components/CreateProjectDialog.tsx
-#: src/components/settings/SharingSection.tsx
-msgid "OK config stays on this machine via <0>.git/info/exclude</0>(per-clone, not committed)."
-msgstr ""
-
 #: src/lib/keyboard-shortcuts.ts
 msgid "OK Desktop"
 msgstr ""
@@ -3918,7 +3904,7 @@ msgid "Open Knowledge will be initialized at <0>{gitRoot}</0> — the parent of 
 msgstr ""
 
 #: src/components/ConsentDialogBody.tsx
-msgid "Open Knowledge will create a <0>.ok/</0> folder here to track this project's metadata."
+msgid "Open Knowledge will create a <0>.ok/</0> folder here to track this project's metadata and index the folder's markdown files. Review or change the details under <1>Advanced settings</1> before you start."
 msgstr ""
 
 #: src/components/AutoSyncEnableWarning.tsx
@@ -4268,6 +4254,10 @@ msgstr ""
 
 #: src/editor/extensions/CodeBlockView.tsx
 msgid "Plain"
+msgstr ""
+
+#: src/components/CreateProjectDialog.tsx
+msgid "Please select a folder"
 msgstr ""
 
 #: src/components/settings/SettingsDialogBody.tsx
@@ -4780,6 +4770,12 @@ msgstr ""
 msgid "Saved as <0>{slug}.md</0>"
 msgstr ""
 
+#: src/components/ConsentDialogBody.tsx
+#: src/components/CreateProjectDialog.tsx
+#: src/components/settings/SharingSection.tsx
+msgid "Saved with the project so everyone who opens it gets the same setup (default)."
+msgstr ""
+
 #: src/components/InstallInClaudeDesktopDialog.tsx
 msgid "Saves the file to <0>~/Downloads/openknowledge.skill</0> and opens the Claude Desktop App. Requires Node.js or Bun on your PATH."
 msgstr ""
@@ -4898,6 +4894,10 @@ msgstr ""
 msgid "Select next occurrence"
 msgstr ""
 
+#: src/components/CreateProjectDialog.tsx
+msgid "Select or create a folder for your new project"
+msgstr ""
+
 #: src/lib/keyboard-shortcuts.ts
 msgid "Select the full source document."
 msgstr ""
@@ -5006,6 +5006,10 @@ msgstr ""
 msgid "Settings sections"
 msgstr ""
 
+#: src/components/ConfigSharingInfoTooltip.tsx
+msgid "Setup files include: <0>.ok/</0>, AI-tool MCP configs (<1>.mcp.json</1> and per-tool files), project skills, and <2>.claude/launch.json</2>.<3/><4>Share with my team</4> commits them to git, so anyone who clones the repo gets the same setup. <5/><6>Local only</6> keeps them out of git (via <7>.git/info/exclude</7>)."
+msgstr ""
+
 #: src/components/ShareButton.tsx
 msgid "Share"
 msgstr ""
@@ -5020,7 +5024,7 @@ msgstr ""
 
 #: src/components/ConsentDialogBody.tsx
 #: src/components/CreateProjectDialog.tsx
-msgid "Share OK config with my team?"
+msgid "Share this setup with your team?"
 msgstr ""
 
 #: src/components/PublishToGitHubDialog.tsx
@@ -5261,6 +5265,12 @@ msgstr ""
 
 #: src/components/AuthModal.tsx
 msgid "Starting sign-in flow"
+msgstr ""
+
+#: src/components/ConsentDialogBody.tsx
+#: src/components/CreateProjectDialog.tsx
+#: src/components/settings/SharingSection.tsx
+msgid "Stays on this computer only. Teammates won't get this setup."
 msgstr ""
 
 #: src/components/MountStalledAffordance.tsx
@@ -6059,6 +6069,10 @@ msgstr ""
 
 #: src/components/HelpPopover.tsx
 msgid "Website"
+msgstr ""
+
+#: src/components/ConfigSharingInfoTooltip.tsx
+msgid "What config sharing covers"
 msgstr ""
 
 #: src/components/CreatedItemsList.tsx

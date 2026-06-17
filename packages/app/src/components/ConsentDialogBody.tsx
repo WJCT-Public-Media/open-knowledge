@@ -7,6 +7,7 @@ import { ChevronRight } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useId, useState } from 'react';
 import { toast as sonnerToast } from 'sonner';
+import { ConfigSharingInfoTooltip } from '@/components/ConfigSharingInfoTooltip';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -87,6 +88,7 @@ function ConsentDialogForm({ payload, store, toast }: ConsentDialogFormProps) {
   const [probe, setProbe] = useState<OkOnboardingProbeContentResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [browseError, setBrowseError] = useState<string | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
     if (!isContentDirSafe(contentDir)) {
@@ -117,6 +119,7 @@ function ConsentDialogForm({ payload, store, toast }: ConsentDialogFormProps) {
 
   const contentDirSafe = isContentDirSafe(contentDir);
   const startDisabled = busy || !contentDirSafe;
+  const advancedExpanded = advancedOpen || !contentDirSafe;
 
   const projectDir = payload.projectDir;
   const pickedRelative =
@@ -195,7 +198,8 @@ function ConsentDialogForm({ payload, store, toast }: ConsentDialogFormProps) {
           <DialogDescription>
             <Trans>
               Open Knowledge will create a <code>.ok/</code> folder here to track this project's
-              metadata.
+              metadata and index the folder's markdown files. Review or change the details under{' '}
+              <strong className="font-semibold">Advanced settings</strong> before you start.
             </Trans>
           </DialogDescription>
         </DialogHeader>
@@ -226,182 +230,216 @@ function ConsentDialogForm({ payload, store, toast }: ConsentDialogFormProps) {
           ) : null}
 
           <form id={formId} onSubmit={onSubmit} data-testid="consent-form" className="space-y-6">
-            <div className="flex flex-col gap-2">
-              <label htmlFor="consent-content-dir" className="text-sm font-medium">
-                <Trans>Content directory</Trans>
-              </label>
-              <div className="flex items-stretch gap-2">
-                <Input
-                  id="consent-content-dir"
-                  value={contentDir}
-                  onChange={(e) => {
-                    setContentDir(e.target.value);
-                    setBrowseError(null);
-                  }}
-                  disabled={busy}
-                  aria-invalid={!contentDirSafe}
-                  data-testid="consent-content-dir"
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => void onBrowseContentDir()}
-                  data-testid="consent-content-dir-browse"
-                >
-                  <Trans>Browse</Trans>
-                </Button>
-              </div>
-              {browseError !== null ? (
-                <p
-                  className="text-1sm text-destructive"
-                  data-testid="consent-content-dir-browse-error"
-                >
-                  {browseError}
-                </p>
-              ) : !contentDirSafe ? (
-                <p className="text-1sm text-destructive" data-testid="consent-content-dir-error">
-                  <Trans>Content directory must be inside the project</Trans>
-                </p>
-              ) : (
-                <ProbePreview probe={probe} />
-              )}
-            </div>
+            {contentDirSafe ? <ProbePreview probe={probe} /> : null}
 
-            <div className="flex flex-col gap-2">
-              <label htmlFor="consent-additional-ignores" className="text-sm font-medium">
-                <Trans>Ignore patterns</Trans>
-              </label>
-              <Textarea
-                id="consent-additional-ignores"
-                value={additionalIgnores}
-                onChange={(e) => setAdditionalIgnores(e.target.value)}
-                disabled={busy}
-                placeholder={'tmp/\n*.draft.md'}
-                rows={3}
-                data-testid="consent-additional-ignores"
-              />
-              <p className="text-1sm text-muted-foreground">
-                <Trans>
-                  One pattern per line — appended to <code>.okignore</code>.
-                </Trans>
-              </p>
-            </div>
-
-            <fieldset className="flex flex-col space-y-2 pb-2">
-              <legend className="text-sm font-medium">
-                <Trans>Connect to AI tools</Trans>
-              </legend>
-              <p className="text-1sm text-muted-foreground">
-                <Trans>
-                  Writes a project-MCP config for each selected tool; Claude also gets{' '}
-                  <code>.claude/launch.json</code>.
-                </Trans>
-              </p>
-              {payload.editorOptions.map((editor) => {
-                const checkboxId = `consent-editor-${editor.id}-cb`;
-                return (
-                  <label
-                    key={editor.id}
-                    htmlFor={checkboxId}
-                    className="flex items-center gap-2 text-sm"
-                  >
-                    <Checkbox
-                      id={checkboxId}
-                      checked={editorIds.has(editor.id)}
-                      onCheckedChange={() => toggleEditor(editor.id)}
-                      disabled={busy}
-                      data-testid={`consent-editor-${editor.id}`}
-                    />
-                    <span>{editor.label}</span>
-                    <span
-                      className="text-xs text-muted-foreground"
-                      data-testid={`consent-editor-${editor.id}-scope`}
-                    >
-                      {editor.hasProjectConfig ? (
-                        <Trans comment="Scope tag next to an AI tool — config is written at both project and user level">
-                          (project + user)
-                        </Trans>
-                      ) : (
-                        <Trans comment="Scope tag next to an AI tool — config is written at user level only">
-                          (user-level only)
-                        </Trans>
-                      )}
-                    </span>
-                  </label>
-                );
-              })}
-            </fieldset>
-
-            <fieldset className="flex flex-col space-y-2 pb-2" data-testid="consent-sharing">
-              <legend className="text-sm font-medium">
-                <Trans>Share OK config with my team?</Trans>
-              </legend>
-              <p className="text-1sm text-muted-foreground">
-                <Trans>
-                  <code>.ok/</code>, <code>.mcp.json</code> (and per-editor variants), project
-                  skills, and <code>.claude/launch.json</code>. Switch later in Settings → Config
-                  sharing, or from the command line with{' '}
-                  <code>ok config-sharing share|unshare</code>.
-                </Trans>
-              </p>
-              <RadioGroup
-                value={sharing}
-                onValueChange={(v) => setSharing(v as 'shared' | 'local-only')}
-                disabled={busy}
-                className="gap-2"
+            <Collapsible
+              open={advancedExpanded}
+              onOpenChange={setAdvancedOpen}
+              className="rounded-md border border-border"
+              data-testid="consent-advanced"
+            >
+              <CollapsibleTrigger
+                className="group flex w-full items-center justify-between gap-2 px-3 py-2 text-sm font-medium hover:bg-muted/50"
+                data-testid="consent-advanced-trigger"
               >
-                <label
-                  htmlFor={`${formId}-sharing-shared`}
-                  className="flex items-start gap-2 text-sm"
-                >
-                  <RadioGroupItem
-                    id={`${formId}-sharing-shared`}
-                    value="shared"
-                    data-testid="consent-sharing-shared"
-                    className="mt-1"
+                <Trans>Advanced settings</Trans>
+                <ChevronRight
+                  className="size-4 transition-transform group-data-[state=open]:rotate-90 motion-reduce:transition-none"
+                  aria-hidden
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-6 border-t border-border px-3 py-4">
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="consent-content-dir" className="text-sm font-medium">
+                    <Trans>Content directory</Trans>
+                  </label>
+                  <div className="flex items-stretch gap-2">
+                    <Input
+                      id="consent-content-dir"
+                      value={contentDir}
+                      onChange={(e) => {
+                        setContentDir(e.target.value);
+                        setBrowseError(null);
+                      }}
+                      disabled={busy}
+                      aria-invalid={!contentDirSafe}
+                      aria-describedby={
+                        browseError !== null
+                          ? 'consent-content-dir-browse-error'
+                          : !contentDirSafe
+                            ? 'consent-content-dir-error'
+                            : undefined
+                      }
+                      data-testid="consent-content-dir"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => void onBrowseContentDir()}
+                      data-testid="consent-content-dir-browse"
+                    >
+                      <Trans>Browse</Trans>
+                    </Button>
+                  </div>
+                  {browseError !== null ? (
+                    <p
+                      id="consent-content-dir-browse-error"
+                      className="text-1sm text-destructive"
+                      data-testid="consent-content-dir-browse-error"
+                    >
+                      {browseError}
+                    </p>
+                  ) : !contentDirSafe ? (
+                    <p
+                      id="consent-content-dir-error"
+                      className="text-1sm text-destructive"
+                      data-testid="consent-content-dir-error"
+                    >
+                      <Trans>Content directory must be inside the project</Trans>
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="consent-additional-ignores" className="text-sm font-medium">
+                    <Trans>Ignore patterns</Trans>
+                  </label>
+                  <Textarea
+                    id="consent-additional-ignores"
+                    value={additionalIgnores}
+                    onChange={(e) => setAdditionalIgnores(e.target.value)}
+                    disabled={busy}
+                    placeholder={'tmp/\n*.draft.md'}
+                    rows={3}
+                    data-testid="consent-additional-ignores"
                   />
-                  <span>
-                    <span className="font-medium">
-                      <Trans>Share with my team</Trans>
-                    </span>
-                    <span className="block text-1sm text-muted-foreground">
-                      <Trans>OK config is committed alongside content (default).</Trans>
-                    </span>
-                  </span>
-                </label>
-                <label
-                  htmlFor={`${formId}-sharing-local-only`}
-                  className="flex items-start gap-2 text-sm"
-                >
-                  <RadioGroupItem
-                    id={`${formId}-sharing-local-only`}
-                    value="local-only"
-                    disabled={sharingDisabled}
-                    data-testid="consent-sharing-local-only"
-                    className="mt-1"
-                  />
-                  <span>
-                    <span className="font-medium">
-                      <Trans>Local only on this machine</Trans>
-                    </span>
-                    <span className="block text-1sm text-muted-foreground">
-                      {sharingDisabled ? (
-                        <Trans>
-                          Requires a git repository — pick a different folder or enable git init.
-                        </Trans>
-                      ) : (
-                        <Trans>
-                          OK config stays on this machine via <code>.git/info/exclude</code>{' '}
-                          (per-clone, not committed).
-                        </Trans>
-                      )}
-                    </span>
-                  </span>
-                </label>
-              </RadioGroup>
-            </fieldset>
+                  <p className="text-1sm text-muted-foreground">
+                    <Trans>
+                      One pattern per line — appended to <code>.okignore</code>.
+                    </Trans>
+                  </p>
+                </div>
+
+                <fieldset className="flex flex-col space-y-2 pb-2">
+                  <legend className="text-sm font-medium">
+                    <Trans>Connect to AI tools</Trans>
+                  </legend>
+                  <p className="text-1sm text-muted-foreground">
+                    <Trans>
+                      Writes a project-MCP config for each selected tool; Claude also gets{' '}
+                      <code>.claude/launch.json</code>.
+                    </Trans>
+                  </p>
+                  {payload.editorOptions.map((editor) => {
+                    const checkboxId = `consent-editor-${editor.id}-cb`;
+                    return (
+                      <label
+                        key={editor.id}
+                        htmlFor={checkboxId}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <Checkbox
+                          id={checkboxId}
+                          checked={editorIds.has(editor.id)}
+                          onCheckedChange={() => toggleEditor(editor.id)}
+                          disabled={busy}
+                          data-testid={`consent-editor-${editor.id}`}
+                        />
+                        <span>{editor.label}</span>
+                        <span
+                          className="text-xs text-muted-foreground"
+                          data-testid={`consent-editor-${editor.id}-scope`}
+                        >
+                          {editor.hasProjectConfig ? (
+                            <Trans comment="Scope tag next to an AI tool — config is written at both project and user level">
+                              (project + user)
+                            </Trans>
+                          ) : (
+                            <Trans comment="Scope tag next to an AI tool — config is written at user level only">
+                              (user-level only)
+                            </Trans>
+                          )}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </fieldset>
+
+                <fieldset className="flex flex-col space-y-2 pb-2" data-testid="consent-sharing">
+                  <legend className="flex items-center gap-1.5 text-sm font-medium">
+                    <Trans>Share this setup with your team?</Trans>
+                    <ConfigSharingInfoTooltip />
+                  </legend>
+                  <p className="text-1sm text-muted-foreground">
+                    <Trans>
+                      Choose whether this project's Open Knowledge setup, including its AI-tool
+                      connections, is saved with the project so teammates get it too, or kept only
+                      on your computer. You can change this anytime in Settings.
+                    </Trans>
+                  </p>
+                  <RadioGroup
+                    value={sharing}
+                    onValueChange={(v) => setSharing(v as 'shared' | 'local-only')}
+                    disabled={busy}
+                    className="gap-2"
+                  >
+                    <label
+                      htmlFor={`${formId}-sharing-shared`}
+                      className="flex items-start gap-2 text-sm"
+                    >
+                      <RadioGroupItem
+                        id={`${formId}-sharing-shared`}
+                        value="shared"
+                        data-testid="consent-sharing-shared"
+                        className="mt-1"
+                      />
+                      <span>
+                        <span className="font-medium">
+                          <Trans>Share with my team</Trans>
+                        </span>
+                        <span className="block text-1sm text-muted-foreground">
+                          <Trans>
+                            Saved with the project so everyone who opens it gets the same setup
+                            (default).
+                          </Trans>
+                        </span>
+                      </span>
+                    </label>
+                    <label
+                      htmlFor={`${formId}-sharing-local-only`}
+                      className="flex items-start gap-2 text-sm"
+                    >
+                      <RadioGroupItem
+                        id={`${formId}-sharing-local-only`}
+                        value="local-only"
+                        disabled={sharingDisabled}
+                        data-testid="consent-sharing-local-only"
+                        className="mt-1"
+                      />
+                      <span>
+                        <span className="font-medium">
+                          <Trans>Local only on this machine</Trans>
+                        </span>
+                        <span className="block text-1sm text-muted-foreground">
+                          {sharingDisabled ? (
+                            <Trans>
+                              Requires a git repository — pick a different folder or enable git
+                              init.
+                            </Trans>
+                          ) : (
+                            <Trans>
+                              Stays on this computer only. Teammates won't get this setup.
+                            </Trans>
+                          )}
+                        </span>
+                      </span>
+                    </label>
+                  </RadioGroup>
+                </fieldset>
+              </CollapsibleContent>
+            </Collapsible>
           </form>
         </DialogBody>
 

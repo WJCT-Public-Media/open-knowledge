@@ -67,6 +67,10 @@ function renderConsentDialog() {
   return harness;
 }
 
+async function expandAdvanced() {
+  await userEvent.click(screen.getByTestId('consent-advanced-trigger'));
+}
+
 describe('ConsentDialogBody runtime form behavior', () => {
   afterEach(() => {
     cleanup();
@@ -75,6 +79,30 @@ describe('ConsentDialogBody runtime form behavior', () => {
 
   test('exports the default component', () => {
     expect(typeof ConsentDialogBody).toBe('function');
+  });
+
+  test('advanced controls are collapsed by default and reveal on expand', async () => {
+    renderConsentDialog();
+
+    expect(screen.queryByTestId('consent-content-dir')).toBeNull();
+    expect(screen.queryByTestId('consent-additional-ignores')).toBeNull();
+    expect(screen.queryByTestId('consent-sharing')).toBeNull();
+
+    await expandAdvanced();
+
+    expect(screen.getByTestId('consent-content-dir')).not.toBeNull();
+    expect(screen.getByTestId('consent-additional-ignores')).not.toBeNull();
+    expect(screen.getByTestId('consent-sharing')).not.toBeNull();
+  });
+
+  test('an invalid default content dir force-opens Advanced settings and shows the error without expanding', () => {
+    const harness = makeStore();
+    const invalidPayload = { ...payload, defaultContentDir: '../secrets' };
+    render(<ConsentDialogBody payload={invalidPayload} store={harness.store} />);
+
+    expect(screen.getByTestId('consent-content-dir')).not.toBeNull();
+    expect(screen.getByTestId('consent-content-dir-error')).not.toBeNull();
+    expect((screen.getByTestId('consent-start') as HTMLButtonElement).disabled).toBe(true);
   });
 
   test('Cancel is a non-submit button and invokes cancel without confirming', async () => {
@@ -113,6 +141,7 @@ describe('ConsentDialogBody runtime form behavior', () => {
 
   test('invalid contentDir submit is default-prevented and does not confirm', async () => {
     const { confirmCalls } = renderConsentDialog();
+    await expandAdvanced();
 
     fireEvent.change(screen.getByTestId('consent-content-dir'), {
       target: { value: '../secrets' },
@@ -137,6 +166,7 @@ describe('ConsentDialogBody runtime form behavior', () => {
       },
     } as Pick<OkDesktopBridge, 'dialog'>);
     renderConsentDialog();
+    await expandAdvanced();
 
     await userEvent.click(screen.getByTestId('consent-content-dir-browse'));
 

@@ -114,6 +114,12 @@ async function countWindowsByMode(
   return n;
 }
 
+async function expandAdvancedSettings(page: Page): Promise<void> {
+  const trigger = page.locator('[data-testid="consent-advanced-trigger"]');
+  await expect(trigger).toBeVisible({ timeout: 15_000 });
+  await trigger.click();
+}
+
 const cleanupTargets: string[] = [];
 function trackForCleanup(...paths: string[]): void {
   cleanupTargets.push(...paths);
@@ -145,6 +151,7 @@ test.describe('Consent-dialog smoke', () => {
     const navigator = await findWindowByMode(app, 'navigator');
 
     await navigator.locator('[data-testid="nav-open"]').click();
+    await expandAdvancedSettings(navigator);
     const contentDir = navigator.locator('[data-testid="consent-content-dir"]');
     await expect(contentDir).toBeVisible({ timeout: 15_000 });
 
@@ -173,6 +180,7 @@ test.describe('Consent-dialog smoke', () => {
     const navigator = await findWindowByMode(app, 'navigator');
 
     await navigator.locator('[data-testid="nav-open"]').click();
+    await expandAdvancedSettings(navigator);
 
     const contentDirInput = navigator.locator('[data-testid="consent-content-dir"]');
     await expect(contentDirInput).toBeVisible({ timeout: 15_000 });
@@ -199,6 +207,7 @@ test.describe('Consent-dialog smoke', () => {
     const navigator = await findWindowByMode(app, 'navigator');
 
     await navigator.locator('[data-testid="nav-open"]').click();
+    await expandAdvancedSettings(navigator);
 
     const contentDir = navigator.locator('[data-testid="consent-content-dir"]');
     await expect(contentDir).toBeVisible({ timeout: 15_000 });
