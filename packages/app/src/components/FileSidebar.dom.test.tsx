@@ -92,7 +92,6 @@ const treeCalls = {
   expandAll: mock(() => {}),
   startCreating: mock((_kind: 'file' | 'folder', _parentDir: string) => {}),
   startCreatingFromTemplate: mock((_parentDir: string) => {}),
-  uploadFiles: mock((_parentDir: string) => {}),
 };
 const projectLocalPatch = mock((_patch: unknown) => projectPatchResult);
 const showItemInFolderMock = mock((_path: string) => Promise.resolve());
@@ -144,7 +143,6 @@ mock.module('@/components/FileTree', () => ({
           treeListeners.add(listener);
           return () => treeListeners.delete(listener);
         },
-        uploadFiles: treeCalls.uploadFiles,
       };
       ref?.(handle);
       return () => ref?.(null);
@@ -402,7 +400,6 @@ describe('FileSidebar runtime behavior', () => {
       treeCalls.expandAll,
       treeCalls.startCreating,
       treeCalls.startCreatingFromTemplate,
-      treeCalls.uploadFiles,
       projectLocalPatch,
       showItemInFolderMock,
       notifyViewMenuStateChangedMock,
@@ -489,11 +486,9 @@ describe('FileSidebar runtime behavior', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'New from template' })[0]);
     fireEvent.click(screen.getByRole('button', { name: 'Daily' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'New folder' })[0]);
-    fireEvent.click(screen.getAllByRole('button', { name: 'Upload file' })[0]);
     expect(treeCalls.startCreating).toHaveBeenCalledWith('file', 'docs');
     expect(treeCalls.createFromTemplate).toHaveBeenCalledWith('docs', 'daily');
     expect(treeCalls.startCreating).toHaveBeenCalledWith('folder', 'docs');
-    expect(treeCalls.uploadFiles).toHaveBeenCalledWith('docs');
 
     expect(screen.getByRole('button', { name: 'Expand all' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Collapse all' })).toBeTruthy();
@@ -520,7 +515,6 @@ describe('FileSidebar runtime behavior', () => {
       'empty-space-menu-new-file',
       'empty-space-menu-new-from-template',
       'empty-space-menu-new-folder',
-      'empty-space-menu-upload-file',
       'empty-space-menu-reveal-in-finder',
       'open-in-agent-empty-space-submenu',
       'empty-space-menu-copy-full-path',
@@ -539,11 +533,9 @@ describe('FileSidebar runtime behavior', () => {
     fireEvent.click(screen.getByTestId('empty-space-menu-new-from-template'));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Root daily' }));
     fireEvent.click(screen.getByTestId('empty-space-menu-new-folder'));
-    fireEvent.click(screen.getByTestId('empty-space-menu-upload-file'));
     expect(treeCalls.startCreating).toHaveBeenCalledWith('file', '');
     expect(treeCalls.createFromTemplate).toHaveBeenCalledWith('', 'root-daily');
     expect(treeCalls.startCreating).toHaveBeenCalledWith('folder', '');
-    expect(treeCalls.uploadFiles).toHaveBeenCalledWith('');
 
     fireEvent.click(screen.getByTestId('empty-space-menu-reveal-in-finder'));
     expect(showItemInFolderMock).toHaveBeenCalledWith('/tmp/open-knowledge');

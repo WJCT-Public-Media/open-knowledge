@@ -65,7 +65,6 @@ const treeCalls = {
   expandAll: mock(() => {}),
   startCreating: mock((_kind: 'file' | 'folder', _parentDir: string) => {}),
   startCreatingFromTemplate: mock((_parentDir: string) => {}),
-  uploadFiles: mock((_parentDir: string) => {}),
 };
 const projectLocalPatch = mock((_patch: unknown) => ({ ok: true as const }));
 let menuActionCallback: ((action: MenuAction) => void) | null = null;
@@ -85,7 +84,6 @@ mock.module('@/components/FileTree', () => ({
         startCreating: treeCalls.startCreating,
         startCreatingFromTemplate: treeCalls.startCreatingFromTemplate,
         subscribe: () => () => {},
-        uploadFiles: treeCalls.uploadFiles,
       };
       ref?.(handle);
       return () => ref?.(null);
@@ -232,7 +230,6 @@ describe('FileSidebar menu-action runtime routing', () => {
       treeCalls.expandAll,
       treeCalls.startCreating,
       treeCalls.startCreatingFromTemplate,
-      treeCalls.uploadFiles,
     ]) {
       fn.mockClear();
     }

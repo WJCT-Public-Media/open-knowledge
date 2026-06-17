@@ -9,7 +9,6 @@ import {
   ListCollapse,
   SquarePen,
   UnfoldVertical,
-  Upload,
 } from 'lucide-react';
 import { type ComponentProps, type FC, type MouseEventHandler, useEffect, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -207,10 +206,6 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
   const handleEmptySpaceCreateFolder = () => {
     if (!workspace) return;
     tree?.startCreating('folder', '');
-  };
-  const handleEmptySpaceUploadFile = () => {
-    if (!workspace) return;
-    tree?.uploadFiles('');
   };
   const handleEmptySpaceReveal = () => {
     if (!workspace || !bridge) return;
@@ -544,11 +539,6 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
                   label={t`New folder`}
                   onClick={() => tree?.startCreating('folder', initialCreateDir)}
                 />
-                <ToolbarButton
-                  icon={Upload}
-                  label={t`Upload file`}
-                  onClick={() => tree?.uploadFiles(initialCreateDir)}
-                />
               </div>
             </SidebarHeader>
             {/*
@@ -662,12 +652,12 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
         </ContextMenuTrigger>
         <ContextMenuContent>
           {/*
-           * Empty-space menu — 12 items, 4 sections.
+           * Empty-space menu — 11 items, 4 sections.
            *
-           * Section 1: Creation and upload (always visible). New file / from
+           * Section 1: Creation (always visible). New file / from
            * template / folder dispatch the project-root creation flow
-           * (parentDir = '' → contentDir). Upload opens the project-root file
-           * picker. Disabled when workspace hasn't resolved.
+           * (parentDir = '' → contentDir). Disabled when workspace hasn't
+           * resolved.
            *
            * Section 2: Act-on-project. Reveal in Finder
            * is Electron-only (`if (!bridge) return null`); Open with AI submenu
@@ -718,14 +708,6 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
           >
             <FolderPlus aria-hidden="true" />
             <Trans>New folder</Trans>
-          </ContextMenuItem>
-          <ContextMenuItem
-            disabled={!workspace}
-            onSelect={handleEmptySpaceUploadFile}
-            data-testid="empty-space-menu-upload-file"
-          >
-            <Upload aria-hidden="true" />
-            <Trans>Upload file</Trans>
           </ContextMenuItem>
           <ContextMenuSeparator />
           {bridge ? (

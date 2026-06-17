@@ -5956,8 +5956,6 @@ msgstr ""
 msgid "Upload failed: {message}"
 msgstr ""
 
-#: src/components/FileSidebar.tsx
-#: src/components/FileTree.tsx
 #: src/editor/components/PropPanel.tsx
 msgid "Upload file"
 msgstr ""

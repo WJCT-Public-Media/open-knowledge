@@ -42,7 +42,6 @@ import {
   Trash2,
   TriangleAlert,
   UnfoldVertical,
-  Upload,
 } from 'lucide-react';
 import { __iconNode as botIcon } from 'lucide-react/dist/esm/icons/bot';
 import { __iconNode as link2Icon } from 'lucide-react/dist/esm/icons/link-2';
@@ -483,7 +482,6 @@ interface FileTreeMenuProps {
    *  (`appearance.sidebar.{showHiddenFiles,showAllFiles}`). */
   mergedConfig: Config | null;
   onStartCreating: (kind: 'file' | 'folder', parentDir: string) => void;
-  onUploadFiles: (parentDir: string) => void;
   /** Inline create-from-template for the given parent dir + template name —
    *  same inline-rename fast path as `onStartCreating`, seeded from a template.
    *  Drives the folder menu's "New from template" hover submenu. */
@@ -544,35 +542,6 @@ function isEditableKeyboardTarget(target: EventTarget | null): boolean {
   );
 }
 
-function chooseSidebarUploadFiles(): Promise<readonly File[]> {
-  if (typeof document === 'undefined') return Promise.resolve([]);
-
-  return new Promise((resolve) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.multiple = true;
-    input.tabIndex = -1;
-    input.style.position = 'fixed';
-    input.style.inlineSize = '1px';
-    input.style.blockSize = '1px';
-    input.style.opacity = '0';
-    input.style.pointerEvents = 'none';
-
-    let settled = false;
-    const settle = (files: readonly File[]) => {
-      if (settled) return;
-      settled = true;
-      input.remove();
-      resolve(files);
-    };
-
-    input.addEventListener('change', () => settle(Array.from(input.files ?? [])), { once: true });
-    input.addEventListener('cancel', () => settle([]), { once: true });
-    document.body.append(input);
-    input.click();
-  });
-}
-
 function collectTabsToCloseForDelete(
   targets: readonly FileTreeTarget[],
   documents: readonly FileEntry[],
@@ -630,7 +599,6 @@ function FileTreeMenu({
   projectLocalBinding,
   mergedConfig,
   onStartCreating,
-  onUploadFiles,
   onCreateFromTemplate,
   onDuplicate,
   onDelete,
@@ -777,16 +745,6 @@ function FileTreeMenu({
             >
               <FolderPlus aria-hidden="true" />
               <Trans>New folder</Trans>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={anyActionBusy}
-              onSelect={() => {
-                closeForInlineSurface();
-                onUploadFiles(treeDirectoryPathToFolderPath(item.path));
-              }}
-            >
-              <Upload aria-hidden="true" />
-              <Trans>Upload file</Trans>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <RevealInFileManagerMenuItem item={item} workspace={workspace} onClose={close} />
@@ -1044,7 +1002,6 @@ function FileTreeMenu({
 
 export interface FileTreeHandle {
   startCreating(kind: 'file' | 'folder', parentDir: string): void;
-  uploadFiles(parentDir: string): void;
   /** Open NewItemDialog at the given parentDir so the template picker is
    *  reachable. Used by the native macOS File menu's "New from Template…"
    *  item, where an inline hover-submenu of templates isn't expressible. */
@@ -2404,17 +2361,6 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
     }
   }
 
-  async function uploadFilesToTargetFromPicker(parentDir: string) {
-    if (busyPathRef.current !== null) return;
-    const files = await chooseSidebarUploadFiles();
-    if (files.length === 0) return;
-    const uploadBusyPath =
-      parentDir === ''
-        ? FILE_TREE_EXTERNAL_FILE_DROP_BUSY_PATH
-        : folderPathToTreeDirectoryPath(parentDir);
-    await uploadExternalFilesToTarget(files, parentDir, uploadBusyPath);
-  }
-
   function startCreatingFromTemplate(parentDir: string) {
     setNewItemRequest({ parentDir });
   }
@@ -2756,11 +2702,9 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
 
   const startCreatingRef = useRef(startCreating);
   const startCreatingFromTemplateRef = useRef(startCreatingFromTemplate);
-  const uploadFilesRef = useRef(uploadFilesToTargetFromPicker);
   useEffect(() => {
     startCreatingRef.current = startCreating;
     startCreatingFromTemplateRef.current = startCreatingFromTemplate;
-    uploadFilesRef.current = uploadFilesToTargetFromPicker;
   });
 
   useImperativeHandle(
@@ -2768,9 +2712,6 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
     () => ({
       startCreating(kind, parentDir) {
         void startCreatingRef.current(kind, parentDir);
-      },
-      uploadFiles(parentDir) {
-        void uploadFilesRef.current(parentDir);
       },
       startCreatingFromTemplate(parentDir) {
         startCreatingFromTemplateRef.current(parentDir);
@@ -3337,17 +3278,6 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
         >
           <Trans>Create your first file</Trans>
         </Button>
-        <Button
-          variant="link"
-          size="sm"
-          className="font-mono uppercase"
-          onClick={() => {
-            void uploadFilesToTargetFromPicker('');
-          }}
-        >
-          <Upload aria-hidden="true" />
-          <Trans>Upload file</Trans>
-        </Button>
       </section>
     );
   }
@@ -3394,9 +3324,6 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
               projectLocalBinding={projectLocalBinding}
               mergedConfig={merged}
               onStartCreating={startCreating}
-              onUploadFiles={(parentDir) => {
-                void uploadFilesToTargetFromPicker(parentDir);
-              }}
               onCreateFromTemplate={(parentDir, templateName) =>
                 startCreating('file', parentDir, { template: templateName })
               }
