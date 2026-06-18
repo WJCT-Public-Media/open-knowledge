@@ -601,18 +601,6 @@ msgstr ""
 msgid "Agent configuration file"
 msgstr ""
 
-#: src/editor/extensions/JsxComponentView.tsx
-msgid "Align center"
-msgstr ""
-
-#: src/editor/extensions/JsxComponentView.tsx
-msgid "Align left"
-msgstr ""
-
-#: src/editor/extensions/JsxComponentView.tsx
-msgid "Align right"
-msgstr ""
-
 #: src/components/FolderOverview.tsx
 msgid "All files"
 msgstr ""
@@ -5921,11 +5909,15 @@ msgid "Upload failed: {message}"
 msgstr ""
 
 #: src/editor/components/PropPanel.tsx
-msgid "Upload file"
+msgid "Upload from computer"
 msgstr ""
 
 #: src/components/FileTree.tsx
 msgid "Upload may have succeeded but the sidebar is out of date — refresh to resync"
+msgstr ""
+
+#: src/editor/components/PropPanel.tsx
+msgid "Uploading"
 msgstr ""
 
 #: src/editor/image-upload/index.ts

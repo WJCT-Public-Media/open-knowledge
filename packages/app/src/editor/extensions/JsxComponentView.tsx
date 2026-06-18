@@ -48,17 +48,7 @@ import { Trans, useLingui } from '@lingui/react/macro';
 import type { NodeViewProps } from '@tiptap/core';
 import { TextSelection } from '@tiptap/pm/state';
 import { NodeViewContent, NodeViewWrapper } from '@tiptap/react';
-import {
-  AlignCenter,
-  AlignLeft,
-  AlignRight,
-  ArrowDown,
-  ArrowUp,
-  ExternalLink,
-  Pencil,
-  Settings2,
-  Trash2,
-} from 'lucide-react';
+import { ArrowDown, ArrowUp, ExternalLink, Pencil, Settings2, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
@@ -91,7 +81,6 @@ import {
   focusInsertedComponent,
 } from '../slash-command/component-items.tsx';
 import { ALIGNABLE_DESCRIPTOR_NAMES } from '../utils/alignable-descriptors.ts';
-import { runWithAlignAnimation } from '../utils/animate-align-change.ts';
 import { formatContainerAriaLabel } from '../utils/editor-strings.ts';
 import { reconstructSource } from '../utils/reconstruct-source.ts';
 import { sanitizeComponentProps } from '../utils/sanitize-url.ts';
@@ -603,82 +592,16 @@ export function JsxComponentView({ node, editor, extension, getPos, selected }: 
           onMouseDown={(e) => e.stopPropagation()}
           {...{ [OPT_OUT_ATTR]: 'true' }}
         >
-          {/* Alignment — left / center / right buttons. Renders for every
-            descriptor in `ALIGNABLE_DESCRIPTOR_NAMES` (`img` + `CommonMarkImage`
-            + `Embed` + `video`). Placed in the hover-revealed chrome bar
-            rather than the bubble menu because clicking an image triggers
-            `react-medium-image-zoom`'s lightbox before PM can settle a
-            NodeSelection — the bubble-menu path doesn't reach the user.
-            Chrome bar shows on HOVER, no click required, so it sidesteps
-            the click-vs-zoom conflict for image and stays consistent for
-            video / Embed.
-
-            CommonMarkImage's prop set is just src/alt/title — no align.
-            When the user picks a non-`center` alignment on a CommonMarkImage,
-            the click handler upgrades the descriptor to `img` (which DOES
-            have `align`) so the value persists through serialization. The
-            `![alt](src)` source upgrades to `<img ... align="…" />` on save
-            — a one-way conversion the user can revert by deleting the
-            block and re-typing the markdown. */}
-          {isAlignable &&
-            (
-              [
-                { value: 'left' as const, label: t`Align left`, Icon: AlignLeft },
-                { value: 'center' as const, label: t`Align center`, Icon: AlignCenter },
-                { value: 'right' as const, label: t`Align right`, Icon: AlignRight },
-              ] as const
-            ).map(({ value, label, Icon }) => {
-              const rawAlign =
-                typeof currentProps.align === 'string' ? currentProps.align : 'center';
-              const currentAlign =
-                rawAlign === 'left' || rawAlign === 'right' || rawAlign === 'center'
-                  ? rawAlign
-                  : 'center';
-              const isActive = currentAlign === value;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  className="jsx-chrome-btn"
-                  aria-label={label}
-                  aria-pressed={isActive}
-                  data-active={isActive ? 'true' : undefined}
-                  onClick={(e) => {
-                    if (typeof pos !== 'number') return;
-                    const curNode = editor.state.doc.nodeAt(pos);
-                    if (!curNode || curNode.type.name !== 'jsxComponent') return;
-                    const wrapperEl = (e.currentTarget as HTMLElement).closest<HTMLElement>(
-                      '.jsx-component-wrapper',
-                    );
-                    const curDescriptorName = String(curNode.attrs.componentName ?? '');
-                    if (!ALIGNABLE_DESCRIPTOR_NAMES.has(curDescriptorName)) {
-                      return;
-                    }
-                    const elementAttrs = getElementJsxAttrs(curNode.attrs);
-                    if (!elementAttrs) return;
-                    const isCommonMark = curDescriptorName === 'CommonMarkImage';
-                    const nextProps = {
-                      ...elementAttrs.props,
-                      align: value,
-                    };
-                    const nextAttrs = isCommonMark
-                      ? {
-                          ...elementAttrs,
-                          componentName: 'img',
-                          props: nextProps,
-                          sourceDirty: true,
-                        }
-                      : { ...elementAttrs, props: nextProps, sourceDirty: true };
-                    runWithAlignAnimation(wrapperEl, () => {
-                      editor.view.dispatch(editor.state.tr.setNodeMarkup(pos, null, nextAttrs));
-                      markUserTyping();
-                    });
-                  }}
-                >
-                  <Icon size={12} aria-hidden="true" />
-                </button>
-              );
-            })}
+          {/* Alignment intentionally absent here — the bubble menu's
+            `ImageAlignButtons` is the single alignment surface for every
+            descriptor in `ALIGNABLE_DESCRIPTOR_NAMES` (`img` /
+            `CommonMarkImage` / `Embed` / `video`). NodeSelection fires
+            on the image click and the floating bubble bar lands centered
+            above the block, so the old chrome-bar trio + PropPanel
+            `Align` Select were redundant duplicates. CommonMarkImage's
+            descriptor-upgrade path on first non-default alignment lives
+            in `ImageAlignButtons` itself; removing it here doesn't lose
+            the conversion. */}
 
           {/* Open in new tab — `Embed` only. Lets the reader hop to the
             embedded URL when they want the full browser surface.

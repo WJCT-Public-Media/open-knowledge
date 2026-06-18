@@ -232,7 +232,7 @@ describe('builtInComponents manifest', () => {
     );
   });
 
-  test('img.align is a 3-value enum with center default (omitOnDefault, common-tier)', () => {
+  test('img.align is a 3-value enum with center default, hidden from PropPanel', () => {
     const img = builtInComponents.find((m) => m.name === 'img');
     const align = img?.props.find((p) => p.name === 'align');
     expect(align).toBeDefined();
@@ -241,6 +241,7 @@ describe('builtInComponents manifest', () => {
       expect(align.defaultValue).toBe('center');
       expect(align.omitOnDefault).toBe(true);
       expect(align.advanced).toBeUndefined();
+      expect(align.hidden).toBe(true);
       expect(align.enumValues[0]).toBe('center');
     }
   });
@@ -330,6 +331,16 @@ describe('builtInComponents manifest', () => {
     expect(imgAlign).toBeDefined();
     expect(videoAlign).toBeDefined();
     expect(videoAlign).toEqual(imgAlign);
+  });
+
+  test('Embed.align mirrors img.align (single alignment surface — bubble menu)', () => {
+    const img = builtInComponents.find((m) => m.name === 'img');
+    const embed = builtInComponents.find((m) => m.name === 'Embed');
+    const imgAlign = img?.props.find((p) => p.name === 'align');
+    const embedAlign = embed?.props.find((p) => p.name === 'align');
+    expect(imgAlign).toBeDefined();
+    expect(embedAlign).toBeDefined();
+    expect(embedAlign).toEqual(imgAlign);
   });
 
   test('video has `controls` as a boolean with `true` default', () => {

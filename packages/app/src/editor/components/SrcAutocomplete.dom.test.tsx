@@ -207,3 +207,27 @@ describe('SrcAutocomplete — keyboard handling', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 });
+
+describe('SrcAutocomplete — popover width tracks the trigger', () => {
+  test('PopoverContent uses the Tailwind v4 implicit-var width syntax (`w-(...)`, not `w-[...]`)', () => {
+    stubAssetPaths.add('assets/photo.png');
+    render(
+      <SrcAutocomplete
+        id="prop-src"
+        value=""
+        onChange={() => {}}
+        accept={ALLOWED_IMAGE_MIME_TYPES}
+      />,
+    );
+    const input = document.getElementById('prop-src') as HTMLInputElement;
+    fireEvent.focus(input);
+
+    const option = screen.getAllByTestId('src-autocomplete-option')[0];
+    expect(option).toBeDefined();
+    const content = option?.closest('[data-slot="popover-content"]') as HTMLElement | null;
+    expect(content).not.toBeNull();
+    const classes = content?.className ?? '';
+    expect(classes).toContain('w-(--radix-popover-trigger-width)');
+    expect(classes).not.toContain('w-[--radix-popover-trigger-width]');
+  });
+});

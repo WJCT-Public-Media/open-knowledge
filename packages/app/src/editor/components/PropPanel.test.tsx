@@ -304,14 +304,14 @@ describe('PropPanel — upload button affordance', () => {
     expect(html).not.toContain('data-prop-upload-input');
   });
 
-  test('upload button uses aria-label="Upload file"', () => {
+  test('upload button surfaces visible "Upload from computer" text as its accessible name', () => {
     const d = makeCanonicalDescriptor('img', [
       { name: 'src', type: 'string', required: true, accept: ['image/png'] },
     ]);
     const html = withFakeStorage(() =>
       renderToString(<PropPanel descriptor={d} values={{}} onChange={() => {}} />),
     );
-    expect(html).toMatch(/aria-label="Upload file"/);
+    expect(html).toMatch(/data-prop-upload-trigger="">.*Upload from computer/);
   });
 });
 
@@ -405,7 +405,7 @@ describe('PropPanel — descriptor.props narrowing (real registry)', () => {
     });
     expect(html).toContain('id="prop-src"');
     expect(html).toContain('id="prop-alt"');
-    expect(html).toContain('id="prop-align"');
+    expect(html).not.toContain('id="prop-align"');
     expect(html).toContain('data-prop-panel-advanced-trigger');
     expect(html).toContain('id="prop-width"');
     expect(html).toContain('id="prop-height"');
@@ -418,7 +418,29 @@ describe('PropPanel — descriptor.props narrowing (real registry)', () => {
     expect(html).toContain('id="prop-crossorigin"');
     expect(html).toContain('id="prop-referrerpolicy"');
     const propIds = html.match(/id="prop-[^"]+"/g) ?? [];
-    expect(propIds.length).toBe(13);
+    expect(propIds.length).toBe(12);
+  });
+
+  test('canonical video descriptor: align is hidden from PropPanel (bubble-menu owns it)', () => {
+    const d = findBuiltIn('video');
+    const html = withFakeStorage(() => {
+      persistAdvancedOpenState('video', true);
+      return renderToString(<PropPanel descriptor={d} values={{}} onChange={() => {}} />);
+    });
+    expect(html).toContain('id="prop-src"');
+    expect(html).not.toContain('id="prop-align"');
+  });
+
+  test('canonical Embed descriptor: align is hidden from PropPanel (bubble-menu owns it)', () => {
+    const d = findBuiltIn('Embed');
+    const html = withFakeStorage(() => {
+      persistAdvancedOpenState('Embed', true);
+      return renderToString(
+        <PropPanel descriptor={d} values={{ src: 'https://example.com' }} onChange={() => {}} />,
+      );
+    });
+    expect(html).toContain('id="prop-src"');
+    expect(html).not.toContain('id="prop-align"');
   });
 });
 

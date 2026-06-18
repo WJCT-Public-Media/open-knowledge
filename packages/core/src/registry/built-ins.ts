@@ -187,6 +187,7 @@ const htmlImgProps: PropDef[] = [
     required: false,
     omitOnDefault: true,
     description: 'Alignment within the column',
+    hidden: true,
   },
 ];
 
@@ -229,6 +230,7 @@ const embedProps: PropDef[] = [
     required: false,
     omitOnDefault: true,
     description: 'Alignment within the column',
+    hidden: true,
   },
 ];
 
@@ -334,6 +336,7 @@ const htmlVideoProps: PropDef[] = [
     required: false,
     omitOnDefault: true,
     description: 'Alignment within the column',
+    hidden: true,
   },
 ];
 

@@ -1,6 +1,6 @@
 import type { PropDef } from '@inkeep/open-knowledge-core';
 import { t } from '@lingui/core/macro';
-import { Trans, useLingui } from '@lingui/react/macro';
+import { Trans } from '@lingui/react/macro';
 import { ChevronDown, Loader2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -310,7 +310,14 @@ function PropControl({
           <label htmlFor={stringId} className="text-xs text-muted-foreground">
             {humanizePropName(propDef.name)}
           </label>
-          <div className="flex gap-1">
+          {/* Two-row layout: src input on its own line, then the upload
+              affordance below it as a labeled full-width button. UX
+              research found users skipping the icon-only upload button
+              entirely — the row-with-icon shape read as "URL field with a
+              decoration on the right," not "URL field OR pick a file."
+              Stacking the affordances and giving the upload button visible
+              "Upload from computer" text makes the second path explicit. */}
+          <div className="flex flex-col gap-1.5">
             {accept !== undefined ? (
               <SrcAutocomplete
                 id={stringId}
@@ -451,7 +458,6 @@ function PropUploadButton({
   accept: readonly string[];
   onUploaded: (url: string) => void;
 }) {
-  const { t } = useLingui();
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   return (
@@ -478,15 +484,20 @@ function PropUploadButton({
         variant="outline"
         size="sm"
         disabled={uploading}
-        aria-label={t`Upload file`}
         data-prop-upload-trigger=""
-        className="h-7 px-2"
+        className="h-7 w-full justify-center gap-1.5 px-2 text-xs"
         onClick={() => inputRef.current?.click()}
       >
         {uploading ? (
-          <Loader2 className="size-3.5 animate-spin" />
+          <>
+            <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+            <Trans>Uploading</Trans>
+          </>
         ) : (
-          <Upload className="size-3.5" />
+          <>
+            <Upload className="size-3.5" aria-hidden="true" />
+            <Trans>Upload from computer</Trans>
+          </>
         )}
       </Button>
     </>
