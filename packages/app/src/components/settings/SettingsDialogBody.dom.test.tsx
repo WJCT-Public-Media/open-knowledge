@@ -6,8 +6,9 @@ import {
   type ConfigPatch,
   ConfigSchema,
 } from '@inkeep/open-knowledge-core';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { ThemeProvider, useTheme } from 'next-themes';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { emitConfigValidationRejected } from '@/lib/config-validation-events';
 import { expectVisualClassTokens } from '@/test-utils/visual-contract';
@@ -176,5 +177,92 @@ describe('SettingsDialogBody preferences runtime', () => {
       );
     });
     expectVisualClassTokens(wordWrapField?.className, ['animate-settings-flash']);
+  });
+});
+
+let themeStorageKeySeq = 0;
+
+function ThemeProbe() {
+  const { theme } = useTheme();
+  return <span data-testid="theme-probe">{theme ?? ''}</span>;
+}
+
+function renderPreferencesWithTheme(binding: ConfigBinding) {
+  themeStorageKeySeq += 1;
+  return render(
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      storageKey={`ok-theme-v1-test-${themeStorageKeySeq}`}
+    >
+      <TooltipProvider>
+        <SettingsDialogBody
+          activeId="preferences"
+          userBinding={binding}
+          okignoreBinding={null}
+          okignoreSynced={false}
+        />
+        <ThemeProbe />
+      </TooltipProvider>
+    </ThemeProvider>,
+  );
+}
+
+function themeToggleItem(container: HTMLElement, option: string): HTMLElement {
+  const field = container.querySelector('[data-field="appearance.theme"]');
+  if (!field) throw new Error('appearance.theme field not rendered');
+  return within(field as HTMLElement).getByText(option);
+}
+
+describe('SettingsDialogBody theme toggle — optimistic apply', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  test('clicking Dark flips next-themes immediately (no ConfigProvider) and still persists via binding.patch', async () => {
+    const user = userEvent.setup();
+    const { binding, patches } = makeBinding();
+    const { container } = renderPreferencesWithTheme(binding);
+
+    expect(screen.getByTestId('theme-probe').textContent).toBe('system');
+
+    await user.click(themeToggleItem(container, 'dark'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('theme-probe').textContent).toBe('dark');
+    });
+    expect(patches).toEqual([{ appearance: { theme: 'dark' } }]);
+  });
+
+  test("clicking System forwards 'system' verbatim to next-themes (does not resolve to light/dark)", async () => {
+    const user = userEvent.setup();
+    const { binding, patches } = makeBinding();
+    const { container } = renderPreferencesWithTheme(binding);
+
+    await user.click(themeToggleItem(container, 'dark'));
+    await waitFor(() => {
+      expect(screen.getByTestId('theme-probe').textContent).toBe('dark');
+    });
+
+    await user.click(themeToggleItem(container, 'system'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('theme-probe').textContent).toBe('system');
+    });
+    expect(patches.at(-1)).toEqual({ appearance: { theme: 'system' } });
+  });
+
+  test('clicking Light flips to light and records the patch', async () => {
+    const user = userEvent.setup();
+    const { binding, patches } = makeBinding();
+    const { container } = renderPreferencesWithTheme(binding);
+
+    await user.click(themeToggleItem(container, 'light'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('theme-probe').textContent).toBe('light');
+    });
+    expect(patches).toEqual([{ appearance: { theme: 'light' } }]);
   });
 });

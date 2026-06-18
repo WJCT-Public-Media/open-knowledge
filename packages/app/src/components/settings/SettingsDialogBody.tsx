@@ -17,6 +17,7 @@ import type { MessageDescriptor } from '@lingui/core';
 import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { ArrowUpRight, Check, ChevronRight, RotateCcw } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { useEffect, useRef, useState } from 'react';
 import { type ControllerRenderProps, type FieldPath, useFormContext } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -728,6 +729,7 @@ function FieldControlBody({
 }: FieldControlBodyProps & SlotForwardedProps) {
   'use no memo';
   const { t } = useLingui();
+  const { setTheme } = useTheme();
   if (typeTag === 'boolean') {
     return (
       <Switch
@@ -745,6 +747,7 @@ function FieldControlBody({
   if (typeTag === 'enum' && enumOptions && enumOptions.length > 0) {
     if (field.control === 'enum-toggle' || enumOptions.length <= 4) {
       const { id: forwardedId, ...wrapperSlotProps } = slotForwarded;
+      const isThemeField = field.path[0] === 'appearance' && field.path[1] === 'theme';
       return (
         <ToggleGroup
           {...wrapperSlotProps}
@@ -753,6 +756,7 @@ function FieldControlBody({
           ref={ctl.ref}
           onValueChange={(next) => {
             if (!next) return;
+            if (isThemeField) setTheme(next);
             ctl.onChange(next);
             onCommit();
           }}
