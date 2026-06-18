@@ -1,13 +1,12 @@
 ---
-title: CLI
-description: Set up a project and open the editor from your terminal with the ok command.
+title: CLI & web app
+description: Install the ok CLI and run the Open Knowledge web app in your browser — on Linux or an Intel Mac.
 ---
-If you are on macOS you should use the Open Knowledge desktop app. Use the `ok` CLI if you are on Linux or have an Intel-based Mac.
+On macOS, use the [desktop app](/docs/get-started/quickstart) for the smoothest experience. On **Linux** or an **Intel Mac**, install the `ok` CLI from npm and run the **same editor as a local web app** in your browser.
 
 <Callout type="info" title="Prerequisites">
-  - **macOS or Linux.** Windows is not supported.
-  - **Node.js ≥24.** Open Knowledge requires Node.js 24 or higher.
-  - **`git`.** Open Knowledge initializes a git repo for your project (used for the timeline and recovery features). Pre-installed via Xcode Command Line Tools on most macOS machines; install with `xcode-select --install` if missing.
+  - **Node.js 24+.** Open Knowledge requires [Node.js](https://nodejs.org) 24 or higher.
+  - **`git`.** Open Knowledge initializes a git repo for your project (used for the timeline and recovery features). On macOS it comes with the Xcode Command Line Tools (`xcode-select --install`); on Linux, install it from [git-scm.com](https://git-scm.com) or your package manager.
 </Callout>
 
 
@@ -21,7 +20,7 @@ npm install -g @inkeep/open-knowledge
 
 ## Set up a project
 
-Run `ok init` in any folder to turn it into an Open Knowledge project. It scaffolds a `.ok/` directory and registers the Open Knowledge MCP server with the AI editors it detects on your machine (Claude, Cursor, Codex).
+Run `ok init` in any folder to turn it into an Open Knowledge project. It scaffolds a `.ok/` directory and registers the Open Knowledge MCP server with the AI editors it detects on your machine (Claude Code, Cursor, Codex).
 
 ```bash
 cd my-project
@@ -59,7 +58,7 @@ Each project runs its own local server. These commands let you see and stop them
 | --- | --- |
 | `ok status` | Show whether a server and UI are running for the current project |
 | `ok ps` | List every running Open Knowledge server on your machine |
-| `ok stop` | Stop the server for the current directory (or pass a port, a path, pid or `all` to nuke all servers). |
+| `ok stop` | Stop the server for the current directory (or pass a port, a path, pid or `all` to stop all servers). |
 | `ok clean` | Remove stale lock files left behind by a crash (never touches live servers) |
 
 ## Commands that run for you

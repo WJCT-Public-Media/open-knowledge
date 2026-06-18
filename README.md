@@ -4,6 +4,23 @@ Open Knowledge is a local-first knowledge base for teams that want docs, help-ce
 
 The project includes a desktop app, web app, server, CLI, shared core packages, and docs site. It uses Bun workspaces and Turbo for builds.
 
+## Install
+
+**macOS:** download the desktop app — open the DMG, drag **Open Knowledge** to **Applications**, and launch it. [Latest release](https://github.com/inkeep/open-knowledge/releases/latest).
+
+**Linux or an Intel Mac:** run the same editor as a local web app via the CLI (Windows isn't supported yet) ([Node.js 24+](https://nodejs.org) required):
+
+```bash
+npm install -g @inkeep/open-knowledge
+cd your-project
+ok init          # scaffold the project + wire up Claude Code, Cursor, and Codex
+ok start --open  # serve the editor and open it in your browser
+```
+
+Full documentation: <https://openknowledge.ai/docs>.
+
+The sections below are for **contributing to** Open Knowledge.
+
 ## Repository Model
 
 This public repository is mirrored from Inkeep's internal monorepo with Copybara. The internal source path is `public/open-knowledge/` in `inkeep/agents-private`.

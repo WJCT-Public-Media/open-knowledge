@@ -19,7 +19,7 @@ From the editor, **Open with AI ▸ Cursor** dispatches the current file, folder
 
 Cursor uses a two-step handoff: Open Knowledge spawns `cursor <projectDir>` to open the workspace first, then fires the `cursor://` URL with a short prompt asking Cursor to open the target in Open Knowledge's web preview. The agent then grounds the rest of the conversation through MCP. See [Editor → Open with AI](/docs/features/editor#open-with-ai) for the full UX.
 
-Cursor's spawn step requires the local Electron app. The row is hidden in the web build, where there's no process-spawn API.
+In the web app, Cursor's spawn step runs through a local `POST /api/spawn-cursor` fallback, so the **Open with AI ▸ Cursor** row works there too — not just in the desktop app.
 
 ## Verify
 

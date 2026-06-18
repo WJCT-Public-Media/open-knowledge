@@ -2,9 +2,12 @@
 title: Quickstart
 description: Set up your agent-maintained knowledge base in less than five minutes.
 ---
+<Tabs groupId="ok-install" persist className="ok-flush-tabs" items={['macOS app', 'Web app (Linux · Intel Mac)']}>
+
+<Tab>
+
 <Callout type="info" title="Prerequisites">
-  - **macOS.** Windows and Linux are not yet supported. If you are using Linux or an Intel-based Mac, you can use the [CLI](/docs/reference/cli) instead.
-  - **Node.js ≥24.** Open Knowledge requires Node.js 24 or higher. Download from [nodejs.org](https://nodejs.org/en/download/).
+  - **macOS on Apple Silicon** (M1 or later).
   - **`git`.** Open Knowledge initializes a git repo for your project (used for the timeline and recovery features). Install from [git-scm.com](https://git-scm.com/install/mac).
 </Callout>
 
@@ -90,6 +93,93 @@ Right-click anywhere in the sidebar (empty space, a folder, or a file) to create
 </Step>
 
 </Steps>
+
+</Tab>
+
+<Tab>
+
+<Callout type="info" title="Prerequisites">
+  - **Node.js 24+.** Open Knowledge requires Node.js 24 or higher. Download from [nodejs.org](https://nodejs.org/en/download/).
+  - **`git`.** Open Knowledge initializes a git repo for your project (used for the timeline and recovery features). Install it from [git-scm.com](https://git-scm.com) or your package manager.
+</Callout>
+
+<Steps>
+
+<Step>
+
+### Install the CLI and open the editor
+
+Install the CLI from npm, initialize a project, and start the editor in your browser:
+
+```bash
+# Install the CLI (puts `ok` on your PATH)
+npm install -g @inkeep/open-knowledge
+
+# Create (or enter) a project folder, then initialize a knowledge base.
+# `ok init` scaffolds .ok/ and wires up Claude Code, Cursor, and Codex.
+mkdir my-knowledge-base && cd my-knowledge-base
+ok init
+
+# Serve the editor and open it in your browser.
+ok start --open
+```
+
+</Step>
+
+<Step>
+
+### Open the knowledge base in your AI agent
+
+`ok init` already registered Open Knowledge with the AI editors it detected, so your agent can use the Open Knowledge tools right away. Open your project in your agent — or, from the editor, click **Open with AI** and pick one.
+
+In the agent's chat window, add the following to get started or use a topic of your choice:
+
+<CopyPrompt>Create a knowledge base about Large Language Models. Include an overview page and separate pages for three key concepts.</CopyPrompt>
+
+<Callout type="info">
+  To avoid having to approve all Open Knowledge tool calls, set your agent to auto-mode, full-access, or an equivalent setting.
+</Callout>
+
+<Callout type="info">
+  If your agent prompts you to approve a new MCP server (Cursor does this), approve `open-knowledge`.
+</Callout>
+
+</Step>
+
+<Step>
+
+### Watch your agent work
+
+You will see your agent's icon in the top right of the editor window. Click on the icon to see the agent's [activity](/docs/features/agent-activity) across files in the knowledge base.
+
+If the agent icon is greyed out, your agent may not have started writing yet. Wait a few seconds and check again.
+
+</Step>
+
+<Step>
+
+### Explore the knowledge base
+
+The editor's sidebar shows every doc in your knowledge base. Each doc has:
+
+- A WYSIWYG body and a source-mode toggle
+- A frontmatter panel for properties
+
+When viewing a document, check out the right side pane for:
+- An outline of the document's structure
+- A list of incoming and outgoing links to other docs
+- A graph view of the document's links in the knowledge base
+- A [timeline](/docs/features/timeline-and-recovery) of recent edits with per-burst diffs and selective rollback
+
+Right-click anywhere in the sidebar (empty space, a folder, or a file) to create, reveal, rename, hide, delete, and **Open with AI**. The full feature tour is under [Features](/docs/features/editor).
+
+</Step>
+
+</Steps>
+
+</Tab>
+
+</Tabs>
 
 ## What's next
 
