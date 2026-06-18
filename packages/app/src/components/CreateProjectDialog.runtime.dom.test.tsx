@@ -180,9 +180,10 @@ describe('CreateProjectDialog runtime wiring', () => {
 
     await waitForLocationHydrate();
 
-    expect(screen.getByTestId('create-sharing')).not.toBeNull();
+    expect(screen.queryByTestId('create-sharing')).toBeNull();
     expect(screen.queryByTestId('create-editor-cursor')).toBeNull();
     fireEvent.click(screen.getByTestId('create-advanced-trigger'));
+    expect(screen.getByTestId('create-sharing')).not.toBeNull();
 
     for (const id of ALL_EDITOR_IDS) {
       const checkbox = screen.getByTestId(`create-editor-${id}`);
@@ -213,6 +214,28 @@ describe('CreateProjectDialog runtime wiring', () => {
       ]);
     });
     expect(stub.onOpenChange).toHaveBeenLastCalledWith(false);
+  });
+
+  test('reopening the dialog re-collapses Advanced so sharing is hidden again', async () => {
+    const stub = makeBridge();
+    const onOpenChange = mock(() => {});
+    const { rerender } = render(
+      <CreateProjectDialog open={true} onOpenChange={onOpenChange} bridge={stub.bridge} />,
+    );
+    await screen.findByTestId('create-project-dialog');
+    await waitForLocationHydrate();
+
+    fireEvent.click(screen.getByTestId('create-advanced-trigger'));
+    expect(screen.getByTestId('create-sharing')).not.toBeNull();
+
+    rerender(<CreateProjectDialog open={false} onOpenChange={onOpenChange} bridge={stub.bridge} />);
+    rerender(<CreateProjectDialog open={true} onOpenChange={onOpenChange} bridge={stub.bridge} />);
+    await screen.findByTestId('create-project-dialog');
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('create-sharing')).toBeNull();
+    });
+    expect(screen.getByTestId('create-advanced-trigger')).not.toBeNull();
   });
 
   test('Location hydrates from defaultProjectsRoot and Browse picks a fresh parent', async () => {
@@ -284,6 +307,7 @@ describe('CreateProjectDialog runtime wiring', () => {
     await typeProjectName(PROJECT_NAME);
     await waitForSubmitEnabled();
 
+    fireEvent.click(screen.getByTestId('create-advanced-trigger'));
     await userEvent.click(screen.getByTestId('create-sharing-local-only'));
 
     fireEvent.click(screen.getByTestId('create-submit'));
@@ -378,6 +402,7 @@ describe('CreateProjectDialog runtime wiring', () => {
     const stub = await renderDialog();
     await waitForLocationHydrate();
 
+    fireEvent.click(screen.getByTestId('create-advanced-trigger'));
     const info = screen.getByTestId('config-sharing-info') as HTMLButtonElement;
     expect(info.type).toBe('button');
 

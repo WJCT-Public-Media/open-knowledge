@@ -555,14 +555,6 @@ export function CreateProjectDialog({ open, onOpenChange, bridge }: CreateProjec
               onConfirmRemoveGit={onConfirmRemoveGit}
             />
 
-            <SharingModeField
-              idPrefix="create"
-              testIdPrefix="create-sharing"
-              value={sharing}
-              onValueChange={setSharing}
-              disabled={busy}
-            />
-
             <Collapsible
               open={advancedOpen}
               onOpenChange={setAdvancedOpen}
@@ -603,6 +595,14 @@ export function CreateProjectDialog({ open, onOpenChange, bridge }: CreateProjec
                     );
                   })}
                 </fieldset>
+
+                <SharingModeField
+                  idPrefix="create"
+                  testIdPrefix="create-sharing"
+                  value={sharing}
+                  onValueChange={setSharing}
+                  disabled={busy}
+                />
               </CollapsibleContent>
             </Collapsible>
 
