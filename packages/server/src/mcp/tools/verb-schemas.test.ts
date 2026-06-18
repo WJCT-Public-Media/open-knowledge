@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { FrontmatterArg } from './verb-schemas.ts';
+import { SUPPORTED_DOC_EXTENSIONS } from '../../doc-extensions.ts';
+import { DocExtensionArg, FrontmatterArg } from './verb-schemas.ts';
 
 describe('FrontmatterArg — recursive value contract (PRD-6947)', () => {
   test('flat scalar values still parse (regression guard for the pre-PRD-6947 contract)', () => {
@@ -63,5 +64,29 @@ describe('FrontmatterArg — recursive value contract (PRD-6947)', () => {
     const description = FrontmatterArg.description ?? '';
     expect(description).toContain('nested');
     expect(description).not.toContain('flat key→value');
+  });
+});
+
+describe('DocExtensionArg — explicit on-create file format', () => {
+  test('accepts every supported extension', () => {
+    for (const ext of SUPPORTED_DOC_EXTENSIONS) {
+      expect(DocExtensionArg.safeParse(ext).success).toBe(true);
+    }
+  });
+
+  test('rejects unsupported extensions', () => {
+    for (const bad of ['.markdown', '.txt', 'mdx', '.MDX', '']) {
+      expect(DocExtensionArg.safeParse(bad).success).toBe(false);
+    }
+  });
+
+  test('enum is single-sourced from SUPPORTED_DOC_EXTENSIONS (no drift)', () => {
+    expect(DocExtensionArg.options).toEqual([...SUPPORTED_DOC_EXTENSIONS]);
+  });
+
+  test('description names .mdx + default and is part of the agent-facing wire contract', () => {
+    const description = DocExtensionArg.description ?? '';
+    expect(description).toContain('.mdx');
+    expect(description).toContain('default');
   });
 });

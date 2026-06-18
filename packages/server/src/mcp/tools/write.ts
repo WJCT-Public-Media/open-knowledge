@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import {
+  type DocExtension,
   type FrontmatterMap,
   type FrontmatterPatch,
   normalizeBridge,
@@ -47,6 +48,7 @@ import {
   textResult,
 } from './shared.ts';
 import {
+  DocExtensionArg,
   exactlyOneTargetError,
   FrontmatterArg,
   PositionArg,
@@ -85,6 +87,7 @@ interface DocSpec {
   frontmatter?: FrontmatterPatch;
   position?: string;
   summary?: string;
+  extension?: DocExtension;
 }
 
 type WriteApiResult = Awaited<ReturnType<typeof httpPost>>;
@@ -194,7 +197,7 @@ async function writeOneDoc(
 
   const existingExt = docExtensionOnDisk(contentDir, docName);
   const docExists = existingExt !== null;
-  const requestedExt = requestedDocExtension(spec.path);
+  const requestedExt = spec.extension ?? requestedDocExtension(spec.path);
 
   let effectivePosition: string;
   if (spec.position !== undefined) {
@@ -592,12 +595,15 @@ export function register(server: ServerInstance, deps: WriteDeps): void {
     path: z
       .string()
       .describe(
-        'Document path, no extension. The slashes are the folder it lands in; missing parent folders are created. Example: "meetings/2026-06-03-standup".',
+        'Document path. The slashes are the folder it lands in; missing parent folders are created. ' +
+          'Example: "meetings/2026-06-03-standup". An optional `.md`/`.mdx` suffix selects the file format ' +
+          '(default `.md`); prefer the `extension` field for that. The docName itself is always extension-less.',
       ),
     content: z
       .string()
       .optional()
       .describe('The full Markdown body. Mutually exclusive with `template`.'),
+    extension: DocExtensionArg.optional(),
     template: z
       .string()
       .min(1)

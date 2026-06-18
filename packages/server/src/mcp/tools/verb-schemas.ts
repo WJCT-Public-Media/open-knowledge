@@ -1,5 +1,6 @@
 import { FrontmatterValueSchema } from '@inkeep/open-knowledge-core';
 import { z } from 'zod';
+import { SUPPORTED_DOC_EXTENSIONS } from '../../doc-extensions.ts';
 
 const FrontmatterPatchValue = z.union([FrontmatterValueSchema, z.null()]);
 
@@ -19,6 +20,14 @@ export const PositionArg = z
   .describe(
     'Where content lands. replace = overwrite the whole body (default for a new doc; required for an existing doc). ' +
       'append / prepend = add to the end / start.',
+  );
+
+export const DocExtensionArg = z
+  .enum(SUPPORTED_DOC_EXTENSIONS)
+  .describe(
+    'File format for a NEW doc: `.md` (default) or `.mdx` (Markdown + JSX components). ' +
+      'Honored only on create — an existing doc keeps its on-disk extension. ' +
+      'Takes precedence over an extension typed into `path`.',
   );
 
 export function splitTargetPath(path: string): { folder: string; name: string } {

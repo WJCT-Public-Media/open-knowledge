@@ -1,9 +1,13 @@
 import { extname } from 'node:path';
+import {
+  DEFAULT_DOC_EXTENSION,
+  type DocExtension,
+  SUPPORTED_DOC_EXTENSIONS,
+} from '@inkeep/open-knowledge-core';
 
-export const SUPPORTED_DOC_EXTENSIONS = ['.mdx', '.md'] as const;
-type DocExtension = (typeof SUPPORTED_DOC_EXTENSIONS)[number];
+export { SUPPORTED_DOC_EXTENSIONS };
 
-const DEFAULT_EXTENSION: DocExtension = '.md';
+const DEFAULT_EXTENSION: DocExtension = DEFAULT_DOC_EXTENSION;
 
 export function isSupportedDocFile(path: string): boolean {
   const ext = extname(path).toLowerCase();

@@ -5,6 +5,7 @@ import {
   ShareConstructUrlResponseSchema,
 } from '@inkeep/open-knowledge-core';
 import { z } from 'zod';
+import { SUPPORTED_DOC_EXTENSIONS } from '../../doc-extensions.ts';
 import { resolveWithinRoot } from './path-safety.ts';
 import { encodeDocName, resolvePreviewUrlForTool } from './preview-url.ts';
 import type { ConfigOrResolver, ServerInstance, ServerUrlOrResolver } from './shared.ts';
@@ -94,7 +95,7 @@ function isExistingDirectory(abs: string): boolean {
 }
 
 function resolveExistingDocPath(projectDir: string, absBase: string): string | null {
-  for (const ext of ['.mdx', '.md'] as const) {
+  for (const ext of SUPPORTED_DOC_EXTENSIONS) {
     const absWithExt = `${absBase}${ext}`;
     if (existsSync(absWithExt)) {
       const projectContained = resolveWithinRoot(projectDir, absWithExt);

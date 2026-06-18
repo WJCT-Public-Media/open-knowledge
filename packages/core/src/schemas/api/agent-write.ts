@@ -1,5 +1,6 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { z } from 'zod';
+import { SUPPORTED_DOC_EXTENSIONS } from '../../constants/doc-extensions.ts';
 
 import { FRONTMATTER_TYPES, FrontmatterValueSchema } from '../../frontmatter/schema.ts';
 import { agentIdentityFields, safeDocNameField, summaryField } from './_shared.ts';
@@ -20,7 +21,7 @@ export const AgentWriteMdRequestSchema = z
     summary: summaryField,
     markdown: z.string(),
     position: z.enum(['append', 'prepend', 'replace']).optional(),
-    extension: z.enum(['.md', '.mdx']).optional(),
+    extension: z.enum(SUPPORTED_DOC_EXTENSIONS).optional(),
     ...agentIdentityFields,
   })
   .loose() satisfies StandardSchemaV1;
