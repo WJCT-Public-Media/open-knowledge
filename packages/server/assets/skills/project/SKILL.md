@@ -21,6 +21,7 @@ Open Knowledge (OK) is a markdown-CRDT collaboration platform exposed via MCP. T
 2. **Writes:** `write({ document: { path, content } })` for a new or full-replace doc; `edit({ document: { path, find, replace } })` for a body find/replace; `edit({ document: { path, frontmatter } })` for a frontmatter merge-patch (`null` deletes a key). `delete({ document })` removes, `move({ from, to })` moves/renames. Body find/replace is body-only — frontmatter goes through the `frontmatter` patch. Pass a one-line `summary` (≤80 chars, user-facing outcome) on every content write — it's the timeline change-note (see §Writing).
 3. **Preview:** every OK read/write response carries a route-only `previewUrl` (`/#/<doc>`, no host:port). If you have a `preview_*` tool, call `preview_start("open-knowledge-ui")`; if you have an in-app browser, call `preview_url` once for the full browser URL and navigate to it; on the Claude Code CLI (no browser tool), run `ok open <doc>` to open it in the OK Desktop app. Surface to the user on a `start-ui` warning (no UI running). Don't `preview_screenshot` to confirm edits — the CRDT tool response is the confirmation.
 4. **Workflow guides** — `workflow({ kind: 'ingest' | 'research' | 'consolidate' | 'discover' })` returns a procedural guide, not data. Use it when the work fits the layer; follow the numbered steps.
+5. **Direct questions:** a plain business question ("which customers…", "can we use…", "what did we decide about…") routes to `search` / `exec` + a cited answer — no "research" or "report" keyword needed. Persist the answer as a page only when it is durable, spans multiple docs, and isn't already covered — *offer* first, never auto-create. See §Answering direct questions from the corpus.
 
 Everything below is depth. Read on demand.
 
@@ -66,6 +67,21 @@ Why: native tools skip frontmatter, backlinks, shadow-repo activity, and project
 - List a directory: `exec("ls -A <dir>")` — per-child frontmatter, recursive markdown counts, most-recently-updated doc per subdir, the folder's own `title`/`description`/`tags` + `templates_available`. Prefer `-A` over plain `ls` to surface dot-prefixed entries (`.ok/`, `.okignore`) without the noisy `.`/`..` rows that `-a` adds.
 - Literal search: `exec("grep -rn <term> <dir> | head -5")` — matches + enrichment on matched files.
 - Ranked search: `search({ query })` — cmd-K parity (title boost + body BM25 + recency); use when picking the best doc, not when listing every occurrence.
+
+## Answering direct questions from the corpus
+
+A direct question you can answer from existing documents — "which customers have non-standard indemnity?", "can we use Alloy's logo?", "what did we decide about X?" — does **not** need the words "research" or "report" to route here. Retrieve with `search` / `exec`, read the relevant docs, and **answer in chat with inline citations to the source docs you used**. That is the complete, correct default — most questions end here. This is NOT `workflow({ kind: 'research' })`: research gathers and synthesizes *external* sources behind a scoping gate; a corpus question just reads what the knowledge base already holds. (Inside an active `workflow({ kind: 'research' })` session, research's own "file valuable Q&A back" step governs how answers are persisted — not this section.)
+
+**Offer to persist the answer only when it is durable knowledge the KB is currently missing** — when ALL of these hold:
+
+- it **synthesizes across multiple docs** or surfaces a non-obvious fact a reader couldn't get from a single doc in one read — two docs that independently state the *same* fact are NOT synthesis; synthesis means combining information no single source holds in isolation;
+- it's **reusable** — likely to be asked again, or it records a decision / reference others will need;
+- **no existing doc already answers it** — scan first (`search`, `exec("grep …")`); if one does, point the user to it instead of writing a near-duplicate;
+- the answer is **sourced** per §Grounding, not speculation.
+
+When all hold, *offer* — don't write yet: "This pulls together [N docs] — want me to save it as `<slug>.md` under `<folder>` so it's findable next time?" On a yes, `write` it with frontmatter + inline citations to the source docs (§Grounding, §Linking). **Never auto-create the page.** A single-doc lookup, a navigational question, or anything you'd hesitate to call durable does NOT warrant an offer — answer in chat and stop; don't even prompt to save it. When in doubt, stay in chat: a missing page costs one re-query; a junk page pollutes the corpus permanently.
+
+**Headless / no user to ask** (autonomous run): still produce the answer — surface it with inline citations in the tool / run output as you would in chat, so the run log is the record. Default to NOT persisting unless the four criteria are unambiguously met; never persist on a maybe.
 
 ## Preview — open the browser at session start
 
@@ -422,6 +438,7 @@ The skill carries the trigger ("KB content changed this turn — go look"). The 
 | Find every literal occurrence of a phrase       | `Grep: "pattern" *.md`                                                             | `exec("grep -rn pattern <dir>")` (literal, grouped by file, with frontmatter)     |
 | Read an individual doc                          | `Read: specs/foo/SPEC.md`                                                          | `exec("cat specs/foo/SPEC.md")`                                                   |
 | Explore a markdown-heavy dir                    | `Agent(Explore): "..."`                                                            | Do `exec`-based exploration yourself                                              |
+| Answer a direct business question from the corpus | answer in chat and move on (it evaporates), OR save every answer as a new doc      | answer with citations; *offer* to persist only when durable + multi-doc + not already covered (§Answering direct questions) |
 | Wait for the server to tell you to open preview | Skip the session-start preview open and wait for the `attach-preview-once` hint    | Open the preview browser at session start; the hint is a fallback when you didn't |
 | Ignore the attach hint                          | Skip the `warning: { action: "attach-preview-once" }` hint in write-tool responses | Open the preview when the hint fires (`preview_start`, or `preview_url`); otherwise do nothing |
 | Make the Claude Code Desktop preview work       | Read / diagnose / edit `.claude/launch.json` (host-managed config)                 | Call `preview_start("open-knowledge-ui")` and nothing else; the OK lock-collision proxy bridges any port mismatch transparently |
