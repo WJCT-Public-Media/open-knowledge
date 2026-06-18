@@ -9,6 +9,7 @@ import {
   REQUIRED_FIXTURE_ENTRY_NAMES,
   test,
   type WorkerServer,
+  waitForActiveProviderSynced,
 } from './_helpers';
 
 function testId(): string {
@@ -689,12 +690,14 @@ test.describe('Editor tabs', () => {
 
     await page.goto(`/#/${barDoc}`);
     await expect(editorTabButtons(page, barLabel)).toHaveCount(1, { timeout: 10_000 });
+    await waitForActiveProviderSynced(page);
 
     await editorNewTabButton(page).click();
     await expect(closeNewTabButtons(page)).toHaveCount(1, { timeout: 10_000 });
     await sidebarTreeItem(page, `hello-${id}.mdx`).click();
     await expect(editorTabButtons(page, helloLabel)).toHaveCount(1, { timeout: 10_000 });
     await expectActiveTab(editorTabButtons(page, helloLabel).first());
+    await waitForActiveProviderSynced(page);
 
     await sidebarTreeItem(page, `bar-${id}.mdx`).click();
 

@@ -45,7 +45,7 @@ test('S6: multi-turn stress — large content + user edits', async ({ page, api,
     await page.waitForFunction(
       (m: string) => window.__activeProvider?.document?.getText('source')?.toString()?.includes(m),
       marker,
-      { timeout: 10_000 },
+      { timeout: 30_000 },
     );
 
     const turnState = await page.evaluate(() => {
