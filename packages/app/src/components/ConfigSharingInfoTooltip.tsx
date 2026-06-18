@@ -20,8 +20,8 @@ export function ConfigSharingInfoTooltip() {
               Setup files include: <code>.ok/</code>, AI-tool MCP configs (<code>.mcp.json</code>{' '}
               and per-tool files), project skills, and <code>.claude/launch.json</code>.
               <br />
-              <strong className="font-semibold">Share with my team</strong> commits them to git, so
-              anyone who clones the repo gets the same setup. <br />
+              <strong className="font-semibold">Shared</strong> commits them to git, so anyone who
+              clones the repo gets the same setup. <br />
               <strong className="font-semibold">Local only</strong> keeps them out of git (via{' '}
               <code>.git/info/exclude</code>).
             </Trans>

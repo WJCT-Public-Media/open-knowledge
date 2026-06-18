@@ -954,11 +954,6 @@ msgstr ""
 msgid "Choose whether this project's Open Knowledge setup, including its AI-tool connections, is saved with the project so teammates get it too, or kept only on your computer."
 msgstr ""
 
-#: src/components/ConsentDialogBody.tsx
-#: src/components/CreateProjectDialog.tsx
-msgid "Choose whether this project's Open Knowledge setup, including its AI-tool connections, is saved with the project so teammates get it too, or kept only on your computer. You can change this anytime in Settings."
-msgstr ""
-
 #: src/components/handoff/OpenInAgentContextSubmenu.tsx
 #: src/components/handoff/OpenInAgentEmptySpaceSubmenu.tsx
 #: src/components/handoff/OpenInAgentMenu.tsx
@@ -3175,10 +3170,9 @@ msgstr ""
 msgid "Local collaboration data for \"{docName}\" could not be cleared. Reload to retry."
 msgstr ""
 
-#: src/components/ConsentDialogBody.tsx
-#: src/components/CreateProjectDialog.tsx
 #: src/components/settings/SharingSection.tsx
-msgid "Local only on this machine"
+#: src/components/SharingModeField.tsx
+msgid "Local only"
 msgstr ""
 
 #: src/components/CloneDialog.tsx
@@ -4569,10 +4563,6 @@ msgstr ""
 msgid "Requires {brand}."
 msgstr ""
 
-#: src/components/ConsentDialogBody.tsx
-msgid "Requires a git repository — pick a different folder or enable git init."
-msgstr ""
-
 #: src/components/settings/SettingsDialogBody.tsx
 msgid "Reset {labelText} to default"
 msgstr ""
@@ -4736,10 +4726,9 @@ msgstr ""
 msgid "Saved as <0>{slug}.md</0>"
 msgstr ""
 
-#: src/components/ConsentDialogBody.tsx
-#: src/components/CreateProjectDialog.tsx
 #: src/components/settings/SharingSection.tsx
-msgid "Saved with the project so everyone who opens it gets the same setup (default)."
+#: src/components/SharingModeField.tsx
+msgid "Saved with the project for your team."
 msgstr ""
 
 #: src/components/InstallInClaudeDesktopDialog.tsx
@@ -4973,7 +4962,7 @@ msgid "Settings sections"
 msgstr ""
 
 #: src/components/ConfigSharingInfoTooltip.tsx
-msgid "Setup files include: <0>.ok/</0>, AI-tool MCP configs (<1>.mcp.json</1> and per-tool files), project skills, and <2>.claude/launch.json</2>.<3/><4>Share with my team</4> commits them to git, so anyone who clones the repo gets the same setup. <5/><6>Local only</6> keeps them out of git (via <7>.git/info/exclude</7>)."
+msgid "Setup files include: <0>.ok/</0>, AI-tool MCP configs (<1>.mcp.json</1> and per-tool files), project skills, and <2>.claude/launch.json</2>.<3/><4>Shared</4> commits them to git, so anyone who clones the repo gets the same setup. <5/><6>Local only</6> keeps them out of git (via <7>.git/info/exclude</7>)."
 msgstr ""
 
 #: src/components/ShareButton.tsx
@@ -4988,8 +4977,7 @@ msgstr ""
 msgid "Share folder"
 msgstr ""
 
-#: src/components/ConsentDialogBody.tsx
-#: src/components/CreateProjectDialog.tsx
+#: src/components/SharingModeField.tsx
 msgid "Share this setup with your team?"
 msgstr ""
 
@@ -4998,10 +4986,9 @@ msgstr ""
 msgid "Share URL"
 msgstr ""
 
-#: src/components/ConsentDialogBody.tsx
-#: src/components/CreateProjectDialog.tsx
 #: src/components/settings/SharingSection.tsx
-msgid "Share with my team"
+#: src/components/SharingModeField.tsx
+msgid "Shared"
 msgstr ""
 
 #: src/components/AutoSyncEnableWarning.tsx
@@ -5237,10 +5224,9 @@ msgstr ""
 msgid "Starting sign-in flow"
 msgstr ""
 
-#: src/components/ConsentDialogBody.tsx
-#: src/components/CreateProjectDialog.tsx
 #: src/components/settings/SharingSection.tsx
-msgid "Stays on this computer only. Teammates won't get this setup."
+#: src/components/SharingModeField.tsx
+msgid "Stays on this computer."
 msgstr ""
 
 #: src/components/MountStalledAffordance.tsx

@@ -7,7 +7,7 @@ import { ChevronRight } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useId, useState } from 'react';
 import { toast as sonnerToast } from 'sonner';
-import { ConfigSharingInfoTooltip } from '@/components/ConfigSharingInfoTooltip';
+import { SharingModeField } from '@/components/SharingModeField';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -21,7 +21,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { type ConsentStore, consentStore as defaultConsentStore } from '@/lib/consent-store';
 import type {
@@ -84,7 +83,6 @@ function ConsentDialogForm({ payload, store, toast }: ConsentDialogFormProps) {
     () => new Set(payload.editorOptions.map((e) => e.id)),
   );
   const [sharing, setSharing] = useState<'shared' | 'local-only'>('shared');
-  const sharingDisabled = !initGit && payload.gitState === 'absent';
   const [probe, setProbe] = useState<OkOnboardingProbeContentResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [browseError, setBrowseError] = useState<string | null>(null);
@@ -232,6 +230,14 @@ function ConsentDialogForm({ payload, store, toast }: ConsentDialogFormProps) {
           <form id={formId} onSubmit={onSubmit} data-testid="consent-form" className="space-y-6">
             {contentDirSafe ? <ProbePreview probe={probe} /> : null}
 
+            <SharingModeField
+              idPrefix={formId}
+              testIdPrefix="consent-sharing"
+              value={sharing}
+              onValueChange={setSharing}
+              disabled={busy}
+            />
+
             <Collapsible
               open={advancedExpanded}
               onOpenChange={setAdvancedOpen}
@@ -365,78 +371,6 @@ function ConsentDialogForm({ payload, store, toast }: ConsentDialogFormProps) {
                       </label>
                     );
                   })}
-                </fieldset>
-
-                <fieldset className="flex flex-col space-y-2 pb-2" data-testid="consent-sharing">
-                  <legend className="flex items-center gap-1.5 text-sm font-medium">
-                    <Trans>Share this setup with your team?</Trans>
-                    <ConfigSharingInfoTooltip />
-                  </legend>
-                  <p className="text-1sm text-muted-foreground">
-                    <Trans>
-                      Choose whether this project's Open Knowledge setup, including its AI-tool
-                      connections, is saved with the project so teammates get it too, or kept only
-                      on your computer. You can change this anytime in Settings.
-                    </Trans>
-                  </p>
-                  <RadioGroup
-                    value={sharing}
-                    onValueChange={(v) => setSharing(v as 'shared' | 'local-only')}
-                    disabled={busy}
-                    className="gap-2"
-                  >
-                    <label
-                      htmlFor={`${formId}-sharing-shared`}
-                      className="flex items-start gap-2 text-sm"
-                    >
-                      <RadioGroupItem
-                        id={`${formId}-sharing-shared`}
-                        value="shared"
-                        data-testid="consent-sharing-shared"
-                        className="mt-1"
-                      />
-                      <span>
-                        <span className="font-medium">
-                          <Trans>Share with my team</Trans>
-                        </span>
-                        <span className="block text-1sm text-muted-foreground">
-                          <Trans>
-                            Saved with the project so everyone who opens it gets the same setup
-                            (default).
-                          </Trans>
-                        </span>
-                      </span>
-                    </label>
-                    <label
-                      htmlFor={`${formId}-sharing-local-only`}
-                      className="flex items-start gap-2 text-sm"
-                    >
-                      <RadioGroupItem
-                        id={`${formId}-sharing-local-only`}
-                        value="local-only"
-                        disabled={sharingDisabled}
-                        data-testid="consent-sharing-local-only"
-                        className="mt-1"
-                      />
-                      <span>
-                        <span className="font-medium">
-                          <Trans>Local only on this machine</Trans>
-                        </span>
-                        <span className="block text-1sm text-muted-foreground">
-                          {sharingDisabled ? (
-                            <Trans>
-                              Requires a git repository — pick a different folder or enable git
-                              init.
-                            </Trans>
-                          ) : (
-                            <Trans>
-                              Stays on this computer only. Teammates won't get this setup.
-                            </Trans>
-                          )}
-                        </span>
-                      </span>
-                    </label>
-                  </RadioGroup>
                 </fieldset>
               </CollapsibleContent>
             </Collapsible>

@@ -157,12 +157,10 @@ function SharingSectionBody() {
             />
             <span>
               <span className="font-medium">
-                <Trans>Share with my team</Trans>
+                <Trans>Shared</Trans>
               </span>
               <span className="block text-1sm text-muted-foreground">
-                <Trans>
-                  Saved with the project so everyone who opens it gets the same setup (default).
-                </Trans>
+                <Trans>Saved with the project for your team.</Trans>
               </span>
             </span>
           </label>
@@ -175,10 +173,10 @@ function SharingSectionBody() {
             />
             <span>
               <span className="font-medium">
-                <Trans>Local only on this machine</Trans>
+                <Trans>Local only</Trans>
               </span>
               <span className="block text-1sm text-muted-foreground">
-                <Trans>Stays on this computer only. Teammates won't get this setup.</Trans>
+                <Trans>Stays on this computer.</Trans>
               </span>
             </span>
           </label>

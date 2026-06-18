@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { ALL_EDITOR_IDS, EDITOR_LABELS } from '@inkeep/open-knowledge-core';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 const toastErrorSpy = mock((_message: string) => {});
 mock.module('sonner', () => ({
@@ -52,6 +53,7 @@ function makeBridge() {
     parent: string;
     name: string;
     editors: OkMcpWiringEditorId[];
+    sharing: 'shared' | 'local-only';
   }> = [];
 
   const bridge = {
@@ -77,7 +79,12 @@ function makeBridge() {
         return Promise.resolve();
       }),
       createNew: mock(
-        (payload: { parent: string; name: string; editors: OkMcpWiringEditorId[] }) => {
+        (payload: {
+          parent: string;
+          name: string;
+          editors: OkMcpWiringEditorId[];
+          sharing: 'shared' | 'local-only';
+        }) => {
           createNewCalls.push(payload);
           return Promise.resolve();
         },
@@ -149,6 +156,7 @@ describe('CreateProjectDialog runtime wiring', () => {
     expect(submit.getAttribute('form')).toBe(form.id);
     expect(browse.type).toBe('button');
 
+    expect(screen.getByTestId('create-sharing')).not.toBeNull();
     expect(screen.queryByTestId('create-editor-cursor')).toBeNull();
     fireEvent.click(screen.getByTestId('create-advanced-trigger'));
 
@@ -198,10 +206,25 @@ describe('CreateProjectDialog runtime wiring', () => {
     expect(stub.onOpenChange).not.toHaveBeenCalled();
   });
 
+  test('selecting Local only carries through to the createNew payload', async () => {
+    const stub = await renderDialog();
+
+    await browseAndWaitForTarget();
+    await waitForSubmitEnabled();
+
+    await userEvent.click(screen.getByTestId('create-sharing-local-only'));
+
+    fireEvent.click(screen.getByTestId('create-submit'));
+
+    await waitFor(() => {
+      expect(stub.createNewCalls).toHaveLength(1);
+    });
+    expect(stub.createNewCalls[0]?.sharing).toBe('local-only');
+  });
+
   test('clicking the config-sharing info tooltip does not submit the form', async () => {
     const stub = await renderDialog();
 
-    fireEvent.click(screen.getByTestId('create-advanced-trigger'));
     const info = screen.getByTestId('config-sharing-info') as HTMLButtonElement;
     expect(info.type).toBe('button');
 

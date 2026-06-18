@@ -86,13 +86,32 @@ describe('ConsentDialogBody runtime form behavior', () => {
 
     expect(screen.queryByTestId('consent-content-dir')).toBeNull();
     expect(screen.queryByTestId('consent-additional-ignores')).toBeNull();
-    expect(screen.queryByTestId('consent-sharing')).toBeNull();
 
     await expandAdvanced();
 
     expect(screen.getByTestId('consent-content-dir')).not.toBeNull();
     expect(screen.getByTestId('consent-additional-ignores')).not.toBeNull();
+  });
+
+  test('config sharing is shown at the top level, not inside Advanced settings', async () => {
+    renderConsentDialog();
+
     expect(screen.getByTestId('consent-sharing')).not.toBeNull();
+    expect(screen.getByTestId('consent-sharing-shared')).not.toBeNull();
+    expect(screen.getByTestId('consent-sharing-local-only')).not.toBeNull();
+    expect(screen.queryByTestId('consent-content-dir')).toBeNull();
+  });
+
+  test('selecting Local only carries through to the confirm payload', async () => {
+    const { confirmCalls } = renderConsentDialog();
+
+    await userEvent.click(screen.getByTestId('consent-sharing-local-only'));
+
+    fireEvent.submit(screen.getByTestId('consent-form') as HTMLFormElement);
+    await waitFor(() => {
+      expect(confirmCalls).toHaveLength(1);
+    });
+    expect(confirmCalls[0]?.sharing).toBe('local-only');
   });
 
   test('an invalid default content dir force-opens Advanced settings and shows the error without expanding', () => {

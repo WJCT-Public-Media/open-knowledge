@@ -12,7 +12,7 @@ import { Trans, useLingui } from '@lingui/react/macro';
 import { ChevronRight } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { ConfigSharingInfoTooltip } from '@/components/ConfigSharingInfoTooltip';
+import { SharingModeField } from '@/components/SharingModeField';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -27,7 +27,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import type {
   OkDesktopBridge,
   OkFindEnclosingGitRootResult,
@@ -595,6 +594,14 @@ export function CreateProjectDialog({ open, onOpenChange, bridge }: CreateProjec
               onConfirmRemoveGit={onConfirmRemoveGit}
             />
 
+            <SharingModeField
+              idPrefix="create"
+              testIdPrefix="create-sharing"
+              value={sharing}
+              onValueChange={setSharing}
+              disabled={busy}
+            />
+
             <Collapsible
               open={advancedOpen}
               onOpenChange={setAdvancedOpen}
@@ -634,70 +641,6 @@ export function CreateProjectDialog({ open, onOpenChange, bridge }: CreateProjec
                       </Label>
                     );
                   })}
-                </fieldset>
-
-                <fieldset className="flex flex-col space-y-2 pb-2" data-testid="create-sharing">
-                  <legend className="flex items-center gap-1.5 text-sm font-medium">
-                    <Trans>Share this setup with your team?</Trans>
-                    <ConfigSharingInfoTooltip />
-                  </legend>
-                  <p className="text-1sm text-muted-foreground">
-                    <Trans>
-                      Choose whether this project's Open Knowledge setup, including its AI-tool
-                      connections, is saved with the project so teammates get it too, or kept only
-                      on your computer. You can change this anytime in Settings.
-                    </Trans>
-                  </p>
-                  <RadioGroup
-                    value={sharing}
-                    onValueChange={(v) => setSharing(v as 'shared' | 'local-only')}
-                    disabled={busy}
-                    className="gap-2"
-                  >
-                    <Label
-                      htmlFor="create-sharing-shared"
-                      className="flex items-start gap-2 text-sm font-normal"
-                    >
-                      <RadioGroupItem
-                        id="create-sharing-shared"
-                        value="shared"
-                        data-testid="create-sharing-shared"
-                        className="mt-1"
-                      />
-                      <span>
-                        <span className="font-medium">
-                          <Trans>Share with my team</Trans>
-                        </span>
-                        <span className="block text-1sm text-muted-foreground">
-                          <Trans>
-                            Saved with the project so everyone who opens it gets the same setup
-                            (default).
-                          </Trans>
-                        </span>
-                      </span>
-                    </Label>
-                    <Label
-                      htmlFor="create-sharing-local-only"
-                      className="flex items-start gap-2 text-sm font-normal"
-                    >
-                      <RadioGroupItem
-                        id="create-sharing-local-only"
-                        value="local-only"
-                        data-testid="create-sharing-local-only"
-                        className="mt-1"
-                      />
-                      <span>
-                        <span className="font-medium">
-                          <Trans>Local only on this machine</Trans>
-                        </span>
-                        <span className="block text-1sm text-muted-foreground">
-                          <Trans>
-                            Stays on this computer only. Teammates won't get this setup.
-                          </Trans>
-                        </span>
-                      </span>
-                    </Label>
-                  </RadioGroup>
                 </fieldset>
               </CollapsibleContent>
             </Collapsible>
