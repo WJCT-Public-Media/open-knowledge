@@ -1,3 +1,4 @@
+
 import type { HandoffOutcome, HandoffTarget, InstallState } from '@inkeep/open-knowledge-core';
 import { t } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
