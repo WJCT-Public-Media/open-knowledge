@@ -19,6 +19,7 @@ mock.module('@lingui/react/macro', () => ({
 let activeDocName: string | null = 'docs/notes';
 let activeTarget: unknown = { kind: 'doc' };
 let sidebarState: 'expanded' | 'collapsed' = 'expanded';
+let isDraggingRail = false;
 let workspace: { contentDir: string; pathSeparator: string } | null = {
   contentDir: '/tmp/project',
   pathSeparator: '/',
@@ -34,7 +35,7 @@ mock.module('@/lib/use-workspace', () => ({
 }));
 
 mock.module('@/components/ui/sidebar', () => ({
-  useSidebar: () => ({ state: sidebarState }),
+  useSidebar: () => ({ state: sidebarState, isDraggingRail }),
   SidebarTrigger: ({ className }: { className?: string }) => (
     <button type="button" data-testid="sidebar-trigger" className={className}>
       sidebar
@@ -107,6 +108,7 @@ describe('EditorHeader runtime behavior', () => {
     activeDocName = 'docs/notes';
     activeTarget = { kind: 'doc' };
     sidebarState = 'expanded';
+    isDraggingRail = false;
     workspace = { contentDir: '/tmp/project', pathSeparator: '/' };
     latestHandoffInput = undefined;
   });
@@ -129,7 +131,10 @@ describe('EditorHeader runtime behavior', () => {
       'items-center',
       'shadow-[inset_0_-1px_0_var(--border)]',
     ]);
-    expectVisualClassTokensAbsent(header.className, ['[-webkit-app-region:drag]', 'pl-[78px]']);
+    expectVisualClassTokensAbsent(header.className, [
+      '[-webkit-app-region:drag]',
+      'pl-[var(--ok-titlebar-reserve-left,1rem)]',
+    ]);
     expectVisualClassTokensAbsent(screen.getByTestId('sidebar-trigger').className, [
       '[-webkit-app-region:no-drag]',
     ]);
@@ -143,7 +148,7 @@ describe('EditorHeader runtime behavior', () => {
     expect(header.getAttribute('data-electron-drag')).toBe('');
     expectVisualClassTokens(header.className, [
       '[-webkit-app-region:drag]',
-      'pl-[78px]',
+      'pl-[var(--ok-titlebar-reserve-left,1rem)]',
       'motion-safe:transition-[padding]',
     ]);
     expectVisualClassTokens(screen.getByTestId('sidebar-trigger').className, [
@@ -159,7 +164,17 @@ describe('EditorHeader runtime behavior', () => {
     const header = await renderHeader();
 
     expectVisualClassTokens(header.className, ['[-webkit-app-region:drag]']);
-    expectVisualClassTokensAbsent(header.className, ['pl-[78px]']);
+    expectVisualClassTokensAbsent(header.className, ['pl-[var(--ok-titlebar-reserve-left,1rem)]']);
+  });
+
+  test('rail drag keeps the reserve but drops the padding transition so it snaps with the sidebar', async () => {
+    setElectronHost(true);
+    sidebarState = 'collapsed';
+    isDraggingRail = true;
+    const header = await renderHeader();
+
+    expectVisualClassTokens(header.className, ['pl-[var(--ok-titlebar-reserve-left,1rem)]']);
+    expectVisualClassTokensAbsent(header.className, ['motion-safe:transition-[padding]']);
   });
 
   test('renders tabs and action cluster without project or asset-title chrome', async () => {

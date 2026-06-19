@@ -50,7 +50,7 @@ export function EditorHeader({
 }: EditorHeaderProps) {
   const { t } = useLingui();
   const { activeDocName, activeTarget } = useDocumentContext();
-  const { state: sidebarState } = useSidebar();
+  const { state: sidebarState, isDraggingRail } = useSidebar();
   const singleFile = useSingleFileMode();
   const sidebarShortcut = formatShortcut('toggle-files-sidebar');
   const searchShortcut = formatShortcut('command-palette');
@@ -90,8 +90,9 @@ export function EditorHeader({
       className={cn(
         'flex h-12 shrink-0 items-center bg-muted/35 shadow-[inset_0_-1px_0_var(--border)]',
         isElectronHost && '[-webkit-app-region:drag]',
-        isElectronHost && isCollapsed && 'pl-[78px]',
+        isElectronHost && isCollapsed && 'pl-[var(--ok-titlebar-reserve-left,1rem)]',
         isElectronHost &&
+          !isDraggingRail &&
           'motion-safe:transition-[padding] motion-safe:duration-200 motion-safe:ease-linear',
       )}
     >

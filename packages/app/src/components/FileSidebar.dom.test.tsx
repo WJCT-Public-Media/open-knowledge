@@ -427,8 +427,12 @@ describe('FileSidebar runtime behavior', () => {
     const header = screen.getByTestId('sidebar-header');
     expect(screen.getByText('Files')).toBeTruthy();
     expectVisualClassTokens(header.className, ['justify-between']);
-    expectVisualClassTokensAbsent(header.className, ['[-webkit-app-region:drag]']);
+    expectVisualClassTokensAbsent(header.className, [
+      '[-webkit-app-region:drag]',
+      'overflow-x-clip',
+    ]);
     expect(header.getAttribute('data-electron-drag')).toBeNull();
+    expect(screen.queryByTestId('sidebar-traffic-light-reserve')).toBeNull();
     expect(screen.queryByText('Project switcher')).toBeNull();
 
     fireEvent.click(screen.getByTestId('sidebar-search'));
@@ -440,13 +444,23 @@ describe('FileSidebar runtime behavior', () => {
     await renderSidebar();
 
     const header = screen.getByTestId('sidebar-header');
-    const toolbar = header.querySelector('div') as HTMLElement;
+    const toolbar = screen.getByTestId('sidebar-toolbar');
     const pillRow = screen.getByTestId('sidebar-search').parentElement as HTMLElement;
 
     expect(screen.queryByText('Files')).toBeNull();
     expect(screen.getByText('Project switcher')).toBeTruthy();
     expect(header.getAttribute('data-electron-drag')).toBe('');
-    expectVisualClassTokens(header.className, ['justify-end', '[-webkit-app-region:drag]']);
+    expectVisualClassTokens(header.className, [
+      'justify-between',
+      'overflow-x-clip',
+      '[-webkit-app-region:drag]',
+    ]);
+    const reserve = screen.getByTestId('sidebar-traffic-light-reserve');
+    expectVisualClassTokens(reserve.className, [
+      'w-[var(--ok-titlebar-reserve-left,0px)]',
+      'shrink-0',
+      'self-stretch',
+    ]);
     expectVisualClassTokens(toolbar.className, ['[&>*]:[-webkit-app-region:no-drag]']);
     expectVisualClassTokens(pillRow.className, ['[-webkit-app-region:no-drag]']);
     expect(screen.getByTestId('sidebar-rail').getAttribute('data-enable-toggle')).toBe('false');

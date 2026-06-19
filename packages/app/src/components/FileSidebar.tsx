@@ -455,7 +455,8 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
               data-electron-drag={isElectronHost ? '' : undefined}
               className={cn(
                 'flex-row h-12 items-center py-0 px-3',
-                isElectronHost ? 'justify-end' : 'justify-between',
+                'justify-between',
+                isElectronHost && 'overflow-x-clip',
                 isElectronHost &&
                   'motion-safe:transition-opacity motion-safe:duration-100 motion-safe:ease-out',
                 isElectronHost && isExpanded && 'motion-safe:delay-100',
@@ -463,12 +464,20 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
                 isElectronHost && '[-webkit-app-region:drag]',
               )}
             >
+              {isElectronHost ? (
+                <div
+                  aria-hidden="true"
+                  data-testid="sidebar-traffic-light-reserve"
+                  className="w-[var(--ok-titlebar-reserve-left,0px)] shrink-0 self-stretch"
+                />
+              ) : null}
               {isExpanded && !isElectronHost ? (
                 <span className="shrink-0 font-mono text-sm uppercase tracking-wider text-sidebar-foreground/50">
                   <Trans>Files</Trans>
                 </span>
               ) : null}
               <div
+                data-testid="sidebar-toolbar"
                 className={cn(
                   'flex items-center gap-1',
                   isElectronHost && '[&>*]:[-webkit-app-region:no-drag]',

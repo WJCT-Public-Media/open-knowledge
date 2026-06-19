@@ -2446,8 +2446,10 @@ html.electron-mode {
     `packages/desktop/src/main/index.ts`), placing OS-drawn close/min/zoom
     buttons in the renderer's top-left at x=22..~100. Any full-viewport
     overlay must reserve enough left padding to clear that footprint.
-    78px = trafficLightPosition.x (22) + 3 buttons × ~18px + margin —
-    mirrors the inline literal in `EditorHeader.tsx:69` (PR #677).
+    78px = trafficLightPosition.x (22) + 3 buttons × ~18px + margin. This
+    token is the single source for that reserve — EditorHeader, FileSidebar's
+    SidebarHeader, GraphPanel, and ConnectingBanner all consume it rather than
+    re-declaring the literal.
     Web hosts (no `window.okDesktop`) never gain the `electron-mode` class,
     so the variable is undefined there. Consumers MUST use the fallback
     form `pl-[var(--ok-titlebar-reserve-left,1rem)]` — `,1rem` matches the
