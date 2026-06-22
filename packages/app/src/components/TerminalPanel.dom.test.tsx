@@ -187,16 +187,76 @@ describe('TerminalPanel', () => {
     expect(terminal.resize).toHaveBeenCalledWith('pty-1', 80, 24);
   });
 
-  test('does not intercept keys — Escape and all keystrokes reach the PTY', async () => {
+  test('cancels the browser default for Shift+Tab only; every other key (incl. Escape) reaches the PTY', async () => {
     const { bridge, terminal } = makeBridge({ ok: true, ptyId: 'pty-1' });
     render(<TerminalPanel bridge={bridge} />);
     await waitFor(() => expect(lastTerm?.onDataCb).toBeTruthy());
 
-    expect(lastTerm?.attachCustomKeyEventHandler).not.toHaveBeenCalled();
-    expect(lastTerm?.keyHandler).toBeNull();
+    expect(lastTerm?.attachCustomKeyEventHandler).toHaveBeenCalledTimes(1);
+    const handler = lastTerm?.keyHandler;
+    expect(handler).toBeTruthy();
+
+    const shiftTabPreventDefault = mock(() => {});
+    const shiftTab = {
+      type: 'keydown',
+      key: 'Tab',
+      shiftKey: true,
+      preventDefault: shiftTabPreventDefault,
+    } as unknown as KeyboardEvent;
+    expect(handler?.(shiftTab)).toBe(true);
+    expect(shiftTabPreventDefault).toHaveBeenCalledTimes(1);
+
+    const plainTabPreventDefault = mock(() => {});
+    const plainTab = {
+      type: 'keydown',
+      key: 'Tab',
+      shiftKey: false,
+      preventDefault: plainTabPreventDefault,
+    } as unknown as KeyboardEvent;
+    expect(handler?.(plainTab)).toBe(true);
+    expect(plainTabPreventDefault).not.toHaveBeenCalled();
+
+    const escapePreventDefault = mock(() => {});
+    const escapeKey = {
+      type: 'keydown',
+      key: 'Escape',
+      shiftKey: false,
+      preventDefault: escapePreventDefault,
+    } as unknown as KeyboardEvent;
+    expect(handler?.(escapeKey)).toBe(true);
+    expect(escapePreventDefault).not.toHaveBeenCalled();
 
     act(() => lastTerm?.onDataCb?.('\x1b'));
     expect(terminal.input).toHaveBeenCalledWith('pty-1', '\x1b');
+  });
+
+  test('Shift+Enter sends a newline (LF) to the PTY instead of submitting (CR)', async () => {
+    const { bridge, terminal } = makeBridge({ ok: true, ptyId: 'pty-1' });
+    render(<TerminalPanel bridge={bridge} />);
+    await waitFor(() => expect(lastTerm?.onDataCb).toBeTruthy());
+    const handler = lastTerm?.keyHandler;
+    expect(handler).toBeTruthy();
+
+    const shiftEnterPreventDefault = mock(() => {});
+    const shiftEnter = {
+      type: 'keydown',
+      key: 'Enter',
+      shiftKey: true,
+      preventDefault: shiftEnterPreventDefault,
+    } as unknown as KeyboardEvent;
+    expect(handler?.(shiftEnter)).toBe(false);
+    expect(shiftEnterPreventDefault).toHaveBeenCalledTimes(1);
+    expect(terminal.input).toHaveBeenCalledWith('pty-1', '\n');
+
+    const plainEnterPreventDefault = mock(() => {});
+    const plainEnter = {
+      type: 'keydown',
+      key: 'Enter',
+      shiftKey: false,
+      preventDefault: plainEnterPreventDefault,
+    } as unknown as KeyboardEvent;
+    expect(handler?.(plainEnter)).toBe(true);
+    expect(plainEnterPreventDefault).not.toHaveBeenCalled();
   });
 
   test('disposes the terminal, kills the PTY, and unsubscribes on unmount', async () => {

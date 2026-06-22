@@ -2,6 +2,7 @@ import { detectEmbeddedHostFromBrowser } from '@inkeep/open-knowledge-core';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
   lazy,
+  type ReactNode,
   Suspense,
   useDeferredValue,
   useEffect,
@@ -302,8 +303,11 @@ function EditorAreaInner({
     }
   }
 
+  let viewContent: ReactNode;
+  let rightPanel: ReactNode = null;
+
   if (activeTarget?.kind === 'large-file') {
-    return (
+    viewContent = (
       <LargeFileEditorState
         docName={activeTarget.docName}
         size={activeTarget.size}
@@ -313,22 +317,16 @@ function EditorAreaInner({
         }
       />
     );
-  }
-
-  if (activeTarget?.kind === 'folder') {
+  } else if (activeTarget?.kind === 'folder') {
+    viewContent = <FolderOverview folderPath={activeTarget.folderPath} />;
     const showAgentPanel = docPanelMode === 'agent' && docPanelAgentId !== null;
-    if (!showAgentPanel) {
-      return <FolderOverview folderPath={activeTarget.folderPath} />;
-    }
-    return (
-      <div className="flex min-h-0 flex-1">
-        <ResizablePanelGroup orientation="horizontal">
-          <ResizablePanel minSize="30%" defaultSize="75%">
-            <FolderOverview folderPath={activeTarget.folderPath} />
-          </ResizablePanel>
+    if (showAgentPanel) {
+      rightPanel = (
+        <>
           <ResizableHandle withHandle />
           {/* Non-collapsible — folder view has no toolbar toggle; dismiss via avatar re-click. */}
           <ResizablePanel
+            id="agent-panel"
             defaultSize="25%"
             minSize="300px"
             maxSize="40%"
@@ -348,55 +346,38 @@ function EditorAreaInner({
               <LazyActivityModeContent showBackButton={false} />
             </Suspense>
           </ResizablePanel>
-        </ResizablePanelGroup>
-      </div>
-    );
-  }
-
-  if (activeTarget?.kind === 'asset') {
-    return (
+        </>
+      );
+    }
+  } else if (activeTarget?.kind === 'asset') {
+    viewContent = (
       <AssetPreview
         key={activeTarget.assetPath}
         assetPath={activeTarget.assetPath}
         mediaKind={activeTarget.mediaKind}
       />
     );
-  }
-
-  if (!activeProvider || !activeDocName) {
+  } else if (!activeProvider || !activeDocName) {
     const hashDoc = typeof window !== 'undefined' ? docNameFromHash(window.location.hash) : null;
     if (hashDoc !== null) {
       return <EditorSkeleton />;
     }
-    if (terminalBridge != null) {
-      return (
-        <TerminalDock
-          bridge={terminalBridge}
-          visible={terminalVisible}
-          onVisibleChange={onTerminalVisibleChange ?? (() => {})}
-          launch={terminalLaunch}
-        >
-          <EmptyEditorState terminalVisible={terminalVisible} />
-        </TerminalDock>
-      );
+    viewContent = <EmptyEditorState terminalVisible={terminalVisible} />;
+  } else {
+    const isSourceMode = editorMode === 'source';
+    const sourceDisabled = !isConnected;
+
+    const isPanelCollapsed = isCollapsed;
+
+    function openAddPropertyForm() {
+      if (!activeDocName) return;
+      requestAddProperty(activeDocName);
     }
-    return <EmptyEditorState />;
-  }
 
-  const isSourceMode = editorMode === 'source';
-  const sourceDisabled = !isConnected;
-
-  const isPanelCollapsed = isCollapsed;
-
-  function openAddPropertyForm() {
-    if (!activeDocName) return;
-    requestAddProperty(activeDocName);
-  }
-
-  const editorContent = (
-    <div className="relative flex h-full flex-col">
-      <div className="relative min-h-0 flex-1">
-        {/* Hybrid Activity + Suspense + ErrorBoundary render tree.
+    const editorContent = (
+      <div className="relative flex h-full flex-col">
+        <div className="relative min-h-0 flex-1">
+          {/* Hybrid Activity + Suspense + ErrorBoundary render tree.
           EditorActivityPool keeps Tiptap eager and lazy-loads SourceEditor on
           the first source-mode visit for each doc, then preserves the per-doc
           display:none toggle after that initial load. Each Activity entry owns
@@ -408,17 +389,17 @@ function EditorAreaInner({
           hidden doc's cached rejected syncPromise cannot re-throw into
           the visible UI (QA-023/024). See EditorActivityPool.tsx file
           docstring "ERROR + SUSPENSE SCOPING" for rationale. */}
-        <div className="relative h-full">
-          <EditorActivityPool
-            activeDocName={deferredActiveDocName ?? activeDocName}
-            isSourceMode={isSourceMode}
-            editorPlaceholder={editorPlaceholder}
-            previousDocName={previousDocName ?? undefined}
-            onNavigateBack={navigateBackToDoc}
-            onRecycle={recycleDocument}
-          />
-          <FindReplaceController activeDocName={activeDocName} isSourceMode={isSourceMode} />
-          {/* Nav-pending skeleton overlay. Rendered when the urgent
+          <div className="relative h-full">
+            <EditorActivityPool
+              activeDocName={deferredActiveDocName ?? activeDocName}
+              isSourceMode={isSourceMode}
+              editorPlaceholder={editorPlaceholder}
+              previousDocName={previousDocName ?? undefined}
+              onNavigateBack={navigateBackToDoc}
+              onRecycle={recycleDocument}
+            />
+            <FindReplaceController activeDocName={activeDocName} isSourceMode={isSourceMode} />
+            {/* Nav-pending skeleton overlay. Rendered when the urgent
             `activeDocName` (shell state — driving sidebar highlight +
             header title) has moved past `deferredActiveDocName` (editor
             subtree prop), AND the upcoming deferred commit will pay a
@@ -450,71 +431,43 @@ function EditorAreaInner({
             (mount-promise.test.ts `mountPromiseHasResolved (warm-
             reopen overlay gate)` + editor-cache.test.ts mount-
             promise-cancellation describes). */}
-          {shouldPaintOverlay({
-            activeDocName,
-            deferredActiveDocName,
-            mountResolved: activeDocName !== null && mountPromiseHasResolved(activeDocName),
-            syncResolved: activeDocName !== null && syncPromiseHasResolved(activeDocName),
-          }) ? (
-            <div className="absolute inset-0 z-10 bg-background">
-              <EditorSkeleton />
-              {/* Mount-stalled affordance — surfaces a "Cancel" link
+            {shouldPaintOverlay({
+              activeDocName,
+              deferredActiveDocName,
+              mountResolved: activeDocName !== null && mountPromiseHasResolved(activeDocName),
+              syncResolved: activeDocName !== null && syncPromiseHasResolved(activeDocName),
+            }) ? (
+              <div className="absolute inset-0 z-10 bg-background">
+                <EditorSkeleton />
+                {/* Mount-stalled affordance — surfaces a "Cancel" link
                   when the mount-promise substrate emits `ok/mount/stalled`
                   past MOUNT_STALLED_THRESHOLD_MS (10s default). Only
                   shown when the skeleton is already overlay-active, so a
                   fast mount never sees the affordance. */}
-              {activeDocName !== null ? <MountStalledAffordance docName={activeDocName} /> : null}
-            </div>
-          ) : null}
+                {activeDocName !== null ? <MountStalledAffordance docName={activeDocName} /> : null}
+              </div>
+            ) : null}
+          </div>
+          {!isConflict && (
+            <EditorToolbar
+              activeDocName={activeDocName}
+              isSourceMode={isSourceMode}
+              sourceDisabled={sourceDisabled}
+              onModeChange={onModeChange}
+              showAddPropertyButton={!isSourceMode}
+              onAddProperty={openAddPropertyForm}
+              isPanelCollapsed={isPanelCollapsed}
+              onTogglePanel={togglePanel}
+            />
+          )}
         </div>
-        {!isConflict && (
-          <EditorToolbar
-            activeDocName={activeDocName}
-            isSourceMode={isSourceMode}
-            sourceDisabled={sourceDisabled}
-            onModeChange={onModeChange}
-            showAddPropertyButton={!isSourceMode}
-            onAddProperty={openAddPropertyForm}
-            isPanelCollapsed={isPanelCollapsed}
-            onTogglePanel={togglePanel}
-          />
-        )}
+        <EditorFooter stats={stats} selectionStats={selectionStats} showStats={showStats} />
       </div>
-      <EditorFooter stats={stats} selectionStats={selectionStats} showStats={showStats} />
-    </div>
-  );
-
-  const editorColumn =
-    terminalBridge != null ? (
-      <TerminalDock
-        bridge={terminalBridge}
-        visible={terminalVisible}
-        onVisibleChange={onTerminalVisibleChange ?? (() => {})}
-        launch={terminalLaunch}
-      >
-        {editorContent}
-      </TerminalDock>
-    ) : (
-      editorContent
     );
 
-  return (
-    <div className="flex min-h-0 flex-1" ref={setGroupContainerEl}>
-      <ResizablePanelGroup
-        orientation="horizontal"
-        data-dragging={isDraggingDocHandle || undefined}
-      >
-        <ResizablePanel
-          minSize="30%"
-          {...(initialRightCollapsed ? { defaultSize: '100%' } : {})}
-          className={
-            isDraggingDocHandle
-              ? undefined
-              : 'transition-[flex-grow] duration-200 ease-out motion-reduce:transition-none motion-reduce:duration-0'
-          }
-        >
-          {editorColumn}
-        </ResizablePanel>
+    viewContent = editorContent;
+    rightPanel = (
+      <>
         <ResizableHandle
           withHandle
           disabled={isEmbedded && isCollapsed}
@@ -559,6 +512,42 @@ function EditorAreaInner({
             mode={docPanelMode}
           />
         </ResizablePanel>
+      </>
+    );
+  }
+
+  const leftColumn =
+    terminalBridge != null ? (
+      <TerminalDock
+        bridge={terminalBridge}
+        visible={terminalVisible}
+        onVisibleChange={onTerminalVisibleChange ?? (() => {})}
+        launch={terminalLaunch}
+      >
+        {viewContent}
+      </TerminalDock>
+    ) : (
+      viewContent
+    );
+
+  return (
+    <div className="flex min-h-0 flex-1" ref={setGroupContainerEl}>
+      <ResizablePanelGroup
+        orientation="horizontal"
+        data-dragging={isDraggingDocHandle || undefined}
+      >
+        <ResizablePanel
+          minSize="30%"
+          {...(rightPanel != null && !initialRightCollapsed ? {} : { defaultSize: '100%' })}
+          className={
+            isDraggingDocHandle
+              ? undefined
+              : 'transition-[flex-grow] duration-200 ease-out motion-reduce:transition-none motion-reduce:duration-0'
+          }
+        >
+          {leftColumn}
+        </ResizablePanel>
+        {rightPanel}
       </ResizablePanelGroup>
     </div>
   );

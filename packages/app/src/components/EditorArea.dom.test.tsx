@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { act, cleanup, render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 
 type SettingsDialogShellProps = {
   open: boolean;
@@ -39,7 +39,29 @@ const EMPTY_DOC_CTX = {
   docPanelAgentId: null,
   docPanelExpandSignal: 0,
 };
-let docCtx: typeof FOLDER_DOC_CTX | typeof EMPTY_DOC_CTX = FOLDER_DOC_CTX;
+const LARGE_FILE_DOC_CTX = {
+  activeDocName: 'big',
+  activeProvider: null,
+  activeTarget: { kind: 'large-file', docName: 'big', size: 9_999_999, limit: 1_000_000 },
+  recycleDocument: () => {},
+  docPanelMode: 'timeline',
+  docPanelAgentId: null,
+  docPanelExpandSignal: 0,
+};
+const ASSET_DOC_CTX = {
+  activeDocName: null,
+  activeProvider: null,
+  activeTarget: { kind: 'asset', assetPath: 'images/diagram.png', mediaKind: 'image' },
+  recycleDocument: () => {},
+  docPanelMode: 'timeline',
+  docPanelAgentId: null,
+  docPanelExpandSignal: 0,
+};
+let docCtx:
+  | typeof FOLDER_DOC_CTX
+  | typeof EMPTY_DOC_CTX
+  | typeof LARGE_FILE_DOC_CTX
+  | typeof ASSET_DOC_CTX = FOLDER_DOC_CTX;
 mock.module('@/editor/DocumentContext', () => ({
   useDocumentContext: () => docCtx,
   useDocumentTransition: () => ({ openDocumentTransition: null }),
@@ -51,12 +73,22 @@ mock.module('@/components/EmptyEditorState', () => ({
   ),
 }));
 
+let terminalDockMounts = 0;
+mock.module('@/components/EditorSkeleton', () => ({
+  EditorSkeleton: () => <div data-testid="editor-skeleton" />,
+}));
+
 mock.module('./TerminalDock', () => ({
-  TerminalDock: ({ children, visible }: { children: ReactNode; visible?: boolean }) => (
-    <div data-testid="terminal-dock" data-visible={String(visible)}>
-      {children}
-    </div>
-  ),
+  TerminalDock: ({ children, visible }: { children: ReactNode; visible?: boolean }) => {
+    useEffect(() => {
+      terminalDockMounts += 1;
+    }, []);
+    return (
+      <div data-testid="terminal-dock" data-visible={String(visible)}>
+        {children}
+      </div>
+    );
+  },
 }));
 
 mock.module('react-resizable-panels', () => ({
@@ -66,6 +98,14 @@ mock.module('react-resizable-panels', () => ({
       expand: () => {},
     },
   }),
+}));
+
+mock.module('@/components/ui/resizable', () => ({
+  ResizablePanelGroup: ({ children }: { children: ReactNode }) => (
+    <div data-testid="resizable-group">{children}</div>
+  ),
+  ResizablePanel: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  ResizableHandle: () => <div data-testid="resizable-handle" />,
 }));
 
 mock.module('@/hooks/use-doc-panel-layout', () => ({
@@ -87,6 +127,18 @@ mock.module('@/presence/use-sync-status', () => ({
 mock.module('@/components/FolderOverview', () => ({
   FolderOverview: ({ folderPath }: { folderPath: string }) => (
     <div data-testid="folder-overview">{folderPath}</div>
+  ),
+}));
+
+mock.module('@/components/AssetPreview', () => ({
+  AssetPreview: ({ assetPath }: { assetPath: string }) => (
+    <div data-testid="asset-preview">{assetPath}</div>
+  ),
+}));
+
+mock.module('@/components/LargeFileEditorState', () => ({
+  LargeFileEditorState: ({ docName }: { docName: string }) => (
+    <div data-testid="large-file-state">{docName}</div>
   ),
 }));
 
@@ -184,5 +236,175 @@ describe('EditorArea empty-state terminal host', () => {
 
     expect(screen.queryByTestId('terminal-dock')).toBeNull();
     expect(screen.getByTestId('empty-editor-state')).toBeTruthy();
+  });
+});
+
+describe('EditorArea folder-view terminal host', () => {
+  beforeEach(() => {
+    cleanup();
+    docCtx = FOLDER_DOC_CTX;
+  });
+
+  test('hosts the docked terminal in folder view when a terminal bridge is present', () => {
+    render(
+      <EditorArea
+        editorMode="wysiwyg"
+        onModeChange={() => {}}
+        activeTab="timeline"
+        onActiveTabChange={() => {}}
+        terminalBridge={{} as never}
+        terminalVisible
+        onTerminalVisibleChange={() => {}}
+        terminalLaunch={null}
+      />,
+    );
+
+    const dock = screen.getByTestId('terminal-dock');
+    expect(dock.getAttribute('data-visible')).toBe('true');
+    expect(dock.querySelector('[data-testid="folder-overview"]')).not.toBeNull();
+  });
+
+  test('renders the folder view with no terminal dock on the web host (no bridge)', () => {
+    renderEditorArea();
+
+    expect(screen.queryByTestId('terminal-dock')).toBeNull();
+    expect(screen.getByTestId('folder-overview').textContent).toBe('folder');
+  });
+});
+
+describe('EditorArea large-file-view terminal host', () => {
+  beforeEach(() => {
+    cleanup();
+    docCtx = LARGE_FILE_DOC_CTX;
+  });
+
+  test('hosts the docked terminal in the large-file view when a bridge is present', () => {
+    render(
+      <EditorArea
+        editorMode="wysiwyg"
+        onModeChange={() => {}}
+        activeTab="timeline"
+        onActiveTabChange={() => {}}
+        terminalBridge={{} as never}
+        terminalVisible
+        onTerminalVisibleChange={() => {}}
+        terminalLaunch={null}
+      />,
+    );
+
+    const dock = screen.getByTestId('terminal-dock');
+    expect(dock.getAttribute('data-visible')).toBe('true');
+    expect(dock.querySelector('[data-testid="large-file-state"]')).not.toBeNull();
+  });
+
+  test('renders the large-file view with no terminal dock on the web host (no bridge)', () => {
+    renderEditorArea();
+
+    expect(screen.queryByTestId('terminal-dock')).toBeNull();
+    expect(screen.getByTestId('large-file-state')).toBeTruthy();
+  });
+});
+
+describe('EditorArea asset-view terminal host', () => {
+  beforeEach(() => {
+    cleanup();
+    docCtx = ASSET_DOC_CTX;
+  });
+
+  test('hosts the docked terminal in the asset view when a bridge is present', () => {
+    render(
+      <EditorArea
+        editorMode="wysiwyg"
+        onModeChange={() => {}}
+        activeTab="timeline"
+        onActiveTabChange={() => {}}
+        terminalBridge={{} as never}
+        terminalVisible
+        onTerminalVisibleChange={() => {}}
+        terminalLaunch={null}
+      />,
+    );
+
+    const dock = screen.getByTestId('terminal-dock');
+    expect(dock.getAttribute('data-visible')).toBe('true');
+    expect(dock.querySelector('[data-testid="asset-preview"]')).not.toBeNull();
+  });
+
+  test('renders the asset view with no terminal dock on the web host (no bridge)', () => {
+    renderEditorArea();
+
+    expect(screen.queryByTestId('terminal-dock')).toBeNull();
+    expect(screen.getByTestId('asset-preview')).toBeTruthy();
+  });
+});
+
+describe('EditorArea terminal persists across view-kind switches', () => {
+  beforeEach(() => {
+    cleanup();
+    terminalDockMounts = 0;
+    docCtx = FOLDER_DOC_CTX;
+  });
+
+  test('keeps a single TerminalDock instance mounted while the active view kind changes', () => {
+    const props = {
+      editorMode: 'wysiwyg' as const,
+      onModeChange: () => {},
+      activeTab: 'timeline' as const,
+      onActiveTabChange: () => {},
+      terminalBridge: {} as never,
+      terminalVisible: true,
+      onTerminalVisibleChange: () => {},
+      terminalLaunch: null,
+    };
+    const { rerender } = render(<EditorArea {...props} />);
+    const mountsAfterInitial = terminalDockMounts;
+    expect(mountsAfterInitial).toBeGreaterThan(0);
+    expect(
+      screen.getByTestId('terminal-dock').querySelector('[data-testid="folder-overview"]'),
+    ).not.toBeNull();
+
+    docCtx = ASSET_DOC_CTX;
+    rerender(<EditorArea {...props} />);
+    expect(
+      screen.getByTestId('terminal-dock').querySelector('[data-testid="asset-preview"]'),
+    ).not.toBeNull();
+
+    docCtx = LARGE_FILE_DOC_CTX;
+    rerender(<EditorArea {...props} />);
+    expect(
+      screen.getByTestId('terminal-dock').querySelector('[data-testid="large-file-state"]'),
+    ).not.toBeNull();
+
+    expect(terminalDockMounts).toBe(mountsAfterInitial);
+  });
+});
+
+describe('EditorArea hash-load skeleton renders outside the panel group', () => {
+  beforeEach(() => {
+    cleanup();
+    docCtx = EMPTY_DOC_CTX;
+  });
+  afterEach(() => {
+    window.location.hash = '';
+  });
+
+  test('renders the load skeleton directly, not inside the terminal dock or panel group', () => {
+    window.location.hash = '#/some-doc';
+    render(
+      <EditorArea
+        editorMode="wysiwyg"
+        onModeChange={() => {}}
+        activeTab="timeline"
+        onActiveTabChange={() => {}}
+        terminalBridge={{} as never}
+        terminalVisible
+        onTerminalVisibleChange={() => {}}
+        terminalLaunch={null}
+      />,
+    );
+
+    expect(screen.getByTestId('editor-skeleton')).toBeTruthy();
+    expect(screen.queryByTestId('resizable-group')).toBeNull();
+    expect(screen.queryByTestId('terminal-dock')).toBeNull();
   });
 });

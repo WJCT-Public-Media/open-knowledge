@@ -583,7 +583,7 @@ describe('TerminalDock multi-session', () => {
     expect(terminalPanelProps?.collapsible).toBe(true);
     expect(terminalPanelProps?.collapsedSize).toBe(0);
     expect(terminalPanelProps?.minSize).toBe('120px');
-    expect(terminalPanelProps?.maxSize).toBe('50%');
+    expect(terminalPanelProps?.maxSize).toBe('95%');
     expect(terminalPanelProps?.defaultSize).toBe(0);
     expect(terminalPanelProps?.inert).toBe(true);
   });

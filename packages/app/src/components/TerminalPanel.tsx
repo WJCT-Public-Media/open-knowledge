@@ -137,6 +137,22 @@ function TerminalSession({
 
     fit.fit();
 
+    term.attachCustomKeyEventHandler((event) => {
+      if (event.type !== 'keydown' || !event.shiftKey) return true;
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        return true;
+      }
+      if (event.key === 'Enter') {
+        const ptyId = ptyIdRef.current;
+        if (ptyId === null) return true;
+        event.preventDefault();
+        bridge.terminal.input(ptyId, '\n');
+        return false;
+      }
+      return true;
+    });
+
     void (async () => {
       let result: Awaited<ReturnType<typeof bridge.terminal.create>>;
       try {

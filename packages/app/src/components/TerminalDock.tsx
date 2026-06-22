@@ -205,7 +205,7 @@ export function TerminalDock({
       className="min-h-0 flex-1"
       data-dragging={isDragging || undefined}
     >
-      <ResizablePanel minSize="20%" className="flex min-h-0 flex-col">
+      <ResizablePanel minSize="5%" className="flex min-h-0 flex-col">
         {/* tabIndex -1 makes this a programmatic focus target for focus-return
             on collapse without adding it to the tab order. */}
         <div
@@ -237,7 +237,7 @@ export function TerminalDock({
         panelRef={panelRef}
         defaultSize={visible ? `${initialHeightPx}px` : 0}
         minSize="120px"
-        maxSize="50%"
+        maxSize="95%"
         collapsible
         collapsedSize={0}
         onResize={(size) => {
