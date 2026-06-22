@@ -17,6 +17,11 @@ export interface ManagedRenameSnapshot {
   content: string;
 }
 
+export interface ManagedRenamePathSnapshot {
+  path: string;
+  content: string;
+}
+
 interface ManagedRenameAffectedDoc {
   from: string;
   to: string;
@@ -37,6 +42,8 @@ interface ManagedRenameRecoveryJournalV2 {
   affectedDocs: ManagedRenameAffectedDoc[];
   createdAt: string;
   snapshots: ManagedRenameSnapshot[];
+  pathSnapshots?: ManagedRenamePathSnapshot[];
+  cleanupPaths?: string[];
 }
 
 type ManagedRenameRecoveryJournal = ManagedRenameRecoveryJournalV1 | ManagedRenameRecoveryJournalV2;
@@ -62,9 +69,11 @@ export function createManagedRenameRecoveryJournal(args: {
   toPath: string;
   affectedDocs: ManagedRenameAffectedDoc[];
   snapshots: ManagedRenameSnapshot[];
+  pathSnapshots?: ManagedRenamePathSnapshot[];
+  cleanupPaths?: string[];
   createdAt?: string;
 }): ManagedRenameRecoveryJournalV2 {
-  return {
+  const journal: ManagedRenameRecoveryJournalV2 = {
     version: 2,
     fromPath: args.fromPath,
     toPath: args.toPath,
@@ -72,12 +81,29 @@ export function createManagedRenameRecoveryJournal(args: {
     createdAt: args.createdAt ?? new Date().toISOString(),
     snapshots: args.snapshots,
   };
+  if (args.pathSnapshots && args.pathSnapshots.length > 0) {
+    journal.pathSnapshots = args.pathSnapshots;
+  }
+  if (args.cleanupPaths && args.cleanupPaths.length > 0) {
+    journal.cleanupPaths = args.cleanupPaths;
+  }
+  return journal;
 }
 
 function isManagedRenameSnapshot(value: unknown): value is ManagedRenameSnapshot {
   if (!value || typeof value !== 'object') return false;
   const snapshot = value as Partial<ManagedRenameSnapshot>;
   return typeof snapshot.docName === 'string' && typeof snapshot.content === 'string';
+}
+
+function isManagedRenamePathSnapshot(value: unknown): value is ManagedRenamePathSnapshot {
+  if (!value || typeof value !== 'object') return false;
+  const snapshot = value as Partial<ManagedRenamePathSnapshot>;
+  return typeof snapshot.path === 'string' && typeof snapshot.content === 'string';
+}
+
+function isManagedRenameCleanupPath(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0;
 }
 
 function isManagedRenameAffectedDoc(value: unknown): value is ManagedRenameAffectedDoc {
@@ -96,21 +122,35 @@ function parseV2(value: Record<string, unknown>): ManagedRenameRecoveryJournalV2
   if (typeof value.createdAt !== 'string' || value.createdAt.length === 0) {
     throw new Error('Managed rename journal v2 is missing createdAt');
   }
-  if (
-    !Array.isArray(value.affectedDocs) ||
-    value.affectedDocs.length === 0 ||
-    !value.affectedDocs.every(isManagedRenameAffectedDoc)
-  ) {
+  const affectedDocs = value.affectedDocs;
+  const rawPathSnapshots = value.pathSnapshots;
+  const rawCleanupPaths = value.cleanupPaths;
+  const hasPathSnapshots = Array.isArray(rawPathSnapshots) && rawPathSnapshots.length > 0;
+  const hasCleanupPaths = Array.isArray(rawCleanupPaths) && rawCleanupPaths.length > 0;
+  if (!Array.isArray(affectedDocs) || !affectedDocs.every(isManagedRenameAffectedDoc)) {
+    throw new Error('Managed rename journal v2 has invalid affectedDocs');
+  }
+  if (affectedDocs.length === 0 && !hasPathSnapshots && !hasCleanupPaths) {
     throw new Error('Managed rename journal v2 has invalid affectedDocs');
   }
   if (
     !Array.isArray(value.snapshots) ||
-    value.snapshots.length === 0 ||
+    (affectedDocs.length > 0 && value.snapshots.length === 0) ||
     !value.snapshots.every(isManagedRenameSnapshot)
   ) {
     throw new Error('Managed rename journal v2 has invalid snapshots');
   }
-  for (const entry of value.affectedDocs as ManagedRenameAffectedDoc[]) {
+  if (rawPathSnapshots !== undefined) {
+    if (!Array.isArray(rawPathSnapshots) || !rawPathSnapshots.every(isManagedRenamePathSnapshot)) {
+      throw new Error('Managed rename journal v2 has invalid pathSnapshots');
+    }
+  }
+  if (rawCleanupPaths !== undefined) {
+    if (!Array.isArray(rawCleanupPaths) || !rawCleanupPaths.every(isManagedRenameCleanupPath)) {
+      throw new Error('Managed rename journal v2 has invalid cleanupPaths');
+    }
+  }
+  for (const entry of affectedDocs as ManagedRenameAffectedDoc[]) {
     if (
       !(value.snapshots as ManagedRenameSnapshot[]).some(
         (snapshot) => snapshot.docName === entry.from,
@@ -125,9 +165,11 @@ function parseV2(value: Record<string, unknown>): ManagedRenameRecoveryJournalV2
     version: 2,
     fromPath: value.fromPath,
     toPath: value.toPath,
-    affectedDocs: value.affectedDocs as ManagedRenameAffectedDoc[],
+    affectedDocs: affectedDocs as ManagedRenameAffectedDoc[],
     createdAt: value.createdAt,
     snapshots: value.snapshots as ManagedRenameSnapshot[],
+    ...(hasPathSnapshots ? { pathSnapshots: rawPathSnapshots as ManagedRenamePathSnapshot[] } : {}),
+    ...(hasCleanupPaths ? { cleanupPaths: rawCleanupPaths as string[] } : {}),
   };
 }
 
@@ -221,6 +263,15 @@ function destinationsToCleanV2(journal: ManagedRenameRecoveryJournalV2): string[
   return journal.affectedDocs.map((entry) => entry.to);
 }
 
+function resolveRecoveryPath(contentDir: string, relativePath: string): string {
+  const root = resolve(contentDir);
+  const filePath = resolve(root, relativePath);
+  if (relativePath.includes('\x00') || filePath === root || !filePath.startsWith(`${root}${sep}`)) {
+    throw new Error(`Invalid recovery path: ${relativePath}`);
+  }
+  return filePath;
+}
+
 function pruneEmptyAncestors(filePath: string, contentDir: string): void {
   const root = resolve(contentDir);
   const boundary = `${root}${sep}`;
@@ -254,6 +305,7 @@ export function recoverPendingManagedRename(
   }
 
   const restoredDocNames = new Set<string>();
+  const restoredPaths = new Set<string>();
   const restoreFailures: Array<{ docName: string; cause: unknown }> = [];
   for (const snapshot of journal.snapshots) {
     try {
@@ -281,6 +333,35 @@ export function recoverPendingManagedRename(
     );
   }
 
+  if (journal.version === 2) {
+    const pathRestoreFailures: Array<{ path: string; cause: unknown }> = [];
+    for (const snapshot of journal.pathSnapshots ?? []) {
+      try {
+        const filePath = resolveRecoveryPath(contentDir, snapshot.path);
+        tracedMkdirSync(dirname(filePath), { recursive: true });
+        tracedWriteFileSync(filePath, snapshot.content, 'utf-8');
+        restoredPaths.add(snapshot.path);
+      } catch (err) {
+        pathRestoreFailures.push({ path: snapshot.path, cause: err });
+        console.warn(`[managed-rename] Failed to restore path ${snapshot.path}:`, err);
+      }
+    }
+
+    if (pathRestoreFailures.length > 0) {
+      const failedPaths = pathRestoreFailures.map((f) => f.path).join(', ');
+      console.warn(
+        `[managed-rename] Recovery incomplete; keeping journal for retry (${failedPaths})`,
+      );
+      const causes = pathRestoreFailures.map((f) =>
+        f.cause instanceof Error ? f.cause : new Error(String(f.cause)),
+      );
+      throw new AggregateError(
+        causes,
+        `Managed rename recovery incomplete; failed to restore paths: ${failedPaths}`,
+      );
+    }
+  }
+
   const destinationsToClean =
     journal.version === 2 ? destinationsToCleanV2(journal) : destinationsToCleanV1(journal);
   const cleanupFailures: Array<{ destination: string; cause: unknown }> = [];
@@ -301,6 +382,29 @@ export function recoverPendingManagedRename(
         err,
       );
       cleanupFailures.push({ destination, cause: err });
+    }
+  }
+
+  if (journal.version === 2) {
+    for (const destination of journal.cleanupPaths ?? []) {
+      if (restoredPaths.has(destination)) continue;
+      let destinationPath: string | null = null;
+      try {
+        destinationPath = resolveRecoveryPath(contentDir, destination);
+        tracedRmSync(destinationPath, { force: true });
+        pruneEmptyAncestors(destinationPath, contentDir);
+      } catch (err) {
+        if (destinationPath && existsSync(destinationPath)) {
+          console.warn(
+            `[managed-rename] Both source and destination paths exist after partial recovery for ${destination}`,
+          );
+        }
+        console.warn(
+          `[managed-rename] Recovery incomplete; failed to clean destination path ${destination}:`,
+          err,
+        );
+        cleanupFailures.push({ destination, cause: err });
+      }
     }
   }
 

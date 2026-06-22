@@ -446,6 +446,32 @@ describe('editor tab state', () => {
     ]);
   });
 
+  test('remapOpenTabs converts document tabs after document-to-file rename', () => {
+    expect(
+      remapOpenTabs(
+        ['docs/a', `${docTabId('docs/a')}\u0000doc-tab:1`, 'docs/b'],
+        [],
+        10,
+        [],
+        [],
+        [{ fromPath: 'docs/a.md', toPath: 'docs/a.txt' }],
+      ),
+    ).toEqual([assetTabId('docs/a.txt'), `${assetTabId('docs/a.txt')}\u0000doc-tab:1`, 'docs/b']);
+  });
+
+  test('remapOpenTabs converts asset tabs after file-to-document rename', () => {
+    expect(
+      remapOpenTabs(
+        [assetTabId('docs/a.txt'), `${assetTabId('docs/a.txt')}\u0000doc-tab:1`, 'docs/b'],
+        [],
+        10,
+        [],
+        [],
+        [{ fromPath: 'docs/a.txt', toPath: 'docs/a.md' }],
+      ),
+    ).toEqual(['docs/a', `docs/a\u0000doc-tab:1`, 'docs/b']);
+  });
+
   test('remapOpenTabs preserves pinned tabs while capping unpinned tabs', () => {
     expect(
       remapOpenTabs(

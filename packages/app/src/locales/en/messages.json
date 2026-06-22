@@ -544,9 +544,6 @@
     "FRYB1Q": ["/api/config returned a malformed body"],
     "FTUGgh": ["Enter a repository URL or owner/repo"],
     "FUMerq": ["Could not enable sync: ", ["detail"]],
-    "FaBZwp": [
-      "File extensions are managed automatically - please rename without changing the extension"
-    ],
     "FjkaiT": ["Zoom out"],
     "FnMkli": ["Sync disabled — you don't have permission to push"],
     "FqTpiN": ["Bird wiki"],

@@ -2475,10 +2475,6 @@ msgstr "File drop zone"
 msgid "File duplicated"
 msgstr "File duplicated"
 
-#: src/components/FileTree.tsx
-msgid "File extensions are managed automatically - please rename without changing the extension"
-msgstr "File extensions are managed automatically - please rename without changing the extension"
-
 #: src/components/NewItemDialog.tsx
 msgid "File name"
 msgstr "File name"

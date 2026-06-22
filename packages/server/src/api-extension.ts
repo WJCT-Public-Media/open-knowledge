@@ -1505,6 +1505,17 @@ function collectFolderPaths(contentDir: string, folderPath: string): string[] {
 function probeAndRegisterSourceFileExtension(contentDir: string, fromPath: string): void {
   if (!isValidRelativeContentPath(fromPath)) return;
   const resolvedContentDir = resolve(contentDir);
+  if (isSupportedDocFile(fromPath)) {
+    const candidate = resolve(resolvedContentDir, fromPath);
+    if (
+      candidate !== resolvedContentDir &&
+      candidate.startsWith(`${resolvedContentDir}${sep}`) &&
+      existsSync(candidate)
+    ) {
+      registerDocExtension(stripDocExtension(fromPath), extname(fromPath));
+    }
+    return;
+  }
   for (const ext of SUPPORTED_DOC_EXTENSIONS) {
     const candidate = resolve(resolvedContentDir, `${fromPath}${ext}`);
     if (candidate !== resolvedContentDir && !candidate.startsWith(`${resolvedContentDir}${sep}`)) {
@@ -2505,19 +2516,6 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
             throw new BacklinkIndexRequiredError();
           }
           const destinationAssetPath = extname(toPath) ? toPath : `${toPath}${extname(fromPath)}`;
-          if (isSupportedDocFile(fromPath) || isSupportedDocFile(destinationAssetPath)) {
-            throw new ManagedRenameInvalidRequestError(
-              'Asset operations do not support markdown documents.',
-            );
-          }
-          if (
-            !isSupportedAssetFile(fromPath, LINKABLE_ASSET_EXTENSIONS) ||
-            !isSupportedAssetFile(destinationAssetPath, LINKABLE_ASSET_EXTENSIONS)
-          ) {
-            throw new ManagedRenameInvalidRequestError(
-              'Asset operations require supported asset extensions.',
-            );
-          }
           if (
             isReservedProjectStatePath(fromPath) ||
             isReservedProjectStatePath(destinationAssetPath)
@@ -2591,6 +2589,147 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
             renamedAssets,
             rewrittenDocs,
           };
+        },
+      ),
+    );
+  }
+
+  async function _performDocumentToFileRename(
+    fromPath: string,
+    toPath: string,
+  ): Promise<{ renamedAssets: RenamedAssetMapping[]; rewrittenDocs: ManagedRenameRewrittenDoc[] }> {
+    return runSerialized(async () =>
+      withSpan(
+        'rename.executeDocumentToFileRewrites',
+        {
+          attributes: {
+            'rename.kind': 'asset',
+            'rename.transition': 'document-to-file',
+          },
+        },
+        async (span) => {
+          if (!backlinkIndex) {
+            throw new BacklinkIndexRequiredError();
+          }
+          if (!isSupportedDocFile(fromPath) || isSupportedDocFile(toPath)) {
+            throw new ManagedRenameInvalidRequestError(
+              'Document-to-file rename requires a markdown source and non-markdown destination.',
+            );
+          }
+          const sourceDocName = stripDocExtension(fromPath);
+          if (isSystemDoc(sourceDocName) || isConfigDoc(sourceDocName)) {
+            throw new ManagedRenameReservedPathError('Reserved document names cannot be renamed.');
+          }
+          if (isReservedProjectStatePath(fromPath) || isReservedProjectStatePath(toPath)) {
+            throw new ManagedRenameReservedPathError('.ok and .git are reserved directories.');
+          }
+          if (contentFilter?.isPathIgnored(toPath)) {
+            throw new ManagedRenameInvalidRequestError(
+              'Destination file is excluded by the project content config.',
+            );
+          }
+
+          const sourcePath = resolveContentEntryPath(contentDir, 'folder', fromPath);
+          const destinationPath = resolveContentEntryPath(contentDir, 'folder', toPath);
+          if (sourcePath === destinationPath) {
+            return { renamedAssets: [], rewrittenDocs: [] };
+          }
+          if (stringsDifferOnlyByCase(fromPath, toPath)) {
+            throw new ManagedRenameInvalidRequestError('Case-only renames are not supported.');
+          }
+          if (!existsSync(sourcePath)) {
+            throw new ManagedRenameSourceNotFoundError('file');
+          }
+          if (existsSync(destinationPath)) {
+            throw new ManagedRenameDestinationExistsError();
+          }
+          const sourceStat = statSync(sourcePath);
+          if (!sourceStat.isFile()) {
+            throw new ManagedRenameSourceTypeMismatchError(
+              'file',
+              'Source path is not a document file.',
+            );
+          }
+
+          const renameEngine = getSyncEngine?.();
+          const trackedFiles = new Set(
+            renameEngine ? renameEngine.getConflicts().map((c) => c.file) : [],
+          );
+          const sourceDoc = hocuspocus.documents.get(sourceDocName);
+          if (
+            (sourceDoc !== undefined && isDocInConflict(sourceDoc)) ||
+            trackedFiles.has(fromPath)
+          ) {
+            throw new DocInConflictError({ file: fromPath });
+          }
+
+          const renamedAssets = [{ fromPath, toPath }];
+          const pendingRewrites = collectAssetReferenceRewritesForMappings(renamedAssets).filter(
+            (entry) => entry.docName !== sourceDocName,
+          );
+          span.setAttribute('rename.rewrite_candidates', pendingRewrites.length);
+          assertRewriteTargetsNotConflicted(pendingRewrites.map((entry) => entry.docName));
+
+          reconcileDiskBeforeAgentWrite(hocuspocus, sourceDocName, contentDir);
+          if (recentlyRemovedDocs && !isSystemDoc(sourceDocName) && !isConfigDoc(sourceDocName)) {
+            recentlyRemovedDocs.setDeleted(sourceDocName);
+          }
+          const liveContents = await captureAndCloseDocuments([sourceDocName]);
+          const liveContent = liveContents.get(sourceDocName);
+          const sourceContent =
+            typeof liveContent === 'string' ? liveContent : readFileSync(sourcePath, 'utf-8');
+          const recoveryJournal = createManagedRenameRecoveryJournal({
+            fromPath,
+            toPath,
+            affectedDocs: [{ from: sourceDocName, to: sourceDocName }],
+            snapshots: [{ docName: sourceDocName, content: sourceContent }],
+            cleanupPaths: [toPath],
+          });
+          let rewrittenDocs: ManagedRenameRewrittenDoc[] = [];
+          await withManagedRenameRecovery(projectDir ?? contentDir, recoveryJournal, async () => {
+            tracedWriteFileSync(sourcePath, sourceContent, 'utf-8');
+            registerWrite(sourcePath, contentHash(sourceContent));
+
+            const renamedWithGit = await renameTrackedPathInGit(
+              projectDir,
+              sourcePath,
+              destinationPath,
+            );
+            if (!renamedWithGit) {
+              renamePathOnDisk(sourcePath, destinationPath);
+            }
+
+            backlinkIndex.deleteDocument(sourceDocName);
+            forgetDocExtension(sourceDocName);
+            mutateFileIndex?.({ kind: 'delete', path: sourcePath, docName: sourceDocName });
+            const destinationStat = statSync(destinationPath);
+            mutateFileIndex?.({
+              kind: 'file-create',
+              path: destinationPath,
+              relativePath: toPath,
+              size: destinationStat.size,
+              modifiedTs: destinationStat.mtimeMs,
+              inode: destinationStat.ino,
+            });
+
+            rewrittenDocs = applyPendingAssetReferenceRewrites(pendingRewrites, renamedAssets);
+
+            void backlinkIndex.saveToDisk().catch((err) => {
+              console.warn(
+                `[backlinks] Failed to persist document-to-file rename cache for ${fromPath} -> ${toPath}:`,
+                err,
+              );
+            });
+            signalChannel?.('files');
+            if (rewrittenDocs.length > 0) {
+              signalChannel?.('backlinks');
+              signalChannel?.('graph');
+            }
+          });
+
+          rewrittenDocs.sort((a, b) => a.docName.localeCompare(b.docName));
+          span.setAttribute('rename.rewrite_count', rewrittenDocs.length);
+          return { renamedAssets, rewrittenDocs };
         },
       ),
     );
@@ -2857,58 +2996,65 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
 
             if (shadowRef?.current) {
               const shadow = shadowRef.current;
-              withSpanSync('rename.appendLog', { attributes: { 'rename.kind': kind } }, (span) => {
-                const groupId = randomUUID();
-                const at = new Date().toISOString();
-                const branch = getCurrentBranch?.() ?? 'main';
-                const renameLogIndex = getOrLoadRenameLogIndex(shadow.gitDir);
-                const actorWriter = options?.actor
-                  ? {
-                      writerId: options.actor.writerId,
-                      displayName: options.actor.displayName,
+              const loggableAffectedDocs = affectedDocs.filter(({ from, to }) => from !== to);
+              if (loggableAffectedDocs.length > 0) {
+                withSpanSync(
+                  'rename.appendLog',
+                  { attributes: { 'rename.kind': kind } },
+                  (span) => {
+                    const groupId = randomUUID();
+                    const at = new Date().toISOString();
+                    const branch = getCurrentBranch?.() ?? 'main';
+                    const renameLogIndex = getOrLoadRenameLogIndex(shadow.gitDir);
+                    const actorWriter = options?.actor
+                      ? {
+                          writerId: options.actor.writerId,
+                          displayName: options.actor.displayName,
+                        }
+                      : { writerId: SERVICE_WRITER.id, displayName: SERVICE_WRITER.name };
+                    let entriesAppended = 0;
+                    for (const { from, to } of loggableAffectedDocs) {
+                      const logEntry: RenameLogEntry = {
+                        v: 1,
+                        from,
+                        to,
+                        at,
+                        commitSha: '',
+                        branch,
+                        groupId,
+                        kind,
+                        actor: actorWriter,
+                      };
+                      appendRenameLogEntry(shadow.gitDir, logEntry, renameLogIndex, shadow);
+                      entriesAppended += 1;
+                      if (options?.actor) {
+                        recordContributor(
+                          to,
+                          options.actor.writerId,
+                          options.actor.displayName,
+                          options.actor.colorSeed,
+                          formatRenameSubject(from, to),
+                          options.actor.actorMetadata,
+                          undefined,
+                          [{ from, to }],
+                        );
+                      } else {
+                        recordContributor(
+                          to,
+                          SERVICE_WRITER.id,
+                          SERVICE_WRITER.name,
+                          SERVICE_WRITER.id,
+                          formatRenameSubject(from, to),
+                          undefined,
+                          undefined,
+                          [{ from, to }],
+                        );
+                      }
                     }
-                  : { writerId: SERVICE_WRITER.id, displayName: SERVICE_WRITER.name };
-                let entriesAppended = 0;
-                for (const { from, to } of affectedDocs) {
-                  const logEntry: RenameLogEntry = {
-                    v: 1,
-                    from,
-                    to,
-                    at,
-                    commitSha: '',
-                    branch,
-                    groupId,
-                    kind,
-                    actor: actorWriter,
-                  };
-                  appendRenameLogEntry(shadow.gitDir, logEntry, renameLogIndex, shadow);
-                  entriesAppended += 1;
-                  if (options?.actor) {
-                    recordContributor(
-                      to,
-                      options.actor.writerId,
-                      options.actor.displayName,
-                      options.actor.colorSeed,
-                      formatRenameSubject(from, to),
-                      options.actor.actorMetadata,
-                      undefined,
-                      [{ from, to }],
-                    );
-                  } else {
-                    recordContributor(
-                      to,
-                      SERVICE_WRITER.id,
-                      SERVICE_WRITER.name,
-                      SERVICE_WRITER.id,
-                      formatRenameSubject(from, to),
-                      undefined,
-                      undefined,
-                      [{ from, to }],
-                    );
-                  }
-                }
-                span.setAttribute('rename.entries_appended', entriesAppended);
-              });
+                    span.setAttribute('rename.entries_appended', entriesAppended);
+                  },
+                );
+              }
             }
 
             const explicitDestExt: string | null =
@@ -7151,13 +7297,20 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
           );
           return;
         }
-        if (kind === 'asset') {
+        const operationKind =
+          kind === 'asset' && isSupportedDocFile(fromPath) && isSupportedDocFile(toPath)
+            ? 'file'
+            : kind;
+        if (operationKind === 'asset') {
           let result: {
             renamedAssets: RenamedAssetMapping[];
             rewrittenDocs: ManagedRenameRewrittenDoc[];
           };
           try {
-            result = await _performAssetRename(fromPath, toPath);
+            result =
+              isSupportedDocFile(fromPath) && !isSupportedDocFile(toPath)
+                ? await _performDocumentToFileRename(fromPath, toPath)
+                : await _performAssetRename(fromPath, toPath);
           } catch (err) {
             if (err instanceof DocInConflictError) {
               respondDocInConflict(res, err, 'rename-path');
@@ -7169,6 +7322,10 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
               cause: err,
             });
             return;
+          }
+
+          if (result.renamedAssets.length > 0) {
+            invalidateReferencedAssetsCache();
           }
 
           let summaryResponse: SummaryResponse | undefined;
@@ -7226,7 +7383,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
           return;
         }
         const renameAffectedDocNames =
-          kind === 'file'
+          operationKind === 'file'
             ? [stripDocExtension(fromPath)]
             : listManagedDocNamesUnderFolderFromDisk(
                 resolveContentEntryPath(contentDir, 'folder', fromPath),
@@ -7239,7 +7396,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
           const affectedDocName = stripDocExtension(affected);
           const doc = hocuspocus.documents.get(affectedDocName);
           const filePath =
-            kind === 'file' ? fromPath : `${affectedDocName}${getDocExtension(affected)}`;
+            operationKind === 'file' ? fromPath : `${affectedDocName}${getDocExtension(affected)}`;
           const conflictedByLifecycle = doc !== undefined && isDocInConflict(doc);
           const conflictedByStore = renameTrackedFiles.has(filePath);
           if (conflictedByLifecycle || conflictedByStore) {
@@ -7247,13 +7404,13 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
             return;
           }
         }
-        if (kind === 'file') {
+        if (operationKind === 'file') {
           probeAndRegisterSourceFileExtension(contentDir, fromPath);
         }
 
         if (contentFilter) {
           const excluded =
-            kind === 'file'
+            operationKind === 'file'
               ? contentFilter.isExcluded(
                   isSupportedDocFile(toPath) ? toPath : `${toPath}${getDocExtension(fromPath)}`,
                 )
@@ -7263,7 +7420,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
               res,
               400,
               'urn:ok:error:invalid-request',
-              `Destination ${kind === 'file' ? 'document' : 'folder'} is excluded by the project content config.`,
+              `Destination ${operationKind === 'file' ? 'document' : 'folder'} is excluded by the project content config.`,
               { handler: 'rename-path' },
             );
             return;
@@ -7289,7 +7446,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
           result = await _performManagedRenameForDocs(
             fromPath,
             toPath,
-            kind,
+            operationKind,
             renameActor ? { actor: renameActor } : {},
           );
         } catch (err) {
@@ -7320,11 +7477,14 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
         }
 
         let summaryResponse: SummaryResponse | undefined;
-        if (result.renamed.length > 0) {
+        const logicalRenames = result.renamed.filter(
+          ({ fromDocName, toDocName }) => fromDocName !== toDocName,
+        );
+        if (logicalRenames.length > 0) {
           summaryResponse = attributeRenameWriteToActor(
             actor,
             `Renamed ${fromPath} → ${toPath}`,
-            result.renamed.map(({ fromDocName, toDocName }) => ({
+            logicalRenames.map(({ fromDocName, toDocName }) => ({
               docName: toDocName,
               subject: formatRenameSubject(fromDocName, toDocName),
             })),
@@ -7339,7 +7499,10 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
             },
           );
         }
-        renameAttributionCounter().add(1, { kind: `rename-${kind}`, attribution_kind: actor.kind });
+        renameAttributionCounter().add(1, {
+          kind: `rename-${operationKind}`,
+          attribution_kind: actor.kind,
+        });
 
         if (flushContributors) {
           try {
@@ -7404,54 +7567,61 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
           return;
         }
         const operationPath = assetResolution.path;
-        if (
-          kind === 'asset' &&
-          (isSupportedDocFile(operationPath) || isReservedProjectStatePath(operationPath))
-        ) {
+        const operationKind = kind === 'asset' && isSupportedDocFile(operationPath) ? 'file' : kind;
+        if (operationKind === 'file') {
+          probeAndRegisterSourceFileExtension(contentDir, operationPath);
+        }
+        if (operationKind === 'asset' && isReservedProjectStatePath(operationPath)) {
           errorResponse(
             res,
             400,
-            isReservedProjectStatePath(operationPath)
-              ? 'urn:ok:error:reserved-doc-name'
-              : 'urn:ok:error:invalid-request',
-            isReservedProjectStatePath(operationPath)
-              ? '.ok and .git are reserved directories.'
-              : 'Asset operations do not support markdown documents.',
+            'urn:ok:error:reserved-doc-name',
+            '.ok and .git are reserved directories.',
             { handler: 'delete-path' },
           );
           return;
         }
 
         const targetPath =
-          kind === 'asset'
+          operationKind === 'asset'
             ? resolveContentEntryPath(contentDir, 'folder', operationPath)
-            : resolveContentEntryPath(contentDir, kind, operationPath);
+            : resolveContentEntryPath(contentDir, operationKind, operationPath);
         if (!existsSync(targetPath)) {
-          errorResponse(res, 404, 'urn:ok:error:doc-not-found', `${kind} does not exist.`, {
-            handler: 'delete-path',
-          });
+          errorResponse(
+            res,
+            404,
+            'urn:ok:error:doc-not-found',
+            `${operationKind} does not exist.`,
+            {
+              handler: 'delete-path',
+            },
+          );
           return;
         }
 
         const targetStat = statSync(targetPath);
         if (
-          (kind === 'file' && !targetStat.isFile()) ||
-          (kind === 'asset' && !targetStat.isFile()) ||
-          (kind === 'folder' && !targetStat.isDirectory())
+          (operationKind === 'file' && !targetStat.isFile()) ||
+          (operationKind === 'asset' && !targetStat.isFile()) ||
+          (operationKind === 'folder' && !targetStat.isDirectory())
         ) {
-          errorResponse(res, 400, 'urn:ok:error:invalid-request', `Target path is not a ${kind}.`, {
-            handler: 'delete-path',
-          });
+          errorResponse(
+            res,
+            400,
+            'urn:ok:error:invalid-request',
+            `Target path is not a ${operationKind}.`,
+            { handler: 'delete-path' },
+          );
           return;
         }
 
         const deletedDocNames =
-          kind === 'asset'
+          operationKind === 'asset'
             ? []
-            : kind === 'file'
-              ? [path]
+            : operationKind === 'file'
+              ? [stripDocExtension(operationPath)]
               : listManagedDocNamesUnderFolderFromDisk(
-                  resolveContentEntryPath(contentDir, 'folder', path),
+                  resolveContentEntryPath(contentDir, 'folder', operationPath),
                 );
 
         const deleteEngine = getSyncEngine?.();
@@ -7462,7 +7632,11 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
           const affectedDocName = stripDocExtension(affected);
           const doc = hocuspocus.documents.get(affectedDocName);
           const filePath =
-            kind === 'file' ? affected : `${affectedDocName}${getDocExtension(affectedDocName)}`;
+            operationKind === 'file'
+              ? isSupportedDocFile(operationPath)
+                ? operationPath
+                : `${affectedDocName}${getDocExtension(affectedDocName)}`
+              : `${affectedDocName}${getDocExtension(affectedDocName)}`;
           const conflictedByLifecycle = doc !== undefined && isDocInConflict(doc);
           const conflictedByStore = deleteTrackedFiles.has(filePath);
           if (conflictedByLifecycle || conflictedByStore) {
@@ -7488,11 +7662,11 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
           }
         }
 
-        if (kind === 'file' || kind === 'asset') {
+        if (operationKind === 'file' || operationKind === 'asset') {
           tracedUnlinkSync(targetPath);
         } else {
           tracedRmSync(targetPath, { recursive: true, force: false });
-          removeFolderIndexEntries(path);
+          removeFolderIndexEntries(operationPath);
         }
         invalidateReferencedAssetsCache();
 
@@ -7555,27 +7729,30 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
               );
               return;
             }
-            const isReservedFolder = kind === 'folder' && isReservedSyntheticFolderPath(path);
-            const isReservedAsset = kind === 'asset' && isReservedProjectStatePath(path);
-            const isInvalidAsset = kind === 'asset' && isSupportedDocFile(path);
+            const operationKind = kind === 'asset' && isSupportedDocFile(path) ? 'file' : kind;
+            const operationDocName = stripDocExtension(path);
+            if (operationKind === 'file') {
+              probeAndRegisterSourceFileExtension(contentDir, path);
+            }
+            const isReservedFolder =
+              operationKind === 'folder' && isReservedSyntheticFolderPath(path);
+            const isReservedAsset = operationKind === 'asset' && isReservedProjectStatePath(path);
             if (
-              (kind === 'file' && (isSystemDoc(path) || isConfigDoc(path))) ||
+              (operationKind === 'file' &&
+                (isSystemDoc(operationDocName) || isConfigDoc(operationDocName))) ||
               isReservedFolder ||
-              isReservedAsset ||
-              isInvalidAsset
+              isReservedAsset
             ) {
               errorResponse(
                 res,
                 400,
-                isInvalidAsset ? 'urn:ok:error:invalid-request' : 'urn:ok:error:reserved-doc-name',
-                isInvalidAsset
-                  ? 'Asset operations do not support markdown documents.'
-                  : `'${path}' is a reserved document name.`,
+                'urn:ok:error:reserved-doc-name',
+                `'${path}' is a reserved document name.`,
                 { handler: 'trash-cleanup' },
               );
               return;
             }
-            if (kind === 'asset') {
+            if (operationKind === 'asset') {
               invalidateReferencedAssetsCache();
               signalChannel?.('files');
               successResponse(
@@ -7590,11 +7767,11 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
 
             const initialIndex = getFileIndex();
             const deletedDocNames =
-              kind === 'file'
-                ? initialIndex.has(path)
-                  ? [path]
+              operationKind === 'file'
+                ? initialIndex.has(operationDocName)
+                  ? [operationDocName]
                   : []
-                : listAffectedDocNames(initialIndex, kind, path);
+                : listAffectedDocNames(initialIndex, operationKind, path);
 
             invalidateReferencedAssetsCache();
 
@@ -7633,7 +7810,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
                 docName,
               });
             }
-            if (kind === 'folder') {
+            if (operationKind === 'folder') {
               removeFolderIndexEntries(path);
             }
 

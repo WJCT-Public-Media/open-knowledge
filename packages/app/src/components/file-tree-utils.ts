@@ -127,7 +127,7 @@ export function toFileEntries(entries: readonly DocumentListEntry[]): FileEntry[
   return mapped;
 }
 
-function synthesizeFileAssetExt(path: string): string {
+export function synthesizeFileAssetExt(path: string): string {
   const basename = path.includes('/') ? (path.split('/').pop() ?? path) : path;
   const dotIndex = basename.lastIndexOf('.');
   if (dotIndex > 0 && dotIndex < basename.length - 1) {

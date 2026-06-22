@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   getFileExtension,
+  hasSupportedDocumentExtension,
   replaceFileExtension,
   validateAndCoerceRenameDestination,
 } from './file-tree-rename-validation';
@@ -94,7 +95,7 @@ describe('replaceFileExtension', () => {
 });
 
 describe('validateAndCoerceRenameDestination — allow paths', () => {
-  test('matching extension allows the rename and coerces casing to source', () => {
+  test('matching extension allows the rename', () => {
     expect(validateAndCoerceRenameDestination('foo.md', 'bar.md', false)).toEqual({
       kind: 'allow',
       destinationPath: 'bar.md',
@@ -108,9 +109,9 @@ describe('validateAndCoerceRenameDestination — allow paths', () => {
     });
   });
 
-  test('chip-stripped destination preserves source extension on commit (chip↔validator contract)', () => {
+  test('basename-only destination preserves source extension on commit', () => {
     const source = 'specs/RELEASES.md';
-    const userTypedBasename = 'specs/RELEASES-v2'; // user typed in chip-mode
+    const userTypedBasename = 'specs/RELEASES-v2';
     const result = validateAndCoerceRenameDestination(source, userTypedBasename, false);
     expect(result).toEqual({
       kind: 'allow',
@@ -118,10 +119,10 @@ describe('validateAndCoerceRenameDestination — allow paths', () => {
     });
   });
 
-  test('user used a different casing of the same extension → coerce to source casing', () => {
+  test('user used a different casing of the same supported extension → preserve typed casing', () => {
     expect(validateAndCoerceRenameDestination('foo.md', 'bar.MD', false)).toEqual({
       kind: 'allow',
-      destinationPath: 'bar.md',
+      destinationPath: 'bar.MD',
     });
   });
 
@@ -168,37 +169,61 @@ describe('validateAndCoerceRenameDestination — allow paths', () => {
       destinationPath: 'bar.mdx',
     });
   });
-});
 
-describe('validateAndCoerceRenameDestination — block paths', () => {
-  test('user types a different extension (.md → .tx) → block', () => {
-    expect(validateAndCoerceRenameDestination('foo.md', 'bar.tx', false)).toEqual({
-      kind: 'block',
-    });
-  });
-
-  test('user changes type .md → .mdx → block (different doc type, explicit change)', () => {
+  test('user changes document extension .md → .mdx explicitly', () => {
     expect(validateAndCoerceRenameDestination('foo.md', 'bar.mdx', false)).toEqual({
-      kind: 'block',
+      kind: 'allow',
+      destinationPath: 'bar.mdx',
     });
   });
 
-  test('block is independent of directory depth', () => {
+  test('user changes document extension .mdx → .md explicitly', () => {
+    expect(validateAndCoerceRenameDestination('foo.mdx', 'bar.md', false)).toEqual({
+      kind: 'allow',
+      destinationPath: 'bar.md',
+    });
+  });
+
+  test('user types an arbitrary document extension (.md → .tx) → allow as-is', () => {
+    expect(validateAndCoerceRenameDestination('foo.md', 'bar.tx', false)).toEqual({
+      kind: 'allow',
+      destinationPath: 'bar.tx',
+    });
+  });
+
+  test('arbitrary extension allowance is independent of directory depth', () => {
     expect(
       validateAndCoerceRenameDestination('meetings/2026/foo.md', 'meetings/2026/foo.notes', false),
-    ).toEqual({ kind: 'block' });
+    ).toEqual({
+      kind: 'allow',
+      destinationPath: 'meetings/2026/foo.notes',
+    });
   });
 
-  test('user adds a multi-dot suffix that looks like a different extension → block', () => {
+  test('user adds a multi-dot suffix that looks like a different extension → allow as-is', () => {
     expect(validateAndCoerceRenameDestination('foo.md', 'report.2026', false)).toEqual({
-      kind: 'block',
+      kind: 'allow',
+      destinationPath: 'report.2026',
     });
   });
 
-  test('block is case-insensitive on comparison (.MD == .md, but .TX != .md)', () => {
+  test('arbitrary extension allowance preserves typed casing', () => {
     expect(validateAndCoerceRenameDestination('foo.md', 'bar.TX', false)).toEqual({
-      kind: 'block',
+      kind: 'allow',
+      destinationPath: 'bar.TX',
     });
+  });
+});
+
+describe('hasSupportedDocumentExtension', () => {
+  test('recognizes managed markdown extensions case-insensitively', () => {
+    expect(hasSupportedDocumentExtension('foo.md')).toBe(true);
+    expect(hasSupportedDocumentExtension('foo.MDX')).toBe(true);
+  });
+
+  test('returns false for arbitrary file extensions', () => {
+    expect(hasSupportedDocumentExtension('foo.txt')).toBe(false);
+    expect(hasSupportedDocumentExtension('foo')).toBe(false);
   });
 });
 
@@ -227,18 +252,16 @@ describe('validateAndCoerceRenameDestination — folder short-circuit', () => {
 
 describe('validateAndCoerceRenameDestination — asset paths', () => {
   test('asset rename allows extension changes as-is', () => {
-    expect(
-      validateAndCoerceRenameDestination('media/image.png', 'media/image.jpg', false, true),
-    ).toEqual({
-      kind: 'allow',
-      destinationPath: 'media/image.jpg',
-    });
+    expect(validateAndCoerceRenameDestination('media/image.png', 'media/image.jpg', false)).toEqual(
+      {
+        kind: 'allow',
+        destinationPath: 'media/image.jpg',
+      },
+    );
   });
 
   test('asset rename preserves the source extension when omitted', () => {
-    expect(
-      validateAndCoerceRenameDestination('media/image.png', 'media/image', false, true),
-    ).toEqual({
+    expect(validateAndCoerceRenameDestination('media/image.png', 'media/image', false)).toEqual({
       kind: 'allow',
       destinationPath: 'media/image.png',
     });

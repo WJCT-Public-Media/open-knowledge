@@ -1,4 +1,5 @@
-type RenameDestinationValidation = { kind: 'allow'; destinationPath: string } | { kind: 'block' };
+type RenameDestinationValidation = { kind: 'allow'; destinationPath: string };
+const SUPPORTED_DOCUMENT_EXTENSIONS = new Set(['.md', '.mdx']);
 
 export function getFileExtension(path: string): string {
   const lastSlash = path.lastIndexOf('/');
@@ -17,27 +18,21 @@ export function replaceFileExtension(path: string, newExt: string): string {
   return `${dir}${basenameNoExt}${newExt}`;
 }
 
+export function hasSupportedDocumentExtension(path: string): boolean {
+  return SUPPORTED_DOCUMENT_EXTENSIONS.has(getFileExtension(path).toLowerCase());
+}
+
 export function validateAndCoerceRenameDestination(
   sourcePath: string,
   destinationPath: string,
   isFolder: boolean,
-  isAsset = false,
 ): RenameDestinationValidation {
   if (isFolder) return { kind: 'allow', destinationPath };
   const sourceExt = getFileExtension(sourcePath);
   if (sourceExt === '') return { kind: 'allow', destinationPath };
   const destExt = getFileExtension(destinationPath);
-  if (isAsset) {
-    return {
-      kind: 'allow',
-      destinationPath: destExt ? destinationPath : replaceFileExtension(destinationPath, sourceExt),
-    };
-  }
-  if (destExt && destExt.toLowerCase() !== sourceExt.toLowerCase()) {
-    return { kind: 'block' };
-  }
   return {
     kind: 'allow',
-    destinationPath: replaceFileExtension(destinationPath, sourceExt),
+    destinationPath: destExt ? destinationPath : replaceFileExtension(destinationPath, sourceExt),
   };
 }

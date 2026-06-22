@@ -255,6 +255,55 @@ describe('managed rename recovery journal — v2 multi-doc recovery', () => {
     expect(existsSync(join(dir, 'essays', 'unrelated.md'))).toBe(true);
     expect(existsSync(join(dir, 'essays'))).toBe(true);
   });
+
+  test('replays path snapshots and removes path-level cleanup targets', () => {
+    const dir = setupTmpDir();
+    mkdirSync(join(dir, 'docs'), { recursive: true });
+    writeFileSync(join(dir, 'docs', 'guide.md'), '# Guide\n', 'utf-8');
+    writeFileSync(join(dir, 'docs', 'guide.txt'), '# Guide\n', 'utf-8');
+
+    writeManagedRenameJournal(
+      dir,
+      createManagedRenameRecoveryJournal({
+        fromPath: 'docs/guide.txt',
+        toPath: 'docs/guide.md',
+        affectedDocs: [],
+        snapshots: [],
+        pathSnapshots: [{ path: 'docs/guide.txt', content: '# Guide\n' }],
+        cleanupPaths: ['docs/guide.md'],
+      }),
+    );
+
+    const recovery = recoverPendingManagedRename(dir);
+    expect(recovery.recovered).toBe(true);
+    expect(recovery.restoredDocNames).toEqual([]);
+    expect(readFileSync(join(dir, 'docs', 'guide.txt'), 'utf-8')).toBe('# Guide\n');
+    expect(existsSync(join(dir, 'docs', 'guide.md'))).toBe(false);
+    expect(existsSync(managedRenameJournalPath(dir))).toBe(false);
+  });
+
+  test('keeps the journal when a path-level cleanup target is invalid', () => {
+    const dir = setupTmpDir();
+    mkdirSync(join(dir, 'docs'), { recursive: true });
+
+    writeManagedRenameJournal(
+      dir,
+      createManagedRenameRecoveryJournal({
+        fromPath: 'docs/guide.txt',
+        toPath: 'docs/guide.md',
+        affectedDocs: [],
+        snapshots: [],
+        pathSnapshots: [{ path: 'docs/guide.txt', content: '# Guide\n' }],
+        cleanupPaths: ['../escape.md'],
+      }),
+    );
+
+    expect(() => recoverPendingManagedRename(dir)).toThrow(
+      'Managed rename recovery incomplete; failed to clean destinations: ../escape.md',
+    );
+    expect(readFileSync(join(dir, 'docs', 'guide.txt'), 'utf-8')).toBe('# Guide\n');
+    expect(existsSync(managedRenameJournalPath(dir))).toBe(true);
+  });
 });
 
 describe('managed rename recovery journal — failure cause propagation', () => {
@@ -416,5 +465,26 @@ describe('managed rename recovery journal — v2 parser validation', () => {
     expect(() => readManagedRenameJournal(dir)).toThrow(
       'Managed rename journal v2 has invalid snapshots',
     );
+  });
+
+  test('accepts v2 path-only journals for cross-type file recovery', () => {
+    const dir = setupTmpDir();
+    writeRawJournal(dir, {
+      version: 2,
+      fromPath: 'docs/guide.txt',
+      toPath: 'docs/guide.md',
+      createdAt: '2026-04-30T00:00:00.000Z',
+      affectedDocs: [],
+      snapshots: [],
+      pathSnapshots: [{ path: 'docs/guide.txt', content: '# Guide\n' }],
+      cleanupPaths: ['docs/guide.md'],
+    });
+
+    const parsed = readManagedRenameJournal(dir);
+    expect(parsed?.version).toBe(2);
+    if (parsed?.version === 2) {
+      expect(parsed.pathSnapshots).toEqual([{ path: 'docs/guide.txt', content: '# Guide\n' }]);
+      expect(parsed.cleanupPaths).toEqual(['docs/guide.md']);
+    }
   });
 });

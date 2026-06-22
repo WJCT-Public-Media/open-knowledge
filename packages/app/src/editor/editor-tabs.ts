@@ -25,6 +25,7 @@ const LOCAL_TAB_SESSION_PREFIX = 'ok-editor-tabs-v1:';
 const FOLDER_TAB_PREFIX = '\u0000folder:';
 const ASSET_TAB_PREFIX = '\u0000asset:';
 const TAB_INSTANCE_SEPARATOR = '\u0000doc-tab:';
+const MARKDOWN_TAB_EXTENSION_PATTERN = /\.(md|mdx)$/i;
 
 interface OpenTabOptions {
   behavior: 'append' | 'replace-active';
@@ -44,6 +45,12 @@ function splitTabInstance(tabId: string): { baseTabId: string; instanceSuffix: s
 
 function baseTabId(tabId: string): string {
   return splitTabInstance(tabId).baseTabId;
+}
+
+function stripMarkdownTabExtension(path: string): string | null {
+  return MARKDOWN_TAB_EXTENSION_PATTERN.test(path)
+    ? path.replace(MARKDOWN_TAB_EXTENSION_PATTERN, '')
+    : null;
 }
 
 function isValidTabId(value: unknown): value is string {
@@ -373,8 +380,30 @@ export function remapOpenTabs(
     return normalizeOpenTabs(tabs, limit);
   }
   const bySource = new Map(mappings.map((entry) => [entry.fromDocName, entry.toDocName]));
+  const docToAssetBySource = new Map(
+    assetMappings.flatMap((entry) => {
+      const sourceDocName = stripMarkdownTabExtension(entry.fromPath);
+      return sourceDocName ? [[sourceDocName, entry.toPath] as const] : [];
+    }),
+  );
+  const assetToDocBySource = new Map(
+    assetMappings.flatMap((entry) => {
+      const targetDocName = stripMarkdownTabExtension(entry.toPath);
+      return targetDocName ? [[entry.fromPath, targetDocName] as const] : [];
+    }),
+  );
   const remapAssetPath = (assetPath: string) =>
     remapPathForAssetRenames(remapPathForFolderRenames(assetPath, folderMappings), assetMappings);
+  const remapDocTabBase = (docName: string, fallbackTabId: string): string => {
+    const renamedDocName = bySource.get(docName);
+    if (renamedDocName) return renamedDocName;
+    const assetPath = docToAssetBySource.get(docName);
+    return assetPath ? assetTabId(assetPath) : fallbackTabId;
+  };
+  const remapAssetTabBase = (assetPath: string): string => {
+    const docName = assetToDocBySource.get(assetPath);
+    return docName ? docTabId(docName) : assetTabId(remapAssetPath(assetPath));
+  };
   const next: string[] = [];
   const seen = new Set<string>();
   for (const tab of tabs) {
@@ -382,10 +411,10 @@ export function remapOpenTabs(
     const parsed = parseEditorTabId(tab);
     const mappedBase =
       parsed.kind === 'doc'
-        ? (bySource.get(parsed.docName) ?? baseTabId(tab))
+        ? remapDocTabBase(parsed.docName, baseTabId(tab))
         : parsed.kind === 'folder'
           ? folderTabId(remapPathForFolderRenames(parsed.folderPath, folderMappings))
-          : assetTabId(remapAssetPath(parsed.assetPath));
+          : remapAssetTabBase(parsed.assetPath);
     const mapped = `${mappedBase}${instanceSuffix}`;
     if (seen.has(mapped)) continue;
     seen.add(mapped);
@@ -396,10 +425,10 @@ export function remapOpenTabs(
   const remappedPinnedTabIds = pinnedTabIds.map((tabId) => {
     const parsed = parseEditorTabId(tabId);
     return parsed.kind === 'doc'
-      ? (bySource.get(parsed.docName) ?? tabId)
+      ? remapDocTabBase(parsed.docName, tabId)
       : parsed.kind === 'folder'
         ? folderTabId(remapPathForFolderRenames(parsed.folderPath, folderMappings))
-        : assetTabId(remapAssetPath(parsed.assetPath));
+        : remapAssetTabBase(parsed.assetPath);
   });
   return capOpenTabsPreservingPinned(next, limit, remappedPinnedTabIds);
 }

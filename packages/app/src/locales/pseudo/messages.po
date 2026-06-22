@@ -2470,10 +2470,6 @@ msgstr ""
 msgid "File duplicated"
 msgstr ""
 
-#: src/components/FileTree.tsx
-msgid "File extensions are managed automatically - please rename without changing the extension"
-msgstr ""
-
 #: src/components/NewItemDialog.tsx
 msgid "File name"
 msgstr ""

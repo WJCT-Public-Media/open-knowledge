@@ -390,7 +390,7 @@ interface RenameEvent {
 
 function simulatePierreCommitRename(
   source: string,
-  chipStrippedDest: string,
+  extensionlessDest: string,
   isFolder: boolean,
 ): void {
   const options = capturedOptions as { renaming?: { onRename?: (e: RenameEvent) => void } } | null;
@@ -398,8 +398,8 @@ function simulatePierreCommitRename(
   if (!onRename) {
     throw new Error('onRename callback missing from captured Pierre options');
   }
-  onRename({ sourcePath: source, destinationPath: chipStrippedDest, isFolder });
-  model.move(source, chipStrippedDest);
+  onRename({ sourcePath: source, destinationPath: extensionlessDest, isFolder });
+  model.move(source, extensionlessDest);
 }
 
 describe('FileTree post-rename Pierre/React store reconciliation', () => {

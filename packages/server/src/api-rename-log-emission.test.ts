@@ -8,6 +8,7 @@ import simpleGit from 'simple-git';
 import { createApiExtension } from './api-extension.ts';
 import { BacklinkIndex } from './backlink-index.ts';
 import { recordContributor, swapContributors } from './contributor-tracker.ts';
+import { _resetDocExtensionsForTests } from './doc-extensions.ts';
 import type { FileIndexEntry } from './file-watcher.ts';
 import { loadRenameLogIndex, type RenameLogEntry, resetRenameLogIndexCache } from './rename-log.ts';
 import { initShadowRepo, type ShadowRef } from './shadow-repo.ts';
@@ -84,6 +85,7 @@ beforeEach(async () => {
   shadowRef = { current: shadow };
 
   swapContributors();
+  _resetDocExtensionsForTests();
   resetRenameLogIndexCache();
 });
 
@@ -156,6 +158,23 @@ describe('rename log emission inside withManagedRenameRecovery (US-006)', () => 
     expect(e.actor.displayName).toBeTruthy();
     expect(e.groupId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(e.at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  test('same-base extension change succeeds without a self-rename log entry', async () => {
+    writeFileSync(resolve(contentDir, 'a.md'), '# A\n');
+
+    const response = await callRename({
+      kind: 'file',
+      fromPath: 'a',
+      toPath: 'a.mdx',
+      agentId: 'claude-1',
+      agentName: 'Claude',
+    });
+    expect(response.status).toBe(200);
+
+    expect(existsSync(resolve(contentDir, 'a.mdx'))).toBe(true);
+    expect(existsSync(resolve(contentDir, 'a.md'))).toBe(false);
+    expect(loadEntries()).toHaveLength(0);
   });
 
   test('anonymous rename produces a service-writer log entry (FR13)', async () => {

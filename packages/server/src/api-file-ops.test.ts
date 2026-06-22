@@ -728,6 +728,25 @@ describe('file operation API routes', () => {
     expect(String(notFoundBody.title).toLowerCase()).toContain('does not exist');
   });
 
+  test('managed rename does not register explicit missing source extensions', async () => {
+    const dir = setupTmpDir();
+
+    const result = await callApi(
+      dir,
+      '/api/rename-path',
+      'POST',
+      {
+        kind: 'file',
+        fromPath: 'missing.mdx',
+        toPath: 'renamed.mdx',
+      },
+      { backlinkIndex: buildBacklinkIndex(dir) },
+    );
+
+    expect(result.status).toBe(404);
+    expect(getDocExtension('missing')).toBe('.md');
+  });
+
   test.skipIf(process.platform === 'win32')(
     'managed rename surfaces actionable symlink escape errors',
     async () => {
@@ -1089,6 +1108,21 @@ describe('file operation API routes', () => {
     expect(body.deletedDocNames).toEqual(['trash-me']);
   });
 
+  test('delete accepts asset-shaped markdown paths as document deletes', async () => {
+    const dir = setupTmpDir();
+    writeFileSync(join(dir, 'trash-me.md'), '# Delete me\n', 'utf-8');
+
+    const result = await callApi(dir, '/api/delete-path', 'POST', {
+      kind: 'asset',
+      path: 'trash-me.md',
+    });
+
+    expect(result.status).toBe(200);
+    expect(existsSync(join(dir, 'trash-me.md'))).toBe(false);
+    const body = JSON.parse(result.body) as { deletedDocNames: string[] };
+    expect(body.deletedDocNames).toEqual(['trash-me']);
+  });
+
   test('renames an asset and rewrites markdown references', async () => {
     const dir = setupTmpDir();
     mkdirSync(join(dir, 'docs/media'), { recursive: true });
@@ -1229,7 +1263,7 @@ describe('file operation API routes', () => {
     expect(body.rewrittenDocs).toEqual([{ docName: 'docs/guide', rewrites: 1 }]);
   });
 
-  test('asset rename rejects unsupported source extensions', async () => {
+  test('asset rename allows arbitrary source extensions', async () => {
     const dir = setupTmpDir();
     mkdirSync(join(dir, 'docs/media'), { recursive: true });
     writeFileSync(join(dir, 'docs/media/archive.xyz'), 'fake bytes', 'utf-8');
@@ -1240,17 +1274,12 @@ describe('file operation API routes', () => {
       toPath: 'docs/media/archive.png',
     });
 
-    expect(result.status).toBe(400);
-    expect(existsSync(join(dir, 'docs/media/archive.xyz'))).toBe(true);
-    expect(existsSync(join(dir, 'docs/media/archive.png'))).toBe(false);
-    expect(JSON.parse(result.body)).toMatchObject({
-      type: 'urn:ok:error:invalid-request',
-      title: 'Asset operations require supported asset extensions.',
-      status: 400,
-    });
+    expect(result.status).toBe(200);
+    expect(existsSync(join(dir, 'docs/media/archive.xyz'))).toBe(false);
+    expect(readFileSync(join(dir, 'docs/media/archive.png'), 'utf-8')).toBe('fake bytes');
   });
 
-  test('asset rename rejects unsupported destination extensions', async () => {
+  test('asset rename allows arbitrary destination extensions', async () => {
     const dir = setupTmpDir();
     mkdirSync(join(dir, 'docs/media'), { recursive: true });
     writeFileSync(join(dir, 'docs/media/diagram.png'), 'fake image bytes', 'utf-8');
@@ -1258,38 +1287,306 @@ describe('file operation API routes', () => {
     const result = await callApi(dir, '/api/rename-path', 'POST', {
       kind: 'asset',
       fromPath: 'docs/media/diagram.png',
-      toPath: 'docs/media/output.xyz',
+      toPath: 'docs/media/diagram.pngg',
     });
 
-    expect(result.status).toBe(400);
-    expect(existsSync(join(dir, 'docs/media/diagram.png'))).toBe(true);
-    expect(existsSync(join(dir, 'docs/media/output.xyz'))).toBe(false);
-    expect(JSON.parse(result.body)).toMatchObject({
-      type: 'urn:ok:error:invalid-request',
-      title: 'Asset operations require supported asset extensions.',
-      status: 400,
-    });
+    expect(result.status).toBe(200);
+    expect(existsSync(join(dir, 'docs/media/diagram.png'))).toBe(false);
+    expect(readFileSync(join(dir, 'docs/media/diagram.pngg'), 'utf-8')).toBe('fake image bytes');
   });
 
-  test('asset rename rejects markdown documents as asset operands', async () => {
+  test('asset rename allows markdown documents to become arbitrary files', async () => {
     const dir = setupTmpDir();
     mkdirSync(join(dir, 'docs/media'), { recursive: true });
     writeFileSync(join(dir, 'docs/guide.md'), '# Guide\n', 'utf-8');
+    writeFileSync(join(dir, 'docs/index.md'), '[Guide](./guide.md)\n', 'utf-8');
 
-    const result = await callApi(dir, '/api/rename-path', 'POST', {
-      kind: 'asset',
-      fromPath: 'docs/guide.md',
-      toPath: 'docs/media/guide.png',
+    const result = await callApi(
+      dir,
+      '/api/rename-path',
+      'POST',
+      {
+        kind: 'asset',
+        fromPath: 'docs/guide.md',
+        toPath: 'docs/media/guide.custom',
+      },
+      { backlinkIndex: buildBacklinkIndex(dir) },
+    );
+
+    expect(result.status).toBe(200);
+    expect(existsSync(join(dir, 'docs/guide.md'))).toBe(false);
+    expect(readFileSync(join(dir, 'docs/media/guide.custom'), 'utf-8')).toBe('# Guide\n');
+    expect(readFileSync(join(dir, 'docs/index.md'), 'utf-8')).toBe(
+      '[Guide](./media/guide.custom)\n',
+    );
+    const body = JSON.parse(result.body) as {
+      renamed: Array<{ fromDocName: string; toDocName: string }>;
+      renamedAssets: Array<{ fromPath: string; toPath: string }>;
+      rewrittenDocs: Array<{ docName: string; rewrites: number }>;
+    };
+    expect(body.renamed).toEqual([]);
+    expect(body.renamedAssets).toEqual([
+      {
+        fromPath: 'docs/guide.md',
+        toPath: 'docs/media/guide.custom',
+      },
+    ]);
+    expect(body.rewrittenDocs).toEqual([{ docName: 'docs/index', rewrites: 1 }]);
+  });
+
+  test('document-to-file rename carries live Y.Doc content to the destination file', async () => {
+    const dir = setupTmpDir();
+    writeFileSync(join(dir, 'live.md'), '# Stale\n', 'utf-8');
+
+    const hocuspocus = new Hocuspocus({ quiet: true });
+    const conn = await hocuspocus.openDirectConnection('live');
+    const document = (conn as unknown as { document: Y.Doc }).document;
+    const ytext = document.getText('source');
+    document.transact(() => {
+      ytext.insert(0, '# Live\n');
     });
 
-    expect(result.status).toBe(400);
-    expect(existsSync(join(dir, 'docs/guide.md'))).toBe(true);
-    expect(existsSync(join(dir, 'docs/media/guide.png'))).toBe(false);
+    try {
+      const result = await callApi(
+        dir,
+        '/api/rename-path',
+        'POST',
+        {
+          kind: 'asset',
+          fromPath: 'live.md',
+          toPath: 'live.txt',
+        },
+        {
+          backlinkIndex: buildBacklinkIndex(dir),
+          hocuspocus,
+        },
+      );
+
+      expect(result.status).toBe(200);
+      expect(existsSync(join(dir, 'live.md'))).toBe(false);
+      expect(readFileSync(join(dir, 'live.txt'), 'utf-8')).toBe('# Live\n');
+    } finally {
+      await conn.disconnect().catch(() => {});
+    }
+  });
+
+  test('document-to-file rename returns 404 when the source document is missing', async () => {
+    const dir = setupTmpDir();
+
+    const result = await callApi(
+      dir,
+      '/api/rename-path',
+      'POST',
+      {
+        kind: 'asset',
+        fromPath: 'missing.md',
+        toPath: 'missing.txt',
+      },
+      { backlinkIndex: buildBacklinkIndex(dir) },
+    );
+
+    expect(result.status).toBe(404);
+    expect(existsSync(join(dir, 'missing.txt'))).toBe(false);
     expect(JSON.parse(result.body)).toMatchObject({
-      type: 'urn:ok:error:invalid-request',
-      title: 'Asset operations do not support markdown documents.',
-      status: 400,
+      type: 'urn:ok:error:doc-not-found',
+      status: 404,
     });
+  });
+
+  test('document-to-file rename returns 409 when the destination file exists', async () => {
+    const dir = setupTmpDir();
+    writeFileSync(join(dir, 'guide.md'), '# Guide\n', 'utf-8');
+    writeFileSync(join(dir, 'guide.txt'), 'existing\n', 'utf-8');
+
+    const result = await callApi(
+      dir,
+      '/api/rename-path',
+      'POST',
+      {
+        kind: 'asset',
+        fromPath: 'guide.md',
+        toPath: 'guide.txt',
+      },
+      { backlinkIndex: buildBacklinkIndex(dir) },
+    );
+
+    expect(result.status).toBe(409);
+    expect(readFileSync(join(dir, 'guide.md'), 'utf-8')).toBe('# Guide\n');
+    expect(readFileSync(join(dir, 'guide.txt'), 'utf-8')).toBe('existing\n');
+  });
+
+  test('document-to-file rename requires a backlink index', async () => {
+    const dir = setupTmpDir();
+    writeFileSync(join(dir, 'guide.md'), '# Guide\n', 'utf-8');
+
+    const result = await callApi(
+      dir,
+      '/api/rename-path',
+      'POST',
+      {
+        kind: 'asset',
+        fromPath: 'guide.md',
+        toPath: 'guide.txt',
+      },
+      { backlinkIndex: null },
+    );
+
+    expect(result.status).toBe(503);
+    expect(JSON.parse(result.body)).toMatchObject({
+      type: 'urn:ok:error:backlink-index-not-configured',
+      status: 503,
+    });
+    expect(readFileSync(join(dir, 'guide.md'), 'utf-8')).toBe('# Guide\n');
+  });
+
+  test('asset rename allows arbitrary files to use markdown extensions', async () => {
+    const dir = setupTmpDir();
+    mkdirSync(join(dir, 'docs/media'), { recursive: true });
+    writeFileSync(join(dir, 'docs/media/guide.custom'), '# Guide\n', 'utf-8');
+    writeFileSync(join(dir, 'docs/index.md'), '[Guide](./media/guide.custom)\n', 'utf-8');
+
+    const result = await callApi(
+      dir,
+      '/api/rename-path',
+      'POST',
+      {
+        kind: 'asset',
+        fromPath: 'docs/media/guide.custom',
+        toPath: 'docs/guide.md',
+      },
+      { backlinkIndex: buildBacklinkIndex(dir) },
+    );
+
+    expect(result.status).toBe(200);
+    expect(existsSync(join(dir, 'docs/media/guide.custom'))).toBe(false);
+    expect(readFileSync(join(dir, 'docs/guide.md'), 'utf-8')).toBe('# Guide\n');
+    expect(readFileSync(join(dir, 'docs/index.md'), 'utf-8')).toBe('[Guide](./guide.md)\n');
+    const body = JSON.parse(result.body) as {
+      renamed: Array<{ fromDocName: string; toDocName: string }>;
+      renamedAssets: Array<{ fromPath: string; toPath: string }>;
+      rewrittenDocs: Array<{ docName: string; rewrites: number }>;
+    };
+    expect(body.renamed).toEqual([]);
+    expect(body.renamedAssets).toEqual([
+      {
+        fromPath: 'docs/media/guide.custom',
+        toPath: 'docs/guide.md',
+      },
+    ]);
+    expect(body.rewrittenDocs).toEqual([{ docName: 'docs/index', rewrites: 1 }]);
+  });
+
+  test('asset rename to markdown extension returns 404 when the source file is missing', async () => {
+    const dir = setupTmpDir();
+
+    const result = await callApi(
+      dir,
+      '/api/rename-path',
+      'POST',
+      {
+        kind: 'asset',
+        fromPath: 'missing.txt',
+        toPath: 'missing.md',
+      },
+      { backlinkIndex: buildBacklinkIndex(dir) },
+    );
+
+    expect(result.status).toBe(404);
+    expect(existsSync(join(dir, 'missing.md'))).toBe(false);
+    expect(JSON.parse(result.body)).toMatchObject({
+      type: 'urn:ok:error:doc-not-found',
+      title: 'Asset does not exist.',
+      status: 404,
+    });
+  });
+
+  test('asset rename to markdown extension returns 409 when the destination exists', async () => {
+    const dir = setupTmpDir();
+    writeFileSync(join(dir, 'guide.txt'), '# Guide\n', 'utf-8');
+    writeFileSync(join(dir, 'guide.md'), '# Existing\n', 'utf-8');
+
+    const result = await callApi(
+      dir,
+      '/api/rename-path',
+      'POST',
+      {
+        kind: 'asset',
+        fromPath: 'guide.txt',
+        toPath: 'guide.md',
+      },
+      { backlinkIndex: buildBacklinkIndex(dir) },
+    );
+
+    expect(result.status).toBe(409);
+    expect(readFileSync(join(dir, 'guide.txt'), 'utf-8')).toBe('# Guide\n');
+    expect(readFileSync(join(dir, 'guide.md'), 'utf-8')).toBe('# Existing\n');
+  });
+
+  test('asset rename to markdown extension requires a backlink index', async () => {
+    const dir = setupTmpDir();
+    writeFileSync(join(dir, 'guide.txt'), '# Guide\n', 'utf-8');
+
+    const result = await callApi(
+      dir,
+      '/api/rename-path',
+      'POST',
+      {
+        kind: 'asset',
+        fromPath: 'guide.txt',
+        toPath: 'guide.md',
+      },
+      { backlinkIndex: null },
+    );
+
+    expect(result.status).toBe(503);
+    expect(JSON.parse(result.body)).toMatchObject({
+      type: 'urn:ok:error:backlink-index-not-configured',
+      status: 503,
+    });
+    expect(readFileSync(join(dir, 'guide.txt'), 'utf-8')).toBe('# Guide\n');
+  });
+
+  test('asset rename allows binary input to use a markdown extension', async () => {
+    const dir = setupTmpDir();
+    writeFileSync(join(dir, 'binary.bin'), Buffer.from([0x23, 0x00, 0xff]));
+
+    const result = await callApi(
+      dir,
+      '/api/rename-path',
+      'POST',
+      {
+        kind: 'asset',
+        fromPath: 'binary.bin',
+        toPath: 'binary.md',
+      },
+      { backlinkIndex: buildBacklinkIndex(dir) },
+    );
+
+    expect(result.status).toBe(200);
+    expect(existsSync(join(dir, 'binary.bin'))).toBe(false);
+    expect(readFileSync(join(dir, 'binary.md'))).toEqual(Buffer.from([0x23, 0x00, 0xff]));
+  });
+
+  test('asset-shaped markdown rename uses the document rename path', async () => {
+    const dir = setupTmpDir();
+    mkdirSync(join(dir, 'docs'), { recursive: true });
+    writeFileSync(join(dir, 'docs/guide.md'), '# Guide\n', 'utf-8');
+
+    const result = await callApi(
+      dir,
+      '/api/rename-path',
+      'POST',
+      {
+        kind: 'asset',
+        fromPath: 'docs/guide.md',
+        toPath: 'docs/guide.mdx',
+      },
+      { backlinkIndex: buildBacklinkIndex(dir) },
+    );
+
+    expect(result.status).toBe(200);
+    expect(existsSync(join(dir, 'docs/guide.md'))).toBe(false);
+    expect(readFileSync(join(dir, 'docs/guide.mdx'), 'utf-8')).toBe('# Guide\n');
   });
 
   test('asset rename returns 404 when the source asset is missing', async () => {
@@ -1624,6 +1921,28 @@ describe('file operation API routes', () => {
     const after = await callApiExtension(api, '/api/documents', 'GET', undefined);
     expect(after.status).toBe(200);
     expect(assetPathsFromDocumentList(after)).not.toContain('docs/foo.png');
+  });
+
+  test('trash cleanup accepts asset-shaped markdown paths as document cleanup', async () => {
+    const dir = setupTmpDir();
+    mkdirSync(join(dir, 'docs'), { recursive: true });
+    writeFileSync(join(dir, 'docs/guide.md'), '# Guide\n', 'utf-8');
+
+    const fileIndex = new Map(buildFileIndex(dir));
+    const api = await createTestApiExtension(dir, {
+      getFileIndex: () => fileIndex,
+    });
+
+    rmSync(join(dir, 'docs/guide.md'));
+    const result = await callApiExtension(api, '/api/trash/cleanup', 'POST', {
+      kind: 'asset',
+      path: 'docs/guide.md',
+    });
+
+    expect(result.status).toBe(200);
+    const body = JSON.parse(result.body) as { deletedDocNames: string[] };
+    expect(body.deletedDocNames).toEqual(['docs/guide']);
+    expect(fileIndex.has('docs/guide')).toBe(false);
   });
 
   test('asset-only folder trash cleanup invalidates the cached document list asset row', async () => {

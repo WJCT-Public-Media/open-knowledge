@@ -106,13 +106,18 @@ import {
   type FileTreeTarget,
   planRenameCleanupCalls,
   type RenamedAssetMapping,
+  type RenamedDocExtensionMapping,
   type RenamedDocMapping,
   type RenamedFolderMapping,
   remapActiveDocName,
 } from '@/components/file-tree-operations';
-import { applyRenameChip, FILE_TREE_RENAME_CHIP_CSS } from '@/components/file-tree-rename-chip';
+import {
+  applyRenameInputAffordance,
+  FILE_TREE_RENAME_INPUT_CSS,
+} from '@/components/file-tree-rename-chip';
 import {
   getFileExtension,
+  hasSupportedDocumentExtension,
   validateAndCoerceRenameDestination,
 } from '@/components/file-tree-rename-validation';
 import { revealActiveRow } from '@/components/file-tree-reveal';
@@ -371,7 +376,7 @@ const FILE_TREE_CREATION_CLEARED_CSS = `
   }
 `;
 
-const FILE_TREE_UNSAFE_CSS = `${FILE_TREE_EXT_BADGE_CSS}\n${FILE_TREE_RENAME_CHIP_CSS}\n${FILE_TREE_ROOT_DROP_CSS}\n${FILE_TREE_EXTERNAL_FILE_DROP_CSS}\n${FILE_TREE_CREATION_CLEARED_CSS}\n${FILE_TREE_INDENT_GUIDE_CSS}\n${FILE_TREE_STICKY_HEADER_CSS}`;
+const FILE_TREE_UNSAFE_CSS = `${FILE_TREE_EXT_BADGE_CSS}\n${FILE_TREE_RENAME_INPUT_CSS}\n${FILE_TREE_ROOT_DROP_CSS}\n${FILE_TREE_EXTERNAL_FILE_DROP_CSS}\n${FILE_TREE_CREATION_CLEARED_CSS}\n${FILE_TREE_INDENT_GUIDE_CSS}\n${FILE_TREE_STICKY_HEADER_CSS}`;
 
 function isAgentTreePath(treePath: string): boolean {
   const name = treePath.split('/').pop()?.replace(/\.md$/i, '').toLowerCase();
@@ -498,7 +503,7 @@ interface FileTreeMenuProps {
   folderTreePaths: readonly string[];
   isAsset: boolean;
   /** Authoritative document list — sourced for `docExt` when Pierre's tree
-   *  path has lost its extension (post-rename-strip). See `treeItemToTarget`. */
+   *  path has lost its extension after a basename-only commit. See `treeItemToTarget`. */
   documents: readonly FileEntry[];
 }
 
@@ -1156,8 +1161,9 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
     );
     navigateToWithPulse(action.path, docEntry?.size);
   }
-  function navigateToAssetWithPulse(assetPath: string) {
-    const entry = documentsRef.current.find(
+  function navigateToAssetWithPulse(assetPath: string, entries?: readonly FileEntry[]) {
+    const currentEntries = entries ?? documentsRef.current;
+    const entry = currentEntries.find(
       (item): item is Extract<FileEntry, { kind: 'asset' }> =>
         isAssetEntry(item) && item.path === assetPath,
     );
@@ -1572,7 +1578,7 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
     }
   };
 
-  const reconcileModelAfterChipRename = (
+  const reconcileModelAfterExtensionlessRename = (
     current: readonly FileEntry[],
     next: readonly FileEntry[],
     renamed: readonly RenamedDocMapping[],
@@ -1586,7 +1592,10 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
       );
       if (source == null) continue;
       if (model.getItem(toDocName) == null) continue;
-      const canonicalTreePath = docNameToTreePath(toDocName, source.docExt);
+      const destination = next.find(
+        (entry): entry is DocumentEntry => isDocumentEntry(entry) && entry.docName === toDocName,
+      );
+      const canonicalTreePath = docNameToTreePath(toDocName, destination?.docExt ?? source.docExt);
       model.move(toDocName, canonicalTreePath);
       lastCanonical = canonicalTreePath;
       reconciledCount += 1;
@@ -2041,9 +2050,32 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
       folderPath: string | null;
       assetPath: string | null;
     },
+    renamedDocExtensions: RenamedDocExtensionMapping[] = [],
   ) => {
     const currentActiveDocName = activeBeforeRename?.docName ?? activeDocNameRef.current;
-    const nextActiveDocName = remapActiveDocName(currentActiveDocName, renamed);
+    const docToAssetRenames = new Map<string, string>();
+    const assetToDocRenames = new Map<string, string>();
+    for (const entry of documentsRef.current) {
+      if (isDocumentEntry(entry)) {
+        const assetPath = renamedAssets.find(
+          (renamedAsset) =>
+            renamedAsset.fromPath === docNameToTreePath(entry.docName, entry.docExt),
+        )?.toPath;
+        if (assetPath) docToAssetRenames.set(entry.docName, assetPath);
+        continue;
+      }
+      if (isAssetEntry(entry)) {
+        const docPath = renamedAssets.find(
+          (renamedAsset) => renamedAsset.fromPath === entry.path,
+        )?.toPath;
+        if (docPath && hasSupportedDocumentExtension(docPath)) {
+          assetToDocRenames.set(entry.path, treeFilePathToDocName(docPath));
+        }
+      }
+    }
+    const activeDocToAssetPath = currentActiveDocName
+      ? (docToAssetRenames.get(currentActiveDocName) ?? null)
+      : null;
     const currentActiveFolderPath =
       activeBeforeRename?.folderPath ??
       (activeTargetRef.current?.kind === 'folder' ? activeTargetRef.current.folderPath : null);
@@ -2053,22 +2085,46 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
     const currentActiveAssetPath =
       activeBeforeRename?.assetPath ??
       (activeTargetRef.current?.kind === 'asset' ? activeTargetRef.current.assetPath : null);
-    const nextActiveAssetPath = currentActiveAssetPath
-      ? (renamedAssets.find((entry) => entry.fromPath === currentActiveAssetPath)?.toPath ??
-        remapPathForFolderRenames(currentActiveAssetPath, renamedFolders))
+    const activeAssetToDoc = currentActiveAssetPath
+      ? (assetToDocRenames.get(currentActiveAssetPath) ?? null)
       : null;
+    const nextActiveDocName = activeDocToAssetPath
+      ? null
+      : (activeAssetToDoc ?? remapActiveDocName(currentActiveDocName, renamed));
+    const nextActiveAssetPath =
+      activeDocToAssetPath ??
+      (currentActiveAssetPath
+        ? activeAssetToDoc
+          ? null
+          : (renamedAssets.find((entry) => entry.fromPath === currentActiveAssetPath)?.toPath ??
+            remapPathForFolderRenames(currentActiveAssetPath, renamedFolders))
+        : null);
 
     captureRenameSnapshots(renamed);
-    const cleanupDocNames = planRenameCleanupCalls(renamed, getPoolActiveDocName(), poolHas);
+    const cleanupDocNames = [
+      ...planRenameCleanupCalls(renamed, getPoolActiveDocName(), poolHas),
+      ...docToAssetRenames.keys(),
+    ];
     await Promise.all(cleanupDocNames.map((docName) => closeAndClearForRename(docName)));
     for (const entry of renamed) {
       addPage(entry.toDocName);
     }
+    for (const entry of assetToDocRenames.values()) {
+      addPage(entry);
+    }
     remapTabsForRename(renamed, renamedFolders, renamedAssets);
 
+    let nextDocumentsForRename: FileEntry[] | null = null;
     setDocuments((current) => {
-      const next = applyRenameToDocuments(current, renamed, renamedFolders, renamedAssets);
-      reconcileModelAfterChipRename(current, next, renamed, renamedAssets);
+      const next = applyRenameToDocuments(
+        current,
+        renamed,
+        renamedFolders,
+        renamedAssets,
+        renamedDocExtensions,
+      );
+      nextDocumentsForRename = next;
+      reconcileModelAfterExtensionlessRename(current, next, renamed, renamedAssets);
       markNextDocumentsAsApplied(next);
       return next;
     });
@@ -2083,11 +2139,10 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
       navigateToWithPulse(nextActiveDocName);
       focusEditorAfterRename(nextActiveDocName);
     } else if (
-      currentActiveAssetPath &&
       nextActiveAssetPath &&
-      nextActiveAssetPath !== currentActiveAssetPath
+      (activeDocToAssetPath || nextActiveAssetPath !== currentActiveAssetPath)
     ) {
-      navigateToAssetWithPulse(nextActiveAssetPath);
+      navigateToAssetWithPulse(nextActiveAssetPath, nextDocumentsForRename ?? documentsRef.current);
     }
     emitDocumentsChanged(['files', 'backlinks', 'graph']);
   };
@@ -2106,22 +2161,15 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
         event.sourcePath,
         event.destinationPath,
         event.isFolder,
-        sourceIsAsset,
       );
-      if (validation.kind === 'block') {
-        toast.error(
-          t`File extensions are managed automatically - please rename without changing the extension`,
-        );
-        queueMicrotask(() => {
-          resetModelToDocuments();
-        });
-        clearPendingCreate();
-        setBusyPath(null);
-        return;
-      }
-      const destinationTreePath = sourceIsAsset
-        ? validation.destinationPath
-        : normalizeTreePathForKind(validation.destinationPath, event.isFolder);
+      const documentBecomesFile =
+        !event.isFolder &&
+        !sourceIsAsset &&
+        !hasSupportedDocumentExtension(validation.destinationPath);
+      const destinationTreePath =
+        sourceIsAsset || documentBecomesFile
+          ? validation.destinationPath
+          : normalizeTreePathForKind(validation.destinationPath, event.isFolder);
 
       const payload = event.isFolder
         ? {
@@ -2129,7 +2177,7 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
             fromPath: treeDirectoryPathToFolderPath(sourceTreePath),
             toPath: treeDirectoryPathToFolderPath(destinationTreePath),
           }
-        : sourceIsAsset
+        : sourceIsAsset || documentBecomesFile
           ? {
               kind: 'asset' as const,
               fromPath: sourceTreePath,
@@ -2138,7 +2186,7 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
           : {
               kind: 'file' as const,
               fromPath: treeFilePathToDocName(sourceTreePath),
-              toPath: treeFilePathToDocName(destinationTreePath),
+              toPath: destinationTreePath,
             };
       const activeBeforeRename = {
         docName: activeDocNameRef.current,
@@ -2185,6 +2233,12 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
             : [],
           success.renamedAssets,
           activeBeforeRename,
+          !event.isFolder && !sourceIsAsset && !documentBecomesFile
+            ? success.renamed.flatMap((entry): RenamedDocExtensionMapping[] => {
+                const docExt = getFileExtension(destinationTreePath);
+                return docExt ? [{ toDocName: entry.toDocName, docExt }] : [];
+              })
+            : [],
         );
       } catch (reconcileErr) {
         console.warn('[FileTree] post-rename reconciliation failed', {
@@ -2753,7 +2807,7 @@ export function FileTree({ ref }: { ref?: Ref<FileTreeHandle | null> }) {
     if (loading || documents.length === 0) return;
     const shadow = fileTreeHostRef.current?.querySelector(FILE_TREE_TAG_NAME)?.shadowRoot;
     if (!shadow) return;
-    const apply = () => applyRenameChip(shadow);
+    const apply = () => applyRenameInputAffordance(shadow);
     apply();
     const observer = new MutationObserver(apply);
     observer.observe(shadow, {

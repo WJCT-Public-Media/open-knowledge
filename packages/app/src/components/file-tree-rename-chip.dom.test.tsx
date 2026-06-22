@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { cleanup } from '@testing-library/react';
 import {
-  __resetRenameChipForTesting,
-  applyRenameChip,
-  OK_RENAME_CHIP_ATTR,
+  __resetRenameInputAffordanceForTesting,
+  applyRenameInputAffordance,
   OK_RENAMING_ATTR,
 } from './file-tree-rename-chip';
 
@@ -56,111 +55,113 @@ function buildPierreShadowRoot(): ShadowRoot {
   return shadow;
 }
 
-describe('applyRenameChip — strip extension + inject chip + select basename', () => {
+describe('applyRenameInputAffordance — keep extension editable + select filename stem', () => {
   afterEach(() => {
     cleanup();
     document.body.innerHTML = '';
   });
 
-  test('strips `.md` from input value and injects a `.md` chip sibling', () => {
-    const { input, content } = buildPierreRenameRow({
+  test('keeps `.md` in the input value and selects only the filename stem', () => {
+    const { input } = buildPierreRenameRow({
       path: 'AGENTS.md',
       initialValue: 'AGENTS.md',
     });
-    applyRenameChip(document);
+    applyRenameInputAffordance(document);
 
-    expect(input.value).toBe('AGENTS');
-    const chip = content.querySelector(`[${OK_RENAME_CHIP_ATTR}]`);
-    expect(chip).not.toBeNull();
-    expect(chip?.textContent).toBe('.md');
-    expect(chip?.getAttribute('aria-hidden')).toBe('true');
+    expect(input.value).toBe('AGENTS.md');
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe('AGENTS'.length);
   });
 
-  test('strips `.mdx` from input value and injects a `.mdx` chip sibling', () => {
-    const { input, content } = buildPierreRenameRow({
+  test('keeps `.mdx` editable and selects only the filename stem', () => {
+    const { input } = buildPierreRenameRow({
       path: 'notes/ideas.mdx',
       initialValue: 'ideas.mdx',
     });
-    applyRenameChip(document);
+    applyRenameInputAffordance(document);
 
-    expect(input.value).toBe('ideas');
-    expect(content.querySelector(`[${OK_RENAME_CHIP_ATTR}]`)?.textContent).toBe('.mdx');
-  });
-
-  test('strips non-markdown extensions (jpg, pdf, etc.) with the same lowercase chip', () => {
-    const { input, content } = buildPierreRenameRow({
-      path: 'images/cat.jpg',
-      initialValue: 'cat.jpg',
-    });
-    applyRenameChip(document);
-
-    expect(input.value).toBe('cat');
-    expect(content.querySelector(`[${OK_RENAME_CHIP_ATTR}]`)?.textContent).toBe('.jpg');
-  });
-
-  test('selects the basename after stripping (selectionStart=0, selectionEnd=basename length)', () => {
-    const { input } = buildPierreRenameRow({
-      path: 'README.md',
-      initialValue: 'README.md',
-    });
-    applyRenameChip(document);
-
-    expect(input.value).toBe('README');
+    expect(input.value).toBe('ideas.mdx');
     expect(input.selectionStart).toBe(0);
-    expect(input.selectionEnd).toBe('README'.length);
+    expect(input.selectionEnd).toBe('ideas'.length);
   });
 
-  test('folder rows (path ends with `/`) are ignored — no chip, no strip', () => {
-    const { input, content } = buildPierreRenameRow({
+  test('keeps asset extensions editable and selects only the stem', () => {
+    const { input } = buildPierreRenameRow({
+      path: '.mcp.json',
+      initialValue: '.mcp.json',
+    });
+    applyRenameInputAffordance(document);
+
+    expect(input.value).toBe('.mcp.json');
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe('.mcp'.length);
+  });
+
+  test('new file placeholder shows `Untitled.md` and selects `Untitled`', () => {
+    const { input } = buildPierreRenameRow({
+      path: 'Untitled.md',
+      initialValue: 'Untitled.md',
+    });
+    applyRenameInputAffordance(document);
+
+    expect(input.value).toBe('Untitled.md');
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe('Untitled'.length);
+  });
+
+  test('folder rows (path ends with `/`) are ignored', () => {
+    const { input } = buildPierreRenameRow({
       path: 'docs/',
       initialValue: 'docs',
     });
-    applyRenameChip(document);
+    applyRenameInputAffordance(document);
 
     expect(input.value).toBe('docs');
-    expect(content.querySelector(`[${OK_RENAME_CHIP_ATTR}]`)).toBeNull();
   });
 
-  test('extension-less files are ignored — no chip, no strip', () => {
-    const { input, content } = buildPierreRenameRow({
+  test('extension-less files keep their value and select the full filename', () => {
+    const { input } = buildPierreRenameRow({
       path: 'Makefile',
       initialValue: 'Makefile',
     });
-    applyRenameChip(document);
+    applyRenameInputAffordance(document);
 
     expect(input.value).toBe('Makefile');
-    expect(content.querySelector(`[${OK_RENAME_CHIP_ATTR}]`)).toBeNull();
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe('Makefile'.length);
   });
 
-  test('idempotent — repeated calls during the same rename session do not re-strip or re-select', () => {
-    const { input, content } = buildPierreRenameRow({
-      path: 'AGENTS.md',
-      initialValue: 'AGENTS.md',
-    });
-    applyRenameChip(document);
-    expect(input.value).toBe('AGENTS');
-
-    input.value = 'AGENTS-edited';
-    input.setSelectionRange(10, 13); // caret somewhere inside the typed text
-
-    applyRenameChip(document);
-    expect(input.value).toBe('AGENTS-edited');
-    expect(input.selectionStart).toBe(10);
-    expect(input.selectionEnd).toBe(13);
-    expect(content.querySelectorAll(`[${OK_RENAME_CHIP_ATTR}]`).length).toBe(1);
-  });
-
-  test('idempotent across user typing the extension back in (no double-strip)', () => {
+  test('idempotent — repeated calls during the same rename session do not re-select', () => {
     const { input } = buildPierreRenameRow({
       path: 'AGENTS.md',
       initialValue: 'AGENTS.md',
     });
-    applyRenameChip(document);
-    expect(input.value).toBe('AGENTS');
+    applyRenameInputAffordance(document);
+    expect(input.value).toBe('AGENTS.md');
 
-    input.value = 'AGENTS.md.bak';
-    applyRenameChip(document);
-    expect(input.value).toBe('AGENTS.md.bak');
+    input.value = 'AGENTS-edited.md';
+    input.setSelectionRange(10, 13); // caret somewhere inside the typed text
+
+    applyRenameInputAffordance(document);
+    expect(input.value).toBe('AGENTS-edited.md');
+    expect(input.selectionStart).toBe(10);
+    expect(input.selectionEnd).toBe(13);
+  });
+
+  test('idempotent across user editing the extension', () => {
+    const { input } = buildPierreRenameRow({
+      path: 'AGENTS.md',
+      initialValue: 'AGENTS.md',
+    });
+    applyRenameInputAffordance(document);
+    expect(input.value).toBe('AGENTS.md');
+
+    input.value = 'AGENTS.mdx';
+    input.setSelectionRange('AGENTS.'.length, 'AGENTS.mdx'.length);
+    applyRenameInputAffordance(document);
+    expect(input.value).toBe('AGENTS.mdx');
+    expect(input.selectionStart).toBe('AGENTS.'.length);
+    expect(input.selectionEnd).toBe('AGENTS.mdx'.length);
   });
 
   test('survives ShadowRoot context — find works through the open shadow root', () => {
@@ -177,10 +178,11 @@ describe('applyRenameChip — strip extension + inject chip + select basename', 
     content.appendChild(input);
     shadow.appendChild(row);
 
-    applyRenameChip(shadow);
+    applyRenameInputAffordance(shadow);
 
-    expect(input.value).toBe('AGENTS');
-    expect(content.querySelector(`[${OK_RENAME_CHIP_ATTR}]`)?.textContent).toBe('.md');
+    expect(input.value).toBe('AGENTS.md');
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe('AGENTS'.length);
   });
 
   test('no rename input present — no-op', () => {
@@ -192,29 +194,44 @@ describe('applyRenameChip — strip extension + inject chip + select basename', 
     row.appendChild(content);
     document.body.appendChild(row);
 
-    expect(() => applyRenameChip(document)).not.toThrow();
-    expect(content.querySelector(`[${OK_RENAME_CHIP_ATTR}]`)).toBeNull();
+    expect(() => applyRenameInputAffordance(document)).not.toThrow();
   });
 });
 
-describe('applyRenameChip — overlay marker for symptom 2 (icon-flash bridge)', () => {
+describe('applyRenameInputAffordance — overlay marker for symptom 2 (icon-flash bridge)', () => {
   beforeEach(() => {
-    __resetRenameChipForTesting();
+    __resetRenameInputAffordanceForTesting();
   });
   afterEach(() => {
     cleanup();
     document.body.innerHTML = '';
-    __resetRenameChipForTesting();
+    __resetRenameInputAffordanceForTesting();
   });
 
-  test('chip-activate stamps the row with data-ok-renaming=<extension>', () => {
+  test('rename-input mount does not stamp the row, avoiding a duplicate markdown icon', () => {
     const { row } = buildPierreRenameRow({
       path: 'AGENTS.md',
       initialValue: 'AGENTS.md',
     });
-    applyRenameChip(document);
+    applyRenameInputAffordance(document);
 
-    expect(row.getAttribute(OK_RENAMING_ATTR)).toBe('.md');
+    expect(row.getAttribute(OK_RENAMING_ATTR)).toBeNull();
+  });
+
+  test('non-markdown asset renames never stamp the overlay marker', () => {
+    const { row, input } = buildPierreRenameRow({
+      path: '.mcp.json',
+      initialValue: '.mcp.json',
+    });
+    applyRenameInputAffordance(document);
+    expect(row.getAttribute(OK_RENAMING_ATTR)).toBeNull();
+
+    input.remove();
+    row.setAttribute('data-item-path', '.mcp');
+    row.setAttribute('data-item-selected', 'true');
+    applyRenameInputAffordance(document);
+
+    expect(row.getAttribute(OK_RENAMING_ATTR)).toBeNull();
   });
 
   test('after Pierre commits — selected extensionless row gets the marker reapplied', () => {
@@ -222,15 +239,15 @@ describe('applyRenameChip — overlay marker for symptom 2 (icon-flash bridge)',
       path: 'AGENTS.md',
       initialValue: 'AGENTS.md',
     });
-    applyRenameChip(document);
-    expect(row.getAttribute(OK_RENAMING_ATTR)).toBe('.md');
+    applyRenameInputAffordance(document);
+    expect(row.getAttribute(OK_RENAMING_ATTR)).toBeNull();
 
     input.remove();
     row.setAttribute('data-item-path', 'AGENTS-RENAMED');
     row.setAttribute('data-item-selected', 'true');
     row.removeAttribute(OK_RENAMING_ATTR);
 
-    applyRenameChip(document);
+    applyRenameInputAffordance(document);
     expect(row.getAttribute(OK_RENAMING_ATTR)).toBe('.md');
   });
 
@@ -244,11 +261,11 @@ describe('applyRenameChip — overlay marker for symptom 2 (icon-flash bridge)',
       path: 'docs/photo.md',
       initialValue: 'docs/photo.md',
     });
-    applyRenameChip(document);
+    applyRenameInputAffordance(document);
 
     input.remove();
 
-    applyRenameChip(document);
+    applyRenameInputAffordance(document);
     expect(makefileRow.getAttribute(OK_RENAMING_ATTR)).toBeNull();
 
     const renamedRow = document.body.querySelector(
@@ -260,7 +277,7 @@ describe('applyRenameChip — overlay marker for symptom 2 (icon-flash bridge)',
     renamedRow.setAttribute('data-item-selected', 'true');
     renamedRow.removeAttribute(OK_RENAMING_ATTR);
 
-    applyRenameChip(document);
+    applyRenameInputAffordance(document);
 
     expect(renamedRow.getAttribute(OK_RENAMING_ATTR)).toBe('.md');
     expect(makefileRow.getAttribute(OK_RENAMING_ATTR)).toBeNull();
@@ -271,18 +288,18 @@ describe('applyRenameChip — overlay marker for symptom 2 (icon-flash bridge)',
       path: 'AGENTS.md',
       initialValue: 'AGENTS.md',
     });
-    applyRenameChip(document);
-    expect(row.getAttribute(OK_RENAMING_ATTR)).toBe('.md');
+    applyRenameInputAffordance(document);
+    expect(row.getAttribute(OK_RENAMING_ATTR)).toBeNull();
 
     input.remove();
     row.setAttribute('data-item-path', 'AGENTS-RENAMED');
     row.setAttribute('data-item-selected', 'true');
     row.removeAttribute(OK_RENAMING_ATTR);
-    applyRenameChip(document);
+    applyRenameInputAffordance(document);
     expect(row.getAttribute(OK_RENAMING_ATTR)).toBe('.md');
 
     row.setAttribute('data-item-path', 'AGENTS-RENAMED.md');
-    applyRenameChip(document);
+    applyRenameInputAffordance(document);
     expect(row.getAttribute(OK_RENAMING_ATTR)).toBeNull();
   });
 
@@ -291,12 +308,12 @@ describe('applyRenameChip — overlay marker for symptom 2 (icon-flash bridge)',
       path: 'AGENTS.md',
       initialValue: 'AGENTS.md',
     });
-    applyRenameChip(document);
-    expect(row.getAttribute(OK_RENAMING_ATTR)).toBe('.md');
+    applyRenameInputAffordance(document);
+    expect(row.getAttribute(OK_RENAMING_ATTR)).toBeNull();
 
     input.remove();
     row.setAttribute('data-item-path', 'images/cat.jpg');
-    applyRenameChip(document);
+    applyRenameInputAffordance(document);
     expect(row.getAttribute(OK_RENAMING_ATTR)).toBeNull();
   });
 
@@ -305,12 +322,12 @@ describe('applyRenameChip — overlay marker for symptom 2 (icon-flash bridge)',
       path: 'AGENTS.md',
       initialValue: 'AGENTS.md',
     });
-    applyRenameChip(document);
-    expect(row.getAttribute(OK_RENAMING_ATTR)).toBe('.md');
+    applyRenameInputAffordance(document);
+    expect(row.getAttribute(OK_RENAMING_ATTR)).toBeNull();
 
     input.remove();
     row.setAttribute('data-item-path', 'AGENTS-RENAMED.md'); // disk-truth refresh
-    applyRenameChip(document);
+    applyRenameInputAffordance(document);
     expect(row.getAttribute(OK_RENAMING_ATTR)).toBeNull();
 
     const makefileRow = document.createElement('div');
@@ -319,7 +336,7 @@ describe('applyRenameChip — overlay marker for symptom 2 (icon-flash bridge)',
     makefileRow.setAttribute('data-item-selected', 'true');
     document.body.appendChild(makefileRow);
 
-    applyRenameChip(document);
+    applyRenameInputAffordance(document);
     expect(makefileRow.getAttribute(OK_RENAMING_ATTR)).toBeNull();
   });
 });

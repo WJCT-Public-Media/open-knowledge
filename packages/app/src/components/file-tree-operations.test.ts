@@ -87,6 +87,22 @@ describe('file-tree-operations', () => {
     ).toEqual(['docs/renamed', 'guides/nested/page', 'docs/empty', 'docs/image.png', 'README']);
   });
 
+  test('applyRenameToDocuments updates docExt for explicit extension-change rename', () => {
+    const [renamed] = applyRenameToDocuments(
+      [{ kind: 'document', docName: 'docs/notes', docExt: '.md', size: 10, modified: '' }],
+      [{ fromDocName: 'docs/notes', toDocName: 'docs/notes' }],
+      [],
+      [],
+      [{ toDocName: 'docs/notes', docExt: '.mdx' }],
+    );
+
+    expect(renamed).toMatchObject({
+      kind: 'document',
+      docName: 'docs/notes',
+      docExt: '.mdx',
+    });
+  });
+
   test('applyRenameToDocuments remaps explicit folder and asset paths', () => {
     expect(
       applyRenameToDocuments(documents, [], [{ fromPath: 'docs', toPath: 'guides' }]).map(
@@ -104,6 +120,51 @@ describe('file-tree-operations', () => {
         [{ fromPath: 'docs/image.png', toPath: 'docs/hero.png' }],
       ).map((entry) => (entry.kind === 'document' ? entry.docName : entry.path)),
     ).toEqual(['docs/notes', 'docs/nested/page', 'docs/empty', 'docs/hero.png', 'README']);
+  });
+
+  test('applyRenameToDocuments converts a markdown document renamed to a non-document file', () => {
+    const [renamed] = applyRenameToDocuments(
+      [{ kind: 'document', docName: 'docs/notes', docExt: '.md', size: 10, modified: 'now' }],
+      [],
+      [],
+      [{ fromPath: 'docs/notes.md', toPath: 'docs/notes.txt' }],
+    );
+
+    expect(renamed).toEqual({
+      kind: 'asset',
+      path: 'docs/notes.txt',
+      assetExt: 'txt',
+      mediaKind: null,
+      size: 10,
+      modified: 'now',
+      referencedBy: [],
+    });
+  });
+
+  test('applyRenameToDocuments converts a non-document file renamed to markdown', () => {
+    const [renamed] = applyRenameToDocuments(
+      [
+        {
+          kind: 'asset',
+          path: 'docs/notes.txt',
+          assetExt: 'txt',
+          mediaKind: null,
+          size: 10,
+          modified: 'now',
+        },
+      ],
+      [],
+      [],
+      [{ fromPath: 'docs/notes.txt', toPath: 'docs/notes.md' }],
+    );
+
+    expect(renamed).toEqual({
+      kind: 'document',
+      docName: 'docs/notes',
+      docExt: '.md',
+      size: 10,
+      modified: 'now',
+    });
   });
 
   test('applyDeleteToDocuments removes all deleted doc names', () => {

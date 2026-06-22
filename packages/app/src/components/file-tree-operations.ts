@@ -3,12 +3,22 @@ import type {
   RenamedAssetMapping,
   RenamedDocMapping,
 } from '@inkeep/open-knowledge-core';
-import { docNameToTreePath, resolveExtensionlessAssetPath } from '@/components/file-tree-adapter';
+import { mediaKindForSidebarAssetExtension } from '@inkeep/open-knowledge-core';
+import {
+  docNameToTreePath,
+  resolveExtensionlessAssetPath,
+  treeFilePathToDocName,
+} from '@/components/file-tree-adapter';
+import {
+  getFileExtension,
+  hasSupportedDocumentExtension,
+} from '@/components/file-tree-rename-validation';
 import {
   type FileEntry,
   isAssetEntry,
   isDocumentEntry,
   isFolderEntry,
+  synthesizeFileAssetExt,
 } from '@/components/file-tree-utils';
 import { joinWorkspacePath, type Workspace } from '@/lib/workspace-paths';
 
@@ -17,6 +27,11 @@ export type { RenamedAssetMapping, RenamedDocMapping };
 export interface RenamedFolderMapping {
   fromPath: string;
   toPath: string;
+}
+
+export interface RenamedDocExtensionMapping {
+  toDocName: string;
+  docExt: string;
 }
 
 interface FileTreeTargetBase {
@@ -57,17 +72,41 @@ export function applyRenameToDocuments(
   renamed: RenamedDocMapping[],
   renamedFolders: RenamedFolderMapping[] = [],
   renamedAssets: RenamedAssetMapping[] = [],
+  renamedDocExtensions: RenamedDocExtensionMapping[] = [],
 ): FileEntry[] {
-  if (renamed.length === 0 && renamedFolders.length === 0 && renamedAssets.length === 0) {
+  if (
+    renamed.length === 0 &&
+    renamedFolders.length === 0 &&
+    renamedAssets.length === 0 &&
+    renamedDocExtensions.length === 0
+  ) {
     return documents;
   }
   const renamedMap = new Map(renamed.map((entry) => [entry.fromDocName, entry.toDocName]));
+  const renamedDocExtMap = new Map(
+    renamedDocExtensions.map((entry) => [entry.toDocName, entry.docExt]),
+  );
   const renamedAssetMap = new Map(renamedAssets.map((entry) => [entry.fromPath, entry.toPath]));
   return documents.map((entry) => {
     if (isDocumentEntry(entry)) {
+      const assetPath = renamedAssetMap.get(docNameToTreePath(entry.docName, entry.docExt));
+      if (assetPath) {
+        const assetExt = synthesizeFileAssetExt(assetPath);
+        return {
+          kind: 'asset',
+          path: assetPath,
+          assetExt,
+          mediaKind: mediaKindForSidebarAssetExtension(assetExt),
+          size: entry.size,
+          modified: entry.modified,
+          referencedBy: [],
+        };
+      }
+      const docName = renamedMap.get(entry.docName) ?? entry.docName;
       return {
         ...entry,
-        docName: renamedMap.get(entry.docName) ?? entry.docName,
+        docName,
+        docExt: renamedDocExtMap.get(docName) ?? entry.docExt,
       };
     }
     if (isFolderEntry(entry)) {
@@ -77,10 +116,19 @@ export function applyRenameToDocuments(
       };
     }
     if (isAssetEntry(entry)) {
+      const renamedAssetPath = renamedAssetMap.get(entry.path);
+      if (renamedAssetPath && hasSupportedDocumentExtension(renamedAssetPath)) {
+        return {
+          kind: 'document',
+          docName: treeFilePathToDocName(renamedAssetPath),
+          docExt: getFileExtension(renamedAssetPath),
+          size: entry.size,
+          modified: entry.modified,
+        };
+      }
       return {
         ...entry,
-        path:
-          renamedAssetMap.get(entry.path) ?? remapPathForFolderRenames(entry.path, renamedFolders),
+        path: renamedAssetPath ?? remapPathForFolderRenames(entry.path, renamedFolders),
       };
     }
     return entry;
