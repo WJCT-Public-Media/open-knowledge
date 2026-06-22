@@ -372,3 +372,38 @@ describe('CommandPalette DOM behavior', () => {
     expect(commandDialogProps.at(-1)?.placement).toBeUndefined();
   });
 });
+
+describe('NavigationItem path subtitle', () => {
+  beforeEach(() => {
+    cleanup();
+  });
+
+  test('a file result row renders its path so same-named siblings are distinguishable', async () => {
+    const { NavigationItem } = await import('./CommandPalette');
+    const fileA = {
+      kind: 'file' as const,
+      path: 'reports/q3/data.csv',
+      name: 'data.csv',
+      title: 'data.csv',
+      score: 1,
+    };
+    const fileB = {
+      kind: 'file' as const,
+      path: 'exports/legacy/data.csv',
+      name: 'data.csv',
+      title: 'data.csv',
+      score: 1,
+    };
+    render(
+      <>
+        <NavigationItem entry={fileA as never} query="data.csv" onSelect={() => {}} />
+        <NavigationItem entry={fileB as never} query="data.csv" onSelect={() => {}} />
+      </>,
+    );
+
+    const rowA = screen.getByTestId('command-palette-nav-file-reports/q3/data.csv');
+    const rowB = screen.getByTestId('command-palette-nav-file-exports/legacy/data.csv');
+    expect(rowA.textContent).toContain('reports/q3/data.csv');
+    expect(rowB.textContent).toContain('exports/legacy/data.csv');
+  });
+});

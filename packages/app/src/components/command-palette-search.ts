@@ -37,7 +37,7 @@ interface WorkspaceEntrySearchCorpus {
 
 export const EMPTY_QUERY_NAV_LIMIT = 20;
 const MATCH_QUERY_NAV_LIMIT = 50;
-const API_SEARCH_LIMIT = 30;
+const API_SEARCH_LIMIT = 50;
 export const SEMANTIC_RESULT_LIMIT = 30;
 
 let cachedEntriesFingerprint = '';
@@ -249,6 +249,7 @@ export async function fetchWorkspaceSearchEntries(
     body: JSON.stringify({
       query: normalizedQuery,
       intent: 'full_text',
+      ranking: options.semantic ? 'relevance' : 'navigation',
       scopes: ['page', 'folder', 'content', 'file'],
       limit: options.limit ?? API_SEARCH_LIMIT,
       source: 'omnibar',

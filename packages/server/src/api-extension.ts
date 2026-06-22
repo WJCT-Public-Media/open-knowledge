@@ -174,6 +174,7 @@ import {
   type WorkspaceSearchCorpus,
   type WorkspaceSearchDocument,
   type WorkspaceSearchIntent,
+  type WorkspaceSearchRanking,
   type WorkspaceSearchResult,
   type WorkspaceSearchScope,
   type WorkspaceSemanticInput,
@@ -10317,6 +10318,10 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
     return 'omnibar';
   }
 
+  function parseSearchRanking(value: unknown): WorkspaceSearchRanking | undefined {
+    return value === 'navigation' || value === 'relevance' ? value : undefined;
+  }
+
   function parseSearchScopes(value: unknown): WorkspaceSearchScope[] | undefined {
     const rawScopes =
       typeof value === 'string' ? value.split(',') : Array.isArray(value) ? value : undefined;
@@ -10414,6 +10419,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
   async function buildSearchResponse(params: {
     query: string;
     intent: WorkspaceSearchIntent;
+    ranking: WorkspaceSearchRanking | undefined;
     scopes: WorkspaceSearchScope[] | undefined;
     limit: number | undefined;
     semanticParam: boolean | undefined;
@@ -10429,6 +10435,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
     );
     const results = searchWorkspaceCorpus(corpus, params.query, {
       intent: params.intent,
+      ranking: params.ranking,
       scopes: params.scopes,
       limit: params.limit,
       semantic: semantic.input,
@@ -10626,6 +10633,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
       const limit = url.searchParams.get('limit');
       const query = url.searchParams.get('query') ?? '';
       const intent = parseSearchIntent(url.searchParams.get('intent'));
+      const ranking = parseSearchRanking(url.searchParams.get('ranking'));
       const scopes = parseSearchScopes(
         url.searchParams.get('scope') ?? url.searchParams.get('scopes'),
       );
@@ -10647,6 +10655,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
         const body = await buildSearchResponse({
           query,
           intent,
+          ranking,
           scopes,
           limit: limitNum,
           semanticParam,
@@ -10671,6 +10680,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
     async (_req, res, body) => {
       const query = typeof body.query === 'string' ? body.query : '';
       const intent = parseSearchIntent(body.intent);
+      const ranking = parseSearchRanking(body.ranking);
       const scopes = parseSearchScopes(body.scopes ?? body.scope);
       const limit = typeof body.limit === 'number' ? body.limit : undefined;
       const semanticParam = parseSemanticParam(body.semantic);
@@ -10690,6 +10700,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
         const responseBody = await buildSearchResponse({
           query,
           intent,
+          ranking,
           scopes,
           limit,
           semanticParam,

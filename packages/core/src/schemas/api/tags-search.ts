@@ -158,6 +158,7 @@ export const SearchRequestSchema = z
   .object({
     query: z.string().optional(),
     intent: z.enum(['autocomplete', 'full_text', 'omnibar']).optional(),
+    ranking: z.enum(['navigation', 'relevance']).optional(),
     scopes: z.array(z.enum(['page', 'folder', 'content', 'file'])).optional(),
     scope: z.string().optional(),
     limit: z.number().int().nonnegative().optional(),

@@ -114,7 +114,7 @@ function resolveCreateInitialDir(
   return defaultInitialDir(activeDocName);
 }
 
-function NavigationItem({
+export function NavigationItem({
   entry,
   query = '',
   onSelect,

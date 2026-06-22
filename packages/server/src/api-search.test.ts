@@ -104,6 +104,36 @@ describe('GET /api/search', () => {
     }
   });
 
+  test('ranking param orders the same full_text candidate set: navigation by name, relevance by body', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ok-search-ranking-'));
+    try {
+      writeFileSync(join(dir, 'STORY.md'), '# Collaboration\n\nNotes about teamwork.\n', 'utf-8');
+      writeFileSync(
+        join(dir, 'storybook-notes.md'),
+        '# Storyboard\n\nstory story story story story story story story\n',
+        'utf-8',
+      );
+      const index = new Map<string, FileIndexEntry>([
+        ['STORY', indexEntry(join(dir, 'STORY.md'), 'markdown')],
+        ['storybook-notes', indexEntry(join(dir, 'storybook-notes.md'), 'markdown')],
+      ]);
+
+      const nav = JSON.parse(
+        (await runSearch(dir, index, '/api/search?query=story&intent=full_text&ranking=navigation'))
+          .body,
+      ) as { results: Array<{ path: string }> };
+      expect(nav.results[0]?.path).toBe('STORY');
+
+      const rel = JSON.parse(
+        (await runSearch(dir, index, '/api/search?query=story&intent=full_text&ranking=relevance'))
+          .body,
+      ) as { results: Array<{ path: string }> };
+      expect(rel.results[0]?.path).toBe('storybook-notes');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test('returns full-text content matches with snippets', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'ok-search-'));
     try {

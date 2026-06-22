@@ -267,8 +267,9 @@ describe('fetchWorkspaceSearchEntries', () => {
     expect(requestBody).toEqual({
       query: 'homepage',
       intent: 'full_text',
+      ranking: 'navigation',
       scopes: ['page', 'folder', 'content', 'file'],
-      limit: 30,
+      limit: 50,
       source: 'omnibar',
     });
     expect(entries).toEqual([
@@ -297,8 +298,9 @@ describe('fetchWorkspaceSearchEntries', () => {
     expect(requestBody).toEqual({
       query: 'auth retries',
       intent: 'full_text',
+      ranking: 'relevance',
       scopes: ['page', 'folder', 'content', 'file'],
-      limit: 30,
+      limit: 50,
       source: 'omnibar',
       semantic: true,
     });

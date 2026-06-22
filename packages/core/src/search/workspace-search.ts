@@ -5,6 +5,8 @@ export type WorkspaceSearchKind = 'page' | 'folder' | 'file';
 export type WorkspaceSearchIntent = 'omnibar' | 'autocomplete' | 'full_text';
 export type WorkspaceSearchScope = WorkspaceSearchKind | 'content';
 
+export type WorkspaceSearchRanking = 'navigation' | 'relevance';
+
 export interface WorkspaceSearchDocument {
   id: string;
   kind: WorkspaceSearchKind;
@@ -36,6 +38,7 @@ export interface WorkspaceSemanticInput {
 
 export interface WorkspaceSearchOptions {
   intent?: WorkspaceSearchIntent;
+  ranking?: WorkspaceSearchRanking;
   scopes?: readonly WorkspaceSearchScope[];
   limit?: number;
   semantic?: WorkspaceSemanticInput;
@@ -201,6 +204,71 @@ function canonicalKindAdjustment(kind: WorkspaceSearchKind): number {
   return kind === 'file' ? -FILE_KIND_SCORE_DEMOTION : 0;
 }
 
+const TIER_DOMINANT_GAP = 1000;
+
+const NAV_RECENCY_CAP = 50;
+
+const NAV_BODY_WEIGHT = 1;
+const NAV_RECENCY_WEIGHT = 1;
+
+const NAV_KIND_NUDGE = 0.001;
+
+function navigationScore(
+  lexical: number,
+  fullText: number,
+  recency: number,
+  kind: WorkspaceSearchKind,
+  maxFullText: number,
+): number {
+  const bodyNorm = maxFullText > 0 ? fullText / maxFullText : 0;
+  const recencyNorm = NAV_RECENCY_CAP > 0 ? recency / NAV_RECENCY_CAP : 0;
+  const kindNudge = kind === 'file' ? -NAV_KIND_NUDGE : 0;
+  const secondary = NAV_BODY_WEIGHT * bodyNorm + NAV_RECENCY_WEIGHT * recencyNorm + kindNudge;
+  return lexical * TIER_DOMINANT_GAP + secondary;
+}
+
+function fullTextScore(
+  lexical: number,
+  fullText: number,
+  recency: number,
+  kind: WorkspaceSearchKind,
+): number {
+  return lexical + fullText * 20 + recency + canonicalKindAdjustment(kind);
+}
+
+function combinedScore(
+  ranking: WorkspaceSearchRanking,
+  lexical: number,
+  fullText: number,
+  recency: number,
+  kind: WorkspaceSearchKind,
+  maxFullText: number,
+): number {
+  return ranking === 'relevance'
+    ? fullTextScore(lexical, fullText, recency, kind)
+    : navigationScore(lexical, fullText, recency, kind, maxFullText);
+}
+
+function resolveRanking(
+  intent: WorkspaceSearchIntent,
+  ranking: WorkspaceSearchRanking | undefined,
+): WorkspaceSearchRanking {
+  if (ranking) return ranking;
+  return intent === 'full_text' ? 'relevance' : 'navigation';
+}
+
+function maxFullTextScore(
+  candidates: Iterable<WorkspaceSearchDocument>,
+  fullTextScores: ReadonlyMap<string, number>,
+): number {
+  let max = 0;
+  for (const document of candidates) {
+    const value = fullTextScores.get(document.id) ?? 0;
+    if (value > max) max = value;
+  }
+  return max;
+}
+
 function recencyScores(documents: readonly WorkspaceSearchDocument[]): Map<string, number> {
   const modifiedValues = documents
     .map((document) => document.modifiedTs)
@@ -247,10 +315,10 @@ function toleranceFor(intent: WorkspaceSearchIntent, query: string): number {
 
 function finalizeResults(
   ranked: readonly WorkspaceSearchResult[],
-  intent: WorkspaceSearchIntent,
+  ranking: WorkspaceSearchRanking,
   limit: number,
 ): WorkspaceSearchResult[] {
-  if (intent === 'full_text') return ranked.slice(0, limit);
+  if (ranking === 'relevance') return ranked.slice(0, limit);
   const selected: WorkspaceSearchResult[] = [];
   let folders = 0;
   let files = 0;
@@ -282,6 +350,7 @@ export function searchWorkspaceCorpus(
   options: WorkspaceSearchOptions = {},
 ): WorkspaceSearchResult[] {
   const intent = options.intent ?? 'omnibar';
+  const ranking = resolveRanking(intent, options.ranking);
   const limit = clampLimit(options.limit);
   const scopes = new Set(options.scopes ?? defaultScopes(intent));
   const scopedDocuments = corpus.documents.filter((document) => scopeAllows(document, scopes));
@@ -327,6 +396,7 @@ export function searchWorkspaceCorpus(
   }
 
   if (!options.semantic) {
+    const maxFullText = maxFullTextScore(candidates.values(), fullTextScores);
     const ranked = [...candidates.values()]
       .map((document) => {
         const lexical = Math.max(0, lexicalScore(document, normalizedQuery));
@@ -334,7 +404,14 @@ export function searchWorkspaceCorpus(
         const recencyScore = recency.get(document.id) ?? 0;
         return {
           document,
-          score: lexical + fullText * 20 + recencyScore + canonicalKindAdjustment(document.kind),
+          score: combinedScore(
+            ranking,
+            lexical,
+            fullText,
+            recencyScore,
+            document.kind,
+            maxFullText,
+          ),
           signals: { lexical, fullText, recency: recencyScore },
         };
       })
@@ -342,7 +419,7 @@ export function searchWorkspaceCorpus(
         if (a.score !== b.score) return b.score - a.score;
         return a.document.path.localeCompare(b.document.path);
       });
-    return finalizeResults(ranked, intent, limit);
+    return finalizeResults(ranked, ranking, limit);
   }
 
   return finalizeResults(
@@ -352,9 +429,10 @@ export function searchWorkspaceCorpus(
       fullTextScores,
       recency,
       normalizedQuery,
+      ranking,
       semantic: options.semantic,
     }),
-    intent,
+    ranking,
     limit,
   );
 }
@@ -383,9 +461,18 @@ function rankWithVector(args: {
   fullTextScores: ReadonlyMap<string, number>;
   recency: ReadonlyMap<string, number>;
   normalizedQuery: string;
+  ranking: WorkspaceSearchRanking;
   semantic: WorkspaceSemanticInput;
 }): WorkspaceSearchResult[] {
-  const { scopedDocuments, candidates, fullTextScores, recency, normalizedQuery, semantic } = args;
+  const {
+    scopedDocuments,
+    candidates,
+    fullTextScores,
+    recency,
+    normalizedQuery,
+    ranking,
+    semantic,
+  } = args;
   const rrfK = semantic.rrfK ?? DEFAULT_RRF_K;
   const candidateLimit = semantic.candidateLimit ?? DEFAULT_VECTOR_CANDIDATE_LIMIT;
   const floor = semantic.similarityFloor ?? DEFAULT_VECTOR_SIMILARITY_FLOOR;
@@ -403,15 +490,21 @@ function rankWithVector(args: {
     }
   }
 
+  const maxFullText = maxFullTextScore(candidates.values(), fullTextScores);
+
   const rows: SemanticRow[] = [...candidates.values()].map((document) => {
     const lexical = Math.max(0, lexicalScore(document, normalizedQuery));
     const fullText = fullTextScores.get(document.id) ?? 0;
     const recencyScore = recency.get(document.id) ?? 0;
     const cosine = vectorScores.get(document.id);
     const qualifies = cosine !== undefined && cosine >= floor;
+    const score =
+      lexical > 0
+        ? combinedScore(ranking, lexical, fullText, recencyScore, document.kind, maxFullText)
+        : fullTextScore(lexical, fullText, recencyScore, document.kind);
     return {
       document,
-      score: lexical + fullText * 20 + recencyScore + canonicalKindAdjustment(document.kind),
+      score,
       signals: qualifies
         ? { lexical, fullText, recency: recencyScore, vector: cosine }
         : { lexical, fullText, recency: recencyScore },

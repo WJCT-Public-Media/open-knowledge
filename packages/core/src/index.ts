@@ -871,6 +871,7 @@ export {
   type WorkspaceSearchIntent,
   type WorkspaceSearchKind,
   type WorkspaceSearchOptions,
+  type WorkspaceSearchRanking,
   type WorkspaceSearchResult,
   type WorkspaceSearchScope,
   type WorkspaceSemanticInput,

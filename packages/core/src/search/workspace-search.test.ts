@@ -35,8 +35,8 @@ describe('searchWorkspaceDocuments', () => {
     const results = searchWorkspaceDocuments(documents, 'arch', { intent: 'omnibar' });
 
     expect(results.map((result) => result.document.path)).toEqual([
-      'architecture',
       'architecture/overview',
+      'architecture',
     ]);
   });
 
@@ -197,19 +197,19 @@ describe('canonical-kind ranking — markdown outranks a same-stem file (D5)', (
     expect(ranked[0]?.document.path).toBe('foo');
   });
 
-  test('a markdown page outranks a same-bracket file even when the file is newer (kind demotion dominates recency)', () => {
+  test('a markdown page outranks a same-stem file at equal recency (kind is the within-tier tiebreaker)', () => {
     const page = createWorkspaceSearchDocument({
       kind: 'page',
       path: 'config',
       title: 'config',
       modifiedTs: 10,
     });
-    const newerFile = createWorkspaceSearchDocument({
+    const file = createWorkspaceSearchDocument({
       kind: 'file',
       path: 'sub/config',
-      modifiedTs: 100,
+      modifiedTs: 10,
     });
-    const ranked = searchWorkspaceDocuments([page, newerFile], 'config', { intent: 'omnibar' });
+    const ranked = searchWorkspaceDocuments([page, file], 'config', { intent: 'omnibar' });
     const pageRank = ranked.findIndex((r) => r.document.path === 'config');
     const fileRank = ranked.findIndex((r) => r.document.path === 'sub/config');
     expect(pageRank).toBeGreaterThanOrEqual(0);

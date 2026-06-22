@@ -206,7 +206,7 @@
       "expected": [
         {
           "id": "page:auth/login",
-          "score": 1707.1890049060949,
+          "score": 700001.25,
           "signals": {
             "lexical": 700,
             "fullText": 49.734450245304735,
@@ -215,7 +215,7 @@
         },
         {
           "id": "page:misc/login-history",
-          "score": 1479.3204629742795,
+          "score": 600001.47759861,
           "signals": {
             "lexical": 600,
             "fullText": 42.40352314871397,
@@ -232,7 +232,7 @@
       "expected": [
         {
           "id": "page:auth/login",
-          "score": 1890.912389055217,
+          "score": 700001.25,
           "signals": {
             "lexical": 700,
             "fullText": 58.92061945276085,
@@ -241,7 +241,7 @@
         },
         {
           "id": "page:misc/login-history",
-          "score": 1626.389211640448,
+          "score": 600001.4694744988,
           "signals": {
             "lexical": 600,
             "fullText": 49.756960582022394,
@@ -302,7 +302,7 @@
       "expected": [
         {
           "id": "folder:auth",
-          "score": 1573.1702123532718,
+          "score": 700001.6623001031,
           "signals": {
             "lexical": 700,
             "fullText": 41.783510617663595,
@@ -310,17 +310,8 @@
           }
         },
         {
-          "id": "page:guides/authentication-overview",
-          "score": 1566.0036368361461,
-          "signals": {
-            "lexical": 600,
-            "fullText": 45.80018184180731,
-            "recency": 50
-          }
-        },
-        {
           "id": "page:auth",
-          "score": 1554.4202123532718,
+          "score": 700001.2873001031,
           "signals": {
             "lexical": 700,
             "fullText": 41.783510617663595,
@@ -328,8 +319,17 @@
           }
         },
         {
+          "id": "page:guides/authentication-overview",
+          "score": 600002,
+          "signals": {
+            "lexical": 600,
+            "fullText": 45.80018184180731,
+            "recency": 50
+          }
+        },
+        {
           "id": "page:auth/session-token-refresh",
-          "score": 713.485200031778,
+          "score": 550000.6511841159,
           "signals": {
             "lexical": 550,
             "fullText": 6.9242600015889,
@@ -338,7 +338,7 @@
         },
         {
           "id": "page:auth/login",
-          "score": 700.985200031778,
+          "score": 550000.4011841159,
           "signals": {
             "lexical": 550,
             "fullText": 6.9242600015889,
@@ -495,7 +495,7 @@
       "expected": [
         {
           "id": "folder:recipes",
-          "score": 1808.6874410044754,
+          "score": 700001,
           "signals": {
             "lexical": 700,
             "fullText": 55.43437205022377,
