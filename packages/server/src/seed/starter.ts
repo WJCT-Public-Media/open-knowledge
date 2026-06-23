@@ -1251,7 +1251,7 @@ export const STARTER_PACKS: Readonly<Record<PackId, StarterPack>> = {
   okf: {
     id: 'okf',
     name: 'Open Knowledge Format',
-    description: "A knowledge base conformant with Google's Open Knowledge Format.",
+    description: "Wiki using Google's Open Knowledge Format.",
     defaultSubfolder: undefined,
     folders: OKF_FOLDERS,
     templates: OKF_TEMPLATES,
