@@ -26,7 +26,7 @@ export function CreateView({ celebrateSignal, onAddStarterPack }: CreateViewProp
   const templatesError = templatesState.status === 'error';
 
   return (
-    <div className="flex w-full flex-col gap-10 py-12 max-w-5xl my-auto">
+    <div className="flex w-full flex-col gap-8 py-12 max-w-5xl my-auto">
       <EmptyStateHeader
         title={t`Create something great.`}
         subtitle={
@@ -58,7 +58,10 @@ export function CreateView({ celebrateSignal, onAddStarterPack }: CreateViewProp
           />
         ) : null}
 
-        <div className="flex w-full items-center justify-between gap-4">
+        {/* Sit the footer links close under the block above — the templates
+            card, or the composer when there are no templates — rather than a
+            full gap-8/gap-10 away. */}
+        <div className="-mt-6 flex w-full items-center justify-between gap-4">
           <Button
             onClick={onAddStarterPack}
             variant="link"

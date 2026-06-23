@@ -1217,13 +1217,18 @@ export const STARTER_PACKS: Readonly<Record<PackId, StarterPack>> = {
     folders: PLAIN_NOTES_FOLDERS,
     templates: PLAIN_NOTES_TEMPLATES,
   },
-  worldbuilding: {
-    id: 'worldbuilding',
-    name: 'Worldbuilding',
-    description: 'A wiki for your story world.',
-    defaultSubfolder: 'world',
-    folders: WORLDBUILDING_FOLDERS,
-    templates: WORLDBUILDING_TEMPLATES,
+  okf: {
+    id: 'okf',
+    name: 'Open Knowledge Format',
+    description: "Wiki using Google's Open Knowledge Format.",
+    defaultSubfolder: undefined,
+    folders: OKF_FOLDERS,
+    templates: OKF_TEMPLATES,
+    rootFiles: {
+      'welcome.md': OKF_WELCOME_MD,
+      'index.md': OKF_INDEX_MD,
+      'log.md': OKF_LOG_MD,
+    },
   },
   'writing-pipeline': {
     id: 'writing-pipeline',
@@ -1248,18 +1253,13 @@ export const STARTER_PACKS: Readonly<Record<PackId, StarterPack>> = {
       'HEARTBEAT.md': ENTITY_VAULT_HEARTBEAT_MD,
     },
   },
-  okf: {
-    id: 'okf',
-    name: 'Open Knowledge Format',
-    description: "Wiki using Google's Open Knowledge Format.",
-    defaultSubfolder: undefined,
-    folders: OKF_FOLDERS,
-    templates: OKF_TEMPLATES,
-    rootFiles: {
-      'welcome.md': OKF_WELCOME_MD,
-      'index.md': OKF_INDEX_MD,
-      'log.md': OKF_LOG_MD,
-    },
+  worldbuilding: {
+    id: 'worldbuilding',
+    name: 'Worldbuilding',
+    description: 'A wiki for your story world.',
+    defaultSubfolder: 'world',
+    folders: WORLDBUILDING_FOLDERS,
+    templates: WORLDBUILDING_TEMPLATES,
   },
 };
 

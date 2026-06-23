@@ -276,26 +276,30 @@ export function CreatePromptComposer({ scenario, className }: CreatePromptCompos
       </div>
       {/* Starter-brief chips — below the card, centered. Clicking one prefills
           the field (no auto-create), so they read as suggestions rather than
-          card actions. Wraps on narrow widths. */}
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        {suggestions.map((suggestion) => {
-          const Icon = suggestion.icon;
-          return (
-            <Button
-              key={suggestion.id}
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => applySuggestion(suggestion.prompt)}
-              className="gap-1.5 rounded-md font-normal text-muted-foreground hover:text-foreground"
-              data-testid={`create-suggestion-${suggestion.id}`}
-            >
-              <Icon className="size-3.5" aria-hidden="true" />
-              {suggestion.label}
-            </Button>
-          );
-        })}
-      </div>
+          card actions. Wraps on narrow widths. Suppressed for `existing-repo`:
+          the repo's own contents are the starting point, so we don't pitch
+          generic prefills there (the embedded copy-list still shows them). */}
+      {scenario !== 'existing-repo' && suggestions.length > 0 ? (
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {suggestions.map((suggestion) => {
+            const Icon = suggestion.icon;
+            return (
+              <Button
+                key={suggestion.id}
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => applySuggestion(suggestion.prompt)}
+                className="gap-1.5 rounded-md font-normal text-muted-foreground hover:text-foreground"
+                data-testid={`create-suggestion-${suggestion.id}`}
+              >
+                <Icon className="size-3.5" aria-hidden="true" />
+                {suggestion.label}
+              </Button>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }
