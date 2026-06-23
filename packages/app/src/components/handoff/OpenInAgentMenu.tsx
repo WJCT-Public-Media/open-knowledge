@@ -56,20 +56,22 @@ function OpenWithAiPanel({
   const hasRows = showDesktopSection || showTerminalSection;
 
   return (
-    <div className="flex flex-col gap-3">
-      <Input
-        value={instruction}
-        onChange={(event) => setInstruction(event.target.value)}
-        placeholder={t`What should the AI do? (optional)`}
-        aria-label={t`Instruction for the AI`}
-        data-testid="open-in-agent-instruction"
-      />
+    <div className="flex flex-col gap-1">
+      <div className="px-2 pt-2 pb-1.5">
+        <Input
+          value={instruction}
+          onChange={(event) => setInstruction(event.target.value)}
+          placeholder={t`What should the AI do? (optional)`}
+          aria-label={t`Instruction for the AI`}
+          data-testid="open-in-agent-instruction"
+        />
+      </div>
       {hasRows ? (
         <div className="flex flex-col gap-0.5">
           {showDesktopSection ? (
             <fieldset className="m-0 flex min-w-0 flex-col gap-0.5 border-0 p-0">
               <legend
-                className="text-muted-foreground text-xs"
+                className="px-1.5 py-1 font-medium text-muted-foreground text-xs"
                 data-testid="open-in-agent-desktop-label"
               >
                 <Trans>Desktop</Trans>
@@ -81,7 +83,7 @@ function OpenWithAiPanel({
                     key={target.id}
                     type="button"
                     variant="ghost"
-                    className="w-full justify-start gap-2"
+                    className="h-auto w-full justify-start gap-1.5 rounded-md px-1.5 py-1 font-normal text-foreground"
                     disabled={disabled}
                     data-testid={`open-in-agent-item-${target.id}`}
                     aria-label={t`Open with AI ${displayName}`}
@@ -99,7 +101,7 @@ function OpenWithAiPanel({
               {showDesktopSection ? <Separator className="my-1" /> : null}
               <fieldset className="m-0 flex min-w-0 flex-col gap-0.5 border-0 p-0">
                 <legend
-                  className="text-muted-foreground text-xs"
+                  className="px-1.5 py-1 font-medium text-muted-foreground text-xs"
                   data-testid="open-in-agent-terminal-label"
                 >
                   <Trans>Terminal</Trans>
@@ -107,7 +109,7 @@ function OpenWithAiPanel({
                 <Button
                   type="button"
                   variant="ghost"
-                  className="w-full justify-start gap-2"
+                  className="h-auto w-full justify-start gap-1.5 rounded-md px-1.5 py-1 font-normal text-foreground"
                   disabled={disabled}
                   data-testid="open-in-agent-terminal"
                   aria-label={t`Claude CLI`}
@@ -220,7 +222,12 @@ export function OpenInAgentMenu({ input, open, onOpenChange }: OpenInAgentMenuPr
           <Trans>Open with AI</Trans>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" aria-label={t`Open with AI`} data-testid="open-in-agent-menu">
+      <PopoverContent
+        align="end"
+        className="p-1"
+        aria-label={t`Open with AI`}
+        data-testid="open-in-agent-menu"
+      >
         <OpenWithAiPanel
           installStates={states}
           terminalLaunch={terminalLaunch}

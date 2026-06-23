@@ -18,9 +18,9 @@ describe('FileTree density configuration', () => {
   test('overrides per-level and row-height vars in both themes', () => {
     for (const theme of ['light', 'dark'] as const) {
       const style = createFileTreeStyle(theme) as Record<string, string | number>;
-      expect(style['--trees-level-gap-override']).toBe('3px');
-      expect(style['--trees-item-row-gap-override']).toBe('2px');
-      expect(style['--trees-item-height']).toBe('24px');
+      expect(style['--trees-level-gap-override']).toBe('4px');
+      expect(style['--trees-item-row-gap-override']).toBe('4px');
+      expect(style['--trees-item-height']).toBe('26px');
     }
   });
 
@@ -34,12 +34,12 @@ describe('FileTree density configuration', () => {
     }
   });
 
-  test('row height clamp is at or below 24px to keep VS Code-style compactness', () => {
+  test('row height clamp is at or below 26px to keep VS Code-style compactness', () => {
     const style = createFileTreeStyle('dark') as Record<string, string>;
     const itemHeight = style['--trees-item-height'];
     expect(itemHeight).toMatch(/^(\d+)px$/);
     const px = Number.parseInt(itemHeight.slice(0, -2), 10);
-    expect(px).toBeLessThanOrEqual(24);
+    expect(px).toBeLessThanOrEqual(26);
   });
 
   test('preserves existing typography + padding overrides alongside density', () => {

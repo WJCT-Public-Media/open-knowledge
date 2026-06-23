@@ -155,148 +155,146 @@ export function CreatePromptComposer({ scenario, className }: CreatePromptCompos
   const showTerminalSection = terminalLaunch !== null;
 
   return (
-    <div
-      className={cn(
-        'flex w-full flex-col rounded-2xl border border-border/60 bg-card shadow-sm transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50',
-        className,
-      )}
-    >
-      {/* The card owns the border + focus ring; the textarea drops its own
-          (border-0 + ring-0) so the whole card lights up on focus instead of
-          nesting a second outline. */}
-      <Textarea
-        ref={textareaRef}
-        value={description}
-        onChange={(event) => setDescription(event.target.value)}
-        onKeyDown={handleKeyDown}
-        rows={4}
-        placeholder={t`A team knowledge base, a personal wiki, project docs...`}
-        aria-label={t`Describe the project you want to create`}
-        className="min-h-[112px] resize-none rounded-2xl border-0 bg-transparent dark:bg-transparent px-4 py-3.5 text-sm leading-relaxed shadow-none focus-visible:border-0 focus-visible:ring-0"
-      />
-      {/* Footer row: starter-brief chips (prefill the field, no auto-create) on
-          the left, the Create split button pinned right. Chips wrap among
-          themselves on narrow widths while the button stays put. */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3 pb-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          {suggestions.map((suggestion) => {
-            const Icon = suggestion.icon;
-            return (
-              <Button
-                key={suggestion.id}
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => applySuggestion(suggestion.prompt)}
-                className="gap-1.5 rounded-md font-normal text-muted-foreground hover:text-foreground"
-                data-testid={`create-suggestion-${suggestion.id}`}
-              >
-                <Icon className="size-3.5" aria-hidden="true" />
-                {suggestion.label}
-              </Button>
-            );
-          })}
-        </div>
-        {selectedAgentId === null ? (
-          <Button
-            type="button"
-            variant="outline"
-            disabled
-            className="gap-1.5"
-            data-testid="create-with-agent"
-          >
-            <Trans>Create</Trans>
-          </Button>
-        ) : (
-          <ButtonGroup>
+    <div className={cn('flex w-full flex-col gap-3', className)}>
+      <div className="flex w-full flex-col rounded-2xl border border-border/60 bg-card shadow-sm transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+        {/* The card owns the border + focus ring; the textarea drops its own
+            (border-0 + ring-0) so the whole card lights up on focus instead of
+            nesting a second outline. */}
+        <Textarea
+          ref={textareaRef}
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          onKeyDown={handleKeyDown}
+          rows={4}
+          placeholder={t`A team knowledge base, a personal wiki, project docs...`}
+          aria-label={t`Describe the project you want to create`}
+          className="min-h-12 resize-none rounded-2xl border-0 bg-transparent dark:bg-transparent px-4 py-3.5 text-sm leading-relaxed shadow-none focus-visible:border-0 focus-visible:ring-0 max-h-96 subtle-scrollbar"
+        />
+        {/* Footer row: the Create split button, pinned right. */}
+        <div className="flex flex-wrap items-center justify-end gap-2 px-3 pb-3">
+          {selectedAgentId === null ? (
             <Button
               type="button"
-              onClick={() => (cliSelected ? launchCli() : handleCreate(selectedAgentId))}
               variant="outline"
+              disabled
               className="gap-1.5"
               data-testid="create-with-agent"
             >
-              {cliSelected ? (
-                <>
-                  <SquareTerminal aria-hidden="true" className="size-3.5" />
-                  <Trans>Create with Claude CLI</Trans>
-                </>
-              ) : (
-                <>
-                  <TargetIcon id={selectedAgentId} aria-hidden="true" className="size-3.5" />
-                  <Trans>Create with {getDisplayNameDefault(selectedAgentId)}</Trans>
-                </>
-              )}
+              <Trans>Create</Trans>
             </Button>
-            <DropdownMenu
-              onOpenChange={(open) => {
-                if (open) void refresh();
-              }}
-            >
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  aria-label={t`Choose agent`}
-                  size="icon"
-                  variant="outline"
-                  data-testid="create-with-agent-menu"
-                >
-                  <ChevronDown aria-hidden="true" className="size-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[200px]">
-                {showDesktopSection ? (
-                  <DropdownMenuGroup aria-label={t`Desktop`}>
-                    <DropdownMenuLabel>
-                      <Trans>Desktop</Trans>
-                    </DropdownMenuLabel>
-                    {selectableTargets.map((target) => (
-                      <DropdownMenuItem
-                        key={target.id}
-                        onSelect={() => chooseAgent(target.id)}
-                        data-testid={`create-agent-option-${target.id}`}
-                      >
-                        <TargetIcon id={target.id} aria-hidden="true" className="size-4" />
-                        <span className="flex-1">{target.displayName}</span>
-                        {!cliSelected && target.id === selectedAgentId ? (
-                          <Check aria-hidden="true" className="size-4 text-muted-foreground" />
-                        ) : null}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuGroup>
-                ) : null}
-                {showTerminalSection ? (
+          ) : (
+            <ButtonGroup>
+              <Button
+                type="button"
+                onClick={() => (cliSelected ? launchCli() : handleCreate(selectedAgentId))}
+                variant="outline"
+                className="gap-1.5"
+                data-testid="create-with-agent"
+              >
+                {cliSelected ? (
                   <>
-                    {showDesktopSection ? <DropdownMenuSeparator /> : null}
-                    <DropdownMenuGroup aria-label={t`Terminal`}>
+                    <SquareTerminal aria-hidden="true" className="size-3.5" />
+                    <Trans>Create with Claude CLI</Trans>
+                  </>
+                ) : (
+                  <>
+                    <TargetIcon id={selectedAgentId} aria-hidden="true" className="size-3.5" />
+                    <Trans>Create with {getDisplayNameDefault(selectedAgentId)}</Trans>
+                  </>
+                )}
+              </Button>
+              <DropdownMenu
+                onOpenChange={(open) => {
+                  if (open) void refresh();
+                }}
+              >
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    aria-label={t`Choose agent`}
+                    size="icon"
+                    variant="outline"
+                    data-testid="create-with-agent-menu"
+                  >
+                    <ChevronDown aria-hidden="true" className="size-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[200px]">
+                  {showDesktopSection ? (
+                    <DropdownMenuGroup aria-label={t`Desktop`}>
                       <DropdownMenuLabel>
-                        <Trans>Terminal</Trans>
+                        <Trans>Desktop</Trans>
                       </DropdownMenuLabel>
-                      {/* Selects the docked-terminal Claude CLI as the create target
+                      {selectableTargets.map((target) => (
+                        <DropdownMenuItem
+                          key={target.id}
+                          onSelect={() => chooseAgent(target.id)}
+                          data-testid={`create-agent-option-${target.id}`}
+                        >
+                          <TargetIcon id={target.id} aria-hidden="true" className="size-4" />
+                          <span className="flex-1">{target.displayName}</span>
+                          {!cliSelected && target.id === selectedAgentId ? (
+                            <Check aria-hidden="true" className="size-4 text-muted-foreground" />
+                          ) : null}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuGroup>
+                  ) : null}
+                  {showTerminalSection ? (
+                    <>
+                      {showDesktopSection ? <DropdownMenuSeparator /> : null}
+                      <DropdownMenuGroup aria-label={t`Terminal`}>
+                        <DropdownMenuLabel>
+                          <Trans>Terminal</Trans>
+                        </DropdownMenuLabel>
+                        {/* Selects the docked-terminal Claude CLI as the create target
                           (the Create button performs the launch). Visible text is
                           "Claude" while the accessible name stays "Claude CLI" so AT
                           users can tell it apart from the Desktop "Claude" (WCAG
                           2.5.3 — the name contains the visible label). */}
-                      <DropdownMenuItem
-                        onSelect={() => chooseCli()}
-                        data-testid="create-with-claude-cli"
-                        aria-label={t`Claude CLI`}
-                      >
-                        <SquareTerminal className="size-4" aria-hidden="true" />
-                        <span className="flex-1">
-                          <Trans>Claude</Trans>
-                        </span>
-                        {cliSelected ? (
-                          <Check aria-hidden="true" className="size-4 text-muted-foreground" />
-                        ) : null}
-                      </DropdownMenuItem>
-                    </DropdownMenuGroup>
-                  </>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </ButtonGroup>
-        )}
+                        <DropdownMenuItem
+                          onSelect={() => chooseCli()}
+                          data-testid="create-with-claude-cli"
+                          aria-label={t`Claude CLI`}
+                        >
+                          <SquareTerminal className="size-4" aria-hidden="true" />
+                          <span className="flex-1">
+                            <Trans>Claude</Trans>
+                          </span>
+                          {cliSelected ? (
+                            <Check aria-hidden="true" className="size-4 text-muted-foreground" />
+                          ) : null}
+                        </DropdownMenuItem>
+                      </DropdownMenuGroup>
+                    </>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </ButtonGroup>
+          )}
+        </div>
+      </div>
+      {/* Starter-brief chips — below the card, centered. Clicking one prefills
+          the field (no auto-create), so they read as suggestions rather than
+          card actions. Wraps on narrow widths. */}
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {suggestions.map((suggestion) => {
+          const Icon = suggestion.icon;
+          return (
+            <Button
+              key={suggestion.id}
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => applySuggestion(suggestion.prompt)}
+              className="gap-1.5 rounded-md font-normal text-muted-foreground hover:text-foreground"
+              data-testid={`create-suggestion-${suggestion.id}`}
+            >
+              <Icon className="size-3.5" aria-hidden="true" />
+              {suggestion.label}
+            </Button>
+          );
+        })}
       </div>
     </div>
   );

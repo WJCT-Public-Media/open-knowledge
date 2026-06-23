@@ -7,10 +7,10 @@ export const FILE_TREE_DENSITY_OPTIONS = {
 } as const;
 
 const FILE_TREE_DENSITY_STYLE = {
-  '--trees-level-gap-override': '3px',
-  '--trees-item-row-gap-override': '2px',
+  '--trees-level-gap-override': '4px',
+  '--trees-item-row-gap-override': '4px',
   '--trees-icon-width-override': '14px',
-  '--trees-item-height': '24px',
+  '--trees-item-height': '26px',
   '--trees-indent-guide-bg-override': 'color-mix(in oklab, var(--trees-fg-muted) 30%, transparent)',
 } as const;
 
