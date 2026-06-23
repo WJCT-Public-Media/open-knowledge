@@ -54,6 +54,9 @@ const LazyActivityModeContent = lazy(async () => {
   return { default: mod.ActivityModeContent };
 });
 
+const DOC_PANEL_MIN_SIZE = '300px';
+const DOC_PANEL_MAX_SIZE = '600px';
+
 interface EditorAreaProps {
   editorMode: EditorMode;
   onModeChange: (mode: EditorMode) => void;
@@ -127,6 +130,10 @@ function EditorAreaInner({
   const isConnected = syncStatus === 'connected' || syncStatus === 'synced';
   const lifecycleStatus = useLifecycleStatus(activeDocName);
   const isConflict = lifecycleStatus === 'conflict';
+  const [everHadProvider, setEverHadProvider] = useState(false);
+  useEffect(() => {
+    if (activeProvider != null && !everHadProvider) setEverHadProvider(true);
+  }, [activeProvider, everHadProvider]);
   const deferredActiveDocName = useDeferredValue(activeDocName);
   const isNewDoc = activeTarget?.kind === 'missing';
   const showStats = !!activeDocName && activeTarget?.kind !== 'folder';
@@ -360,9 +367,36 @@ function EditorAreaInner({
   } else if (!activeProvider || !activeDocName) {
     const hashDoc = typeof window !== 'undefined' ? docNameFromHash(window.location.hash) : null;
     if (hashDoc !== null) {
-      return <EditorSkeleton />;
+      if (terminalBridge != null && everHadProvider) {
+        viewContent = <EditorSkeleton />;
+        rightPanel = (
+          <>
+            <ResizableHandle withHandle disabled />
+            <ResizablePanel
+              id="doc-panel"
+              defaultSize={initialRightCollapsed ? 0 : `${initialDocPanelWidthPx}px`}
+              minSize={DOC_PANEL_MIN_SIZE}
+              maxSize={DOC_PANEL_MAX_SIZE}
+              collapsible
+              collapsedSize={0}
+              inert
+              className="flex flex-col bg-muted/20"
+            >
+              {/* Visual-only filler. `inert` removes this subtree from the a11y
+                  tree + focus order, so a live-region role/aria-busy here would
+                  be dead ARIA — the skeleton in the left column is the announced
+                  loading state. Mirrors the real doc-panel (no ARIA on children
+                  under its own `inert`). */}
+              <div className="min-h-0 flex-1" />
+            </ResizablePanel>
+          </>
+        );
+      } else {
+        return <EditorSkeleton />;
+      }
+    } else {
+      viewContent = <EmptyEditorState terminalVisible={terminalVisible} />;
     }
-    viewContent = <EmptyEditorState terminalVisible={terminalVisible} />;
   } else {
     const isSourceMode = editorMode === 'source';
     const sourceDisabled = !isConnected;
@@ -486,8 +520,8 @@ function EditorAreaInner({
           id="doc-panel"
           panelRef={panelRef}
           defaultSize={initialRightCollapsed ? 0 : `${initialDocPanelWidthPx}px`}
-          minSize="300px"
-          maxSize="600px"
+          minSize={DOC_PANEL_MIN_SIZE}
+          maxSize={DOC_PANEL_MAX_SIZE}
           collapsible
           collapsedSize={0}
           onResize={(size) => {

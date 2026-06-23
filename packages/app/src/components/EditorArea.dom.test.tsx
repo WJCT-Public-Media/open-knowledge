@@ -57,11 +57,23 @@ const ASSET_DOC_CTX = {
   docPanelAgentId: null,
   docPanelExpandSignal: 0,
 };
+const FOLDER_LIVE_CTX = { ...FOLDER_DOC_CTX, activeProvider: {} as never };
+const DOC_COLD_CTX = {
+  activeDocName: null,
+  activeProvider: null,
+  activeTarget: { kind: 'doc', target: 'some-doc', docName: 'some-doc' },
+  recycleDocument: () => {},
+  docPanelMode: 'timeline',
+  docPanelAgentId: null,
+  docPanelExpandSignal: 0,
+};
 let docCtx:
   | typeof FOLDER_DOC_CTX
+  | typeof FOLDER_LIVE_CTX
   | typeof EMPTY_DOC_CTX
   | typeof LARGE_FILE_DOC_CTX
-  | typeof ASSET_DOC_CTX = FOLDER_DOC_CTX;
+  | typeof ASSET_DOC_CTX
+  | typeof DOC_COLD_CTX = FOLDER_DOC_CTX;
 mock.module('@/editor/DocumentContext', () => ({
   useDocumentContext: () => docCtx,
   useDocumentTransition: () => ({ openDocumentTransition: null }),
@@ -379,10 +391,10 @@ describe('EditorArea terminal persists across view-kind switches', () => {
   });
 });
 
-describe('EditorArea hash-load skeleton renders outside the panel group', () => {
+describe('EditorArea hash-load skeleton renders outside the panel group (cold start)', () => {
   beforeEach(() => {
     cleanup();
-    docCtx = EMPTY_DOC_CTX;
+    docCtx = DOC_COLD_CTX;
   });
   afterEach(() => {
     window.location.hash = '';
@@ -402,6 +414,67 @@ describe('EditorArea hash-load skeleton renders outside the panel group', () => 
         terminalLaunch={null}
       />,
     );
+
+    expect(screen.getByTestId('editor-skeleton')).toBeTruthy();
+    expect(screen.queryByTestId('resizable-group')).toBeNull();
+    expect(screen.queryByTestId('terminal-dock')).toBeNull();
+  });
+});
+
+describe('EditorArea terminal persists across a mid-session cold navigation', () => {
+  beforeEach(() => {
+    cleanup();
+    terminalDockMounts = 0;
+    window.location.hash = '';
+    docCtx = FOLDER_LIVE_CTX;
+  });
+  afterEach(() => {
+    window.location.hash = '';
+  });
+
+  test('keeps the dock mounted when a tab close/switch transiently nulls the provider', () => {
+    const props = {
+      editorMode: 'wysiwyg' as const,
+      onModeChange: () => {},
+      activeTab: 'timeline' as const,
+      onActiveTabChange: () => {},
+      terminalBridge: {} as never,
+      terminalVisible: true,
+      onTerminalVisibleChange: () => {},
+      terminalLaunch: null,
+    };
+    const { rerender } = render(<EditorArea {...props} />);
+    const mountsAfterInitial = terminalDockMounts;
+    expect(mountsAfterInitial).toBeGreaterThan(0);
+    expect(
+      screen.getByTestId('terminal-dock').querySelector('[data-testid="folder-overview"]'),
+    ).not.toBeNull();
+
+    act(() => {
+      docCtx = DOC_COLD_CTX;
+      window.location.hash = '#/some-doc';
+    });
+    rerender(<EditorArea {...props} />);
+
+    const dock = screen.getByTestId('terminal-dock');
+    expect(dock.querySelector('[data-testid="editor-skeleton"]')).not.toBeNull();
+    expect(terminalDockMounts).toBe(mountsAfterInitial);
+    expect(screen.getByTestId('resizable-group')).toBeTruthy();
+  });
+
+  test('web host keeps the bare early-return on mid-session cold nav (no dock to preserve)', () => {
+    const webProps = {
+      editorMode: 'wysiwyg' as const,
+      onModeChange: () => {},
+      activeTab: 'timeline' as const,
+      onActiveTabChange: () => {},
+    };
+    const { rerender } = render(<EditorArea {...webProps} />);
+    act(() => {
+      docCtx = DOC_COLD_CTX;
+      window.location.hash = '#/some-doc';
+    });
+    rerender(<EditorArea {...webProps} />);
 
     expect(screen.getByTestId('editor-skeleton')).toBeTruthy();
     expect(screen.queryByTestId('resizable-group')).toBeNull();
