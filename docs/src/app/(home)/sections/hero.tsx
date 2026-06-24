@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { ClaudeIcon } from '@/components/icons/claude';
 import { CodexBrandIcon } from '@/components/icons/codex';
 import { CursorIcon } from '@/components/icons/cursor';
-import { DOWNLOAD_URL } from '@/lib/site';
+import { DOWNLOAD_URL, SITE_HEADLINE } from '@/lib/site';
 import { cn } from '@/lib/utils';
 import { DotTexture } from '../dot-texture';
 import { MarketingButton } from '../marketing-button';
@@ -41,7 +41,7 @@ export function Hero() {
           headingClassName="sm:text-6xl text-5xl"
           description="A rich text editor for you and your agents. Private, open source, and free."
         >
-          Beautiful, AI-native markdown editor.
+          {SITE_HEADLINE}
         </SectionHeading>
 
         <div className="mt-6 flex items-center justify-center gap-4">

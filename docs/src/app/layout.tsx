@@ -2,7 +2,14 @@ import type { Metadata } from 'next';
 import { DM_Sans, Inter, JetBrains_Mono } from 'next/font/google';
 import type { Organization, WebSite, WithContext } from 'schema-dts';
 import { JsonLd } from '@/components/seo/json-ld';
-import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site';
+import {
+  metaDescription,
+  SITE_DESCRIPTION,
+  SITE_HEADLINE,
+  SITE_NAME,
+  SITE_URL,
+  TWITTER_HANDLE,
+} from '@/lib/site';
 import './global.css';
 import { Provider } from './provider';
 
@@ -45,10 +52,12 @@ const siteLd = {
   description: SITE_DESCRIPTION,
 } satisfies WithContext<WebSite>;
 
+const SITE_META_DESCRIPTION = metaDescription(SITE_DESCRIPTION);
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'Open Knowledge — Your knowledge, co-authored by AI',
+    default: `${SITE_NAME} — ${SITE_HEADLINE}`,
     template: '%s · Open Knowledge',
   },
   description: SITE_DESCRIPTION,
@@ -60,15 +69,17 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: SITE_NAME,
-    title: 'Open Knowledge — Your knowledge, co-authored by AI',
-    description: SITE_DESCRIPTION,
+    title: `${SITE_NAME} — ${SITE_HEADLINE}`,
+    description: SITE_META_DESCRIPTION,
     url: SITE_URL,
     locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Open Knowledge — Your knowledge, co-authored by AI',
-    description: SITE_DESCRIPTION,
+    site: TWITTER_HANDLE,
+    creator: TWITTER_HANDLE,
+    title: `${SITE_NAME} — ${SITE_HEADLINE}`,
+    description: SITE_META_DESCRIPTION,
   },
   verification: {
     google: 'ZeS2oQLq-M3Hut-WpCMBqfn6XhXPMQmRCx8ntea36RI',

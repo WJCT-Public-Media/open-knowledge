@@ -1,7 +1,25 @@
 export const SITE_URL = 'https://openknowledge.ai';
 export const SITE_NAME = 'Open Knowledge';
+export const TWITTER_HANDLE = '@OpenKnowledgeAI';
 export const SITE_DESCRIPTION =
   'An agent-native knowledge platform where humans and AI co-create. Real-time CRDT editing, markdown-native, connected to any AI agent via MCP.';
+
+export const SITE_HEADLINE = 'Beautiful, AI-native markdown editor.';
+
+const DESCRIPTION_MAX = 160;
+
+export function metaDescription(
+  text: string | null | undefined,
+  fallback: string = SITE_DESCRIPTION,
+): string {
+  const normalized = (text ?? '').replace(/\s+/g, ' ').trim();
+  const base = normalized.length > 0 ? normalized : fallback;
+  if (base.length <= DESCRIPTION_MAX) return base;
+  const slice = base.slice(0, DESCRIPTION_MAX - 1);
+  const lastSpace = slice.lastIndexOf(' ');
+  const cut = lastSpace > DESCRIPTION_MAX * 0.6 ? slice.slice(0, lastSpace) : slice;
+  return `${cut.trimEnd()}…`;
+}
 
 export const DOWNLOAD_URL =
   'https://github.com/inkeep/open-knowledge/releases/latest/download/Open-Knowledge-arm64.dmg';

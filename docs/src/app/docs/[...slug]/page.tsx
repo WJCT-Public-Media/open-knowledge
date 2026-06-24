@@ -1,6 +1,7 @@
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/page';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { metaDescription, SITE_NAME, TWITTER_HANDLE } from '@/lib/site';
 import { source } from '@/lib/source';
 import { getMDXComponents } from '@/mdx-components';
 
@@ -43,25 +44,29 @@ export async function generateMetadata(props: PageProps<'/docs/[...slug]'>): Pro
     .filter(Boolean);
 
   const ogImageUrl = `/og/docs/${params.slug.join('/')}`;
+  const description = metaDescription(page.data.description);
 
   return {
     title: page.data.title,
-    description: page.data.description,
+    description,
     keywords,
     alternates: {
       canonical: page.url,
     },
     openGraph: {
       type: 'article',
+      siteName: SITE_NAME,
       title: page.data.title,
-      description: page.data.description,
+      description,
       url: page.url,
       images: [ogImageUrl],
     },
     twitter: {
       card: 'summary_large_image',
+      site: TWITTER_HANDLE,
+      creator: TWITTER_HANDLE,
       title: page.data.title,
-      description: page.data.description,
+      description,
       images: [ogImageUrl],
     },
   };

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { OK_WORDMARK_DATA_URL } from './ok-wordmark.data';
+import { SITE_HEADLINE } from './site';
 
 export const OG_SIZE = { width: 1200, height: 630 } as const;
 export const OG_CONTENT_TYPE = 'image/png';
@@ -10,7 +11,7 @@ export const OG_CACHE_HEADERS = {
 const BG = '#fbf9f4';
 const TEXT = '#1a1a1a';
 const MUTED = '#71717a';
-const ACCENT = '#3685ff';
+const ACCENT = '#3784ff'; // matches --slide-accent (light)
 const DOT_COLOR = '#e3e3e1';
 const DOT_SPACING = 24;
 const DOT_RADIUS = 1.8;
@@ -18,11 +19,12 @@ const MASK_INNER = 0.7;
 const MASK_OUTER = 1.3;
 const PAD_X = 72;
 const PAD_Y = 64;
+const SAFE_BOTTOM = 96;
 const CARD_W = OG_SIZE.width;
 const CARD_H = OG_SIZE.height;
 
-const WORDMARK_NATURAL_W = 318;
-const WORDMARK_NATURAL_H = 55;
+const WORDMARK_NATURAL_W = 1307;
+const WORDMARK_NATURAL_H = 252;
 const WORDMARK_HEIGHT = 44;
 const WORDMARK_WIDTH = Math.round((WORDMARK_HEIGHT * WORDMARK_NATURAL_W) / WORDMARK_NATURAL_H);
 
@@ -95,13 +97,45 @@ function Wordmark() {
   );
 }
 
-function FilenameWithScribble({
-  filename,
-  fontSize = 88,
-}: {
-  filename: string;
-  fontSize?: number;
-}) {
+function GitBranchIcon() {
+  return (
+    // biome-ignore lint/a11y/noSvgWithoutTitle: rasterized to PNG by satori; ARIA never reaches an a11y tree.
+    <svg
+      width={26}
+      height={26}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={MUTED}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M6 3v12" />
+      <circle cx="18" cy="6" r="3" />
+      <circle cx="6" cy="18" r="3" />
+      <path d="M18 9a9 9 0 0 1-9 9" />
+    </svg>
+  );
+}
+
+function Eyebrow({ label }: { label: string }) {
+  return (
+    <span
+      style={{
+        fontSize: 22,
+        fontWeight: 500,
+        letterSpacing: '0.14em',
+        textTransform: 'uppercase',
+        color: ACCENT,
+        marginBottom: 18,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function Filename({ filename, fontSize = 88 }: { filename: string; fontSize?: number }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <h1
@@ -117,22 +151,6 @@ function FilenameWithScribble({
       >
         {filename}
       </h1>
-      {/* biome-ignore lint/a11y/noSvgWithoutTitle: rasterized to PNG by satori; ARIA never reaches an a11y tree. */}
-      <svg
-        width={800}
-        height={20}
-        viewBox="0 0 286 14"
-        fill="none"
-        preserveAspectRatio="none"
-        style={{ marginTop: 8 }}
-      >
-        <path
-          d="M3 11C45 3.5 91.5 1.5 143 5.5C194.5 9.5 241 7 283 3"
-          stroke={ACCENT}
-          strokeWidth="5"
-          strokeLinecap="round"
-        />
-      </svg>
     </div>
   );
 }
@@ -158,7 +176,7 @@ function CardFrame({ masks, children }: { masks: MaskEllipse[]; children: ReactN
           left: 0,
           right: 0,
           bottom: 0,
-          padding: `${PAD_Y}px ${PAD_X}px`,
+          padding: `${PAD_Y}px ${PAD_X}px ${PAD_Y + SAFE_BOTTOM}px`,
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -171,13 +189,14 @@ function CardFrame({ masks, children }: { masks: MaskEllipse[]; children: ReactN
 }
 
 const LOGO_MASK: MaskEllipse = { cx: 200, cy: 86, rx: 260, ry: 70 };
-const BODY_MASK: MaskEllipse = { cx: 400, cy: 500, rx: 650, ry: 220 };
+const BODY_MASK: MaskEllipse = { cx: 400, cy: 420, rx: 650, ry: 220 };
 
 export function BrandCard() {
   return (
     <CardFrame masks={[LOGO_MASK, BODY_MASK]}>
       <Wordmark />
       <div style={{ display: 'flex', flexDirection: 'column', maxWidth: 1056 }}>
+        <Eyebrow label="Open source" />
         <h1
           style={{
             fontSize: 76,
@@ -188,7 +207,7 @@ export function BrandCard() {
             whiteSpace: 'pre-line',
           }}
         >
-          {'Your knowledge,\nco-authored by AI'}
+          {SITE_HEADLINE}
         </h1>
       </div>
     </CardFrame>
@@ -206,7 +225,8 @@ export function DocPageCard({
     <CardFrame masks={[LOGO_MASK, BODY_MASK]}>
       <Wordmark />
       <div style={{ display: 'flex', flexDirection: 'column', maxWidth: 1056 }}>
-        <FilenameWithScribble filename={title} fontSize={titleFontSize(title)} />
+        <Eyebrow label="Docs" />
+        <Filename filename={title} fontSize={titleFontSize(title)} />
         {description ? (
           <div
             style={{
@@ -237,17 +257,20 @@ export function ShareCard({
   repoPath,
   branch,
   isDefaultBranch,
+  target = 'doc',
 }: {
   filename: string;
   repoPath: string;
   branch: string;
   isDefaultBranch: boolean;
+  target?: 'doc' | 'folder';
 }) {
   return (
     <CardFrame masks={[LOGO_MASK, BODY_MASK]}>
       <Wordmark />
       <div style={{ display: 'flex', flexDirection: 'column', maxWidth: 1056 }}>
-        <FilenameWithScribble filename={filename} />
+        <Eyebrow label={target === 'folder' ? 'Shared folder' : 'Shared'} />
+        <Filename filename={filename} />
         <div
           style={{
             display: 'flex',
@@ -260,9 +283,10 @@ export function ShareCard({
         >
           <span>{repoPath}</span>
           {isDefaultBranch ? null : (
-            <span style={{ display: 'flex', alignItems: 'center', marginLeft: 18, color: TEXT }}>
-              <span style={{ color: MUTED, opacity: 0.5, marginRight: 18 }}>•</span>
-              on&nbsp;<span style={{ fontWeight: 500 }}>{branch}</span>
+            <span style={{ display: 'flex', alignItems: 'center', marginLeft: 18, color: MUTED }}>
+              <span style={{ opacity: 0.5, marginRight: 18 }}>•</span>
+              <GitBranchIcon />
+              <span style={{ fontWeight: 500, marginLeft: 10 }}>{branch}</span>
             </span>
           )}
         </div>

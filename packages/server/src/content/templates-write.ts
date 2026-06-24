@@ -1,4 +1,3 @@
-
 import {
   existsSync,
   mkdirSync,
@@ -114,8 +113,7 @@ export function applyTemplateWrite(input: WriteTemplateInput): TemplateWriteResu
   } catch (err) {
     try {
       unlinkSync(tmpPath);
-    } catch {
-    }
+    } catch {}
     return {
       ok: false,
       error: {
@@ -187,15 +185,13 @@ function cleanEmptyOkDirs(
     try {
       rmdirSync(templatesDir);
       templatesCleaned = true;
-    } catch {
-    }
+    } catch {}
   }
   if (existsSync(okDir) && isEmpty(okDir)) {
     try {
       rmdirSync(okDir);
       okCleaned = true;
-    } catch {
-    }
+    } catch {}
   }
   return { templatesDir: templatesCleaned, okDir: okCleaned };
 }

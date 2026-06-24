@@ -10,11 +10,12 @@ import {
   ShareCard,
 } from '@/lib/og-card';
 import { buildSplashViewModel, type SplashView } from '@/lib/share-splash';
+import { SITE_NAME } from '@/lib/site';
 
 export const dynamic = 'force-static';
 export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
-export const alt = 'Open in Open Knowledge';
+export const alt = `Open in ${SITE_NAME}`;
 
 interface OgImageProps {
   params: Promise<{ encoded: string }>;
@@ -35,6 +36,7 @@ export function renderShareOgImage(view: SplashView, fonts: FontPair | null): Im
         repoPath={view.repoPath}
         branch={view.branch}
         isDefaultBranch={view.isDefaultBranch}
+        target={view.target}
       />
     ) : (
       <BrandCard />

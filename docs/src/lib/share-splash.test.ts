@@ -3,6 +3,7 @@ import { encodeShareUrl } from '@inkeep/open-knowledge-core';
 import {
   buildCloneCommand,
   buildCustomSchemeUrl,
+  buildShareDescription,
   buildSplashViewModel,
   classifySplashOs,
   clipboardCopyOutcome,
@@ -10,6 +11,7 @@ import {
   SPLASH_INSTALL_COMMAND,
   splashCtaLayout,
 } from './share-splash.ts';
+import { SITE_NAME } from './site.ts';
 
 function encodeV1(sharedUrl: string): string {
   return encodeShareUrl(sharedUrl);
@@ -538,5 +540,53 @@ describe('clipboardCopyOutcome', () => {
 
   test('maps failure to the `fallback-select` branch (never a silent no-op)', () => {
     expect(clipboardCopyOutcome(false)).toEqual({ kind: 'fallback-select' });
+  });
+});
+
+describe('buildShareDescription', () => {
+  function okView(sharedUrl: string) {
+    const view = buildSplashViewModel(encodeV1(sharedUrl));
+    if (view.kind !== 'ok') throw new Error(`expected ok view, got ${view.kind}`);
+    return view;
+  }
+
+  test('doc on the default branch — names the document + repo, no branch suffix', () => {
+    const d = buildShareDescription(
+      okView('https://github.com/inkeep/tech-ipos/blob/main/README.md'),
+    );
+    expect(d).toBe(`Open README.md with ${SITE_NAME} — a shared document from inkeep/tech-ipos.`);
+  });
+
+  test('doc on a non-default branch — appends "(on <branch>)"', () => {
+    const d = buildShareDescription(
+      okView('https://github.com/inkeep/tech-ipos/blob/draft-q4/README.md'),
+    );
+    expect(d).toBe(
+      `Open README.md with ${SITE_NAME} — a shared document from inkeep/tech-ipos (on draft-q4).`,
+    );
+  });
+
+  test('folder on the default branch — uses "folder" noun', () => {
+    const d = buildShareDescription(
+      okView('https://github.com/inkeep/open-knowledge/tree/main/docs'),
+    );
+    expect(d).toBe(`Open docs with ${SITE_NAME} — a shared folder from inkeep/open-knowledge.`);
+  });
+
+  test('folder on a non-default branch — folder noun + branch suffix', () => {
+    const d = buildShareDescription(
+      okView('https://github.com/inkeep/open-knowledge/tree/feature/docs'),
+    );
+    expect(d).toBe(
+      `Open docs with ${SITE_NAME} — a shared folder from inkeep/open-knowledge (on feature).`,
+    );
+  });
+
+  test('always carries the action phrase and the product name', () => {
+    const d = buildShareDescription(
+      okView('https://github.com/inkeep/tech-ipos/blob/main/README.md'),
+    );
+    expect(d).toContain(`with ${SITE_NAME}`);
+    expect(d.startsWith('Open ')).toBe(true);
   });
 });

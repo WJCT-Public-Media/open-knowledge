@@ -1,3 +1,4 @@
+import { SITE_NAME } from './site';
 
 const SHARE_URL_VERSION_V1 = 0x01;
 
@@ -346,4 +347,10 @@ export function buildSplashViewModel(encoded: string): SplashView {
     customSchemeUrl: buildCustomSchemeUrl(decoded.sharedUrl),
     githubUrl: decoded.sharedUrl,
   };
+}
+
+export function buildShareDescription(view: Extract<SplashView, { kind: 'ok' }>): string {
+  const noun = view.target === 'folder' ? 'folder' : 'document';
+  const branchSuffix = view.isDefaultBranch ? '' : ` (on ${view.branch})`;
+  return `Open ${view.filename} with ${SITE_NAME} — a shared ${noun} from ${view.repoPath}${branchSuffix}.`;
 }

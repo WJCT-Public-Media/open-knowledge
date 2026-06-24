@@ -4,11 +4,12 @@ import Link from 'next/link';
 import { OkWordmark } from '@/components/ok-wordmark';
 import {
   buildCloneCommand,
+  buildShareDescription,
   buildSplashViewModel,
   SPLASH_DOWNLOAD_URL,
   SPLASH_INSTALL_COMMAND,
 } from '@/lib/share-splash';
-import { SITE_URL } from '@/lib/site';
+import { metaDescription, SITE_NAME, SITE_URL, TWITTER_HANDLE } from '@/lib/site';
 import { cn } from '@/lib/utils';
 import { DotTexture } from '../../(home)/dot-texture';
 import { SplashButtonLabel, splashOutlineButton, splashPrimaryButton } from './splash-buttons';
@@ -25,27 +26,49 @@ export async function generateMetadata({ params }: SplashPageProps): Promise<Met
   const view = buildSplashViewModel(encoded);
 
   if (view.kind !== 'ok') {
+    const fallbackDescription = metaDescription(
+      'Open shared documents and folders with Open Knowledge, the AI-native markdown editor.',
+    );
     return {
-      title: { absolute: 'Open Knowledge' },
-      description: 'Open in Open Knowledge.',
+      title: { absolute: SITE_NAME },
+      description: fallbackDescription,
       robots: { index: false, follow: true },
+      openGraph: {
+        siteName: SITE_NAME,
+        title: SITE_NAME,
+        description: fallbackDescription,
+        url: `${SITE_URL}/d/${encoded}`,
+        type: 'website',
+      },
+      twitter: {
+        card: 'summary_large_image',
+        site: TWITTER_HANDLE,
+        creator: TWITTER_HANDLE,
+        title: SITE_NAME,
+        description: fallbackDescription,
+      },
     };
   }
 
+  const description = metaDescription(buildShareDescription(view));
+
   return {
     title: view.filename,
-    description: 'Open in Open Knowledge.',
+    description,
     robots: { index: false, follow: true },
     openGraph: {
+      siteName: SITE_NAME,
       title: view.filename,
-      description: 'Open in Open Knowledge.',
+      description,
       url: `${SITE_URL}/d/${encoded}`,
       type: 'article',
     },
     twitter: {
       card: 'summary_large_image',
+      site: TWITTER_HANDLE,
+      creator: TWITTER_HANDLE,
       title: view.filename,
-      description: 'Open in Open Knowledge.',
+      description,
     },
   };
 }

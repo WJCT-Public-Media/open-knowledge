@@ -86,7 +86,6 @@ export function PropertyPanel({ provider }: PropertyPanelProps) {
   const [resetCounters, setResetCounters] = useState<Record<string, number>>({});
   const docName = provider.configuration.name ?? '';
 
-
   function commitPatch(patch: FrontmatterPatch): PatchResult {
     if (!binding) {
       return { ok: false, error: t`Connecting` };

@@ -1,4 +1,3 @@
-
 import { describe, expect, test } from 'bun:test';
 import { normalizeBridge } from '@inkeep/open-knowledge-core';
 import type { JSONContent } from '@tiptap/core';
@@ -120,7 +119,6 @@ describe('I13 — NG12 probe cases: idempotent under synthetic prop edits', () =
   });
 });
 
-
 interface IndentedJsxCase {
   name: string;
   source: string;
@@ -221,7 +219,6 @@ describe('I13 — indented-children MDX JSX bridge fixed-point (PRD-7110)', () =
     });
   }
 });
-
 
 function findJsxContainer(root: JSONContent, componentName: string): JSONContent | undefined {
   let found: JSONContent | undefined;
@@ -402,7 +399,6 @@ describe('I13 — string-attr entity divergence on the delegation path (PRD-7110
     expect(normalizeBridge(out)).toBe(normalizeBridge(source));
   });
 });
-
 
 interface DetailsCase {
   name: string;
