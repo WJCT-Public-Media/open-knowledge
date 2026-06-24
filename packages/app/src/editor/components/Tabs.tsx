@@ -13,15 +13,12 @@ interface TabSummary {
   panelId: string | null;
 }
 
-const TABS_SELECTOR = '[data-component-type="tabs"]';
-const RENDERER_SELECTOR = '[data-node-view-content-react] > .react-renderer';
+const SLOT_SELECTOR =
+  ':scope > .component-children > [data-node-view-content-react] > .react-renderer';
 
-function readTabSlots(root: HTMLElement): TabSummary[] {
-  const ownerTabs = root.closest(TABS_SELECTOR);
-  if (!ownerTabs) return [];
-  const all = Array.from(root.querySelectorAll<HTMLElement>(RENDERER_SELECTOR));
-  const ours = all.filter((r) => r.parentElement?.closest(TABS_SELECTOR) === ownerTabs);
-  return ours.map((r, i) => {
+export function readTabSlots(root: HTMLElement): TabSummary[] {
+  const renderers = Array.from(root.querySelectorAll<HTMLElement>(SLOT_SELECTOR));
+  return renderers.map((r, i) => {
     const tabEl = r.querySelector<HTMLElement>('[data-tab-label]');
     const fromAttr = tabEl?.getAttribute('data-tab-label');
     const label = fromAttr?.trim() || `Tab ${i + 1}`;
