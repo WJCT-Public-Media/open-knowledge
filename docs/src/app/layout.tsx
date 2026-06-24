@@ -33,13 +33,7 @@ const orgLd = {
   description:
     'Ship Agent-powered assistants and automations that boost customer experience and 10x your teams.',
   foundingDate: '2023',
-  sameAs: [
-    'https://x.com/inkeep',
-    'https://linkedin.com/company/inkeep',
-    'https://github.com/inkeep',
-    'https://crunchbase.com/organization/inkeep',
-    'https://youtube.com/@inkeep-ai',
-  ],
+  sameAs: ['https://x.com/OpenKnowledgeAI', 'https://github.com/inkeep/open-knowledge'],
 } satisfies WithContext<Organization>;
 
 const siteLd = {

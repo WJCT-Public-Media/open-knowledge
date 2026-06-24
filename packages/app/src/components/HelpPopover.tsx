@@ -1,27 +1,35 @@
 import type { MessageDescriptor } from '@lingui/core';
 import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
-import { BookOpen, CircleHelp, Globe } from 'lucide-react';
+import { BookOpen, CircleHelp } from 'lucide-react';
 import type { ComponentProps, FC } from 'react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { dispatchExternalLinkClick } from '@/lib/external-link';
+import { cn } from '@/lib/utils';
 import { DiscordIcon } from './icons/discord';
 import { GithubIcon } from './icons/github';
+import { OkIcon } from './icons/ok';
 import { XTwitterIcon } from './icons/x-twitter';
 
 const links: Array<{
   label: string | MessageDescriptor;
   href: string;
   icon: FC<ComponentProps<'svg'>>;
+  iconClassName?: string;
 }> = [
-  { label: msg`Documentation`, href: 'https://openknowledge.ai/docs', icon: BookOpen },
+  { label: msg`Docs`, href: 'https://openknowledge.ai/docs', icon: BookOpen },
   { label: 'GitHub', href: 'https://github.com/inkeep/open-knowledge', icon: GithubIcon },
-  { label: msg`Website`, href: 'https://openknowledge.ai/', icon: Globe },
   { label: 'Discord', href: 'https://discord.com/invite/YujKpFN49', icon: DiscordIcon },
-  { label: 'Twitter', href: 'https://x.com/inkeep', icon: XTwitterIcon },
+  { label: 'X', href: 'https://x.com/OpenKnowledgeAI', icon: XTwitterIcon },
+  {
+    label: 'Open Knowledge',
+    href: 'https://openknowledge.ai/',
+    icon: OkIcon,
+    iconClassName: 'scale-125 grayscale transition-[filter] group-hover:grayscale-0',
+  },
 ];
 
 export const HelpPopover: FC = () => {
@@ -49,13 +57,13 @@ export const HelpPopover: FC = () => {
           <Trans>Resources</Trans>
         </TooltipContent>
       </Tooltip>
-      <PopoverContent align="end" className="w-64 p-3">
+      <PopoverContent align="end" className="w-48 p-3">
         <p className="font-mono tracking-wide uppercase text-muted-foreground text-xs mb-1">
           <Trans>Resources</Trans>
         </p>
         <nav aria-label={t`Resources`}>
           <ul className="space-y-0.5">
-            {links.map(({ label, href, icon: Icon }) => (
+            {links.map(({ label, href, icon: Icon, iconClassName }) => (
               <li key={href}>
                 <a
                   href={href}
@@ -63,9 +71,9 @@ export const HelpPopover: FC = () => {
                   rel="noopener noreferrer"
                   onClick={(e) => dispatchExternalLinkClick(e, href)}
                   onAuxClick={(e) => dispatchExternalLinkClick(e, href)}
-                  className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-azure-900/5 dark:hover:bg-white/20 hover:text-primary"
+                  className="group flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-azure-900/5 dark:hover:bg-white/20 hover:text-primary"
                 >
-                  <Icon aria-hidden="true" className="size-4 shrink-0" />
+                  <Icon aria-hidden="true" className={cn('size-4 shrink-0', iconClassName)} />
                   {typeof label === 'string' ? label : t(label)}
                 </a>
               </li>

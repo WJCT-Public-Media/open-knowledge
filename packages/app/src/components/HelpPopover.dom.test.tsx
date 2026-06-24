@@ -67,7 +67,7 @@ describe('HelpPopover runtime behavior', () => {
       })),
     ).toEqual([
       {
-        label: 'Documentation',
+        label: 'Docs',
         href: 'https://openknowledge.ai/docs',
         target: '_blank',
         rel: 'noopener noreferrer',
@@ -81,13 +81,6 @@ describe('HelpPopover runtime behavior', () => {
         hasIcon: true,
       },
       {
-        label: 'Website',
-        href: 'https://openknowledge.ai/',
-        target: '_blank',
-        rel: 'noopener noreferrer',
-        hasIcon: true,
-      },
-      {
         label: 'Discord',
         href: 'https://discord.com/invite/YujKpFN49',
         target: '_blank',
@@ -95,8 +88,15 @@ describe('HelpPopover runtime behavior', () => {
         hasIcon: true,
       },
       {
-        label: 'Twitter',
-        href: 'https://x.com/inkeep',
+        label: 'X',
+        href: 'https://x.com/OpenKnowledgeAI',
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        hasIcon: true,
+      },
+      {
+        label: 'Open Knowledge',
+        href: 'https://openknowledge.ai/',
         target: '_blank',
         rel: 'noopener noreferrer',
         hasIcon: true,

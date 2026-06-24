@@ -1,13 +1,13 @@
 import Link from 'next/link';
+import { DiscordIcon } from '@/components/icons/discord';
 import { GitHubIcon } from '@/components/icons/github';
-import { LinkedInIcon } from '@/components/icons/linkedin';
 import { XIcon } from '@/components/icons/x';
 import { InkeepWordmark } from '@/components/inkeep-wordmark';
 
 const socialLinks = [
   { href: 'https://github.com/inkeep/open-knowledge', label: 'GitHub', Icon: GitHubIcon },
-  { href: 'https://www.linkedin.com/company/inkeep/', label: 'LinkedIn', Icon: LinkedInIcon },
-  { href: 'https://x.com/inkeep', label: 'X', Icon: XIcon },
+  { href: 'https://discord.com/invite/YujKpFN49', label: 'Discord', Icon: DiscordIcon },
+  { href: 'https://x.com/OpenKnowledgeAI', label: 'X', Icon: XIcon },
 ];
 
 const legalLinks = [

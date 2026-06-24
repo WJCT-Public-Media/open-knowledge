@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useState } from 'react';
 import { ClaudeIcon } from '@/components/icons/claude';
 import { CodexBrandIcon } from '@/components/icons/codex';
@@ -43,7 +44,7 @@ export function Hero() {
           Beautiful, AI-native markdown editor.
         </SectionHeading>
 
-        <div className="mt-6">
+        <div className="mt-6 flex items-center justify-center gap-4">
           <MarketingButton
             href={DOWNLOAD_URL}
             target="_blank"
@@ -53,6 +54,12 @@ export function Hero() {
           >
             Download for macOS
           </MarketingButton>
+          <Link
+            href="/docs/reference/cli"
+            className="font-mono text-sm text-slide-muted underline-offset-4 transition-colors hover:text-slide-text hover:underline"
+          >
+            or CLI
+          </Link>
         </div>
 
         <div className="mt-16 flex justify-center">

@@ -1901,6 +1901,10 @@ msgstr "Display text"
 msgid "Do you want to permanently delete instead?"
 msgstr "Do you want to permanently delete instead?"
 
+#: src/components/HelpPopover.tsx
+msgid "Docs"
+msgstr "Docs"
+
 #: src/components/CommandPalette.tsx
 msgid "Docs tagged #{tagDocsName}"
 msgstr "Docs tagged #{tagDocsName}"
@@ -1929,10 +1933,6 @@ msgstr "Document statistics"
 #: src/components/empty-state/use-create-suggestions.ts
 msgid "Document the architecture of this repo: create an overview page that links to a page per major module describing its responsibilities and entry points."
 msgstr "Document the architecture of this repo: create an overview page that links to a page per major module describing its responsibilities and entry points."
-
-#: src/components/HelpPopover.tsx
-msgid "Documentation"
-msgstr "Documentation"
 
 #: src/components/FileTree.tsx
 msgid "Documents response did not match expected shape."
@@ -6177,10 +6177,6 @@ msgstr "We'll build <0>openknowledge.skill</0>, save it to <1>~/Downloads</1>, a
 #: src/components/settings/SettingsDialogBody.tsx
 msgid "We'll create a repository and start syncing — no terminal needed."
 msgstr "We'll create a repository and start syncing — no terminal needed."
-
-#: src/components/HelpPopover.tsx
-msgid "Website"
-msgstr "Website"
 
 #: src/components/ConfigSharingInfoTooltip.tsx
 msgid "What config sharing covers"

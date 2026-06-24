@@ -2,14 +2,44 @@
 
 import { Menu, X } from 'lucide-react';
 import Link from 'next/link';
+import type { FC, SVGProps } from 'react';
 import { useEffect, useRef, useState } from 'react';
+import { DiscordIcon } from '@/components/icons/discord';
+import { GitHubIcon } from '@/components/icons/github';
+import { XIcon } from '@/components/icons/x';
 import { OkWordmark } from '@/components/ok-wordmark';
 import { DOWNLOAD_URL } from '@/lib/site';
 import { MarketingButton } from './marketing-button';
 
-const navLinks = [
+type NavLink = {
+  href: string;
+  label: string;
+  external: boolean;
+  icon?: FC<SVGProps<SVGSVGElement>>;
+  iconOnly?: boolean;
+};
+
+const navLinks: NavLink[] = [
   { href: '/docs', label: 'Docs', external: false },
-  { href: 'https://github.com/inkeep/open-knowledge', label: 'GitHub', external: true },
+  {
+    href: 'https://github.com/inkeep/open-knowledge',
+    label: 'GitHub',
+    external: true,
+    icon: GitHubIcon,
+  },
+  {
+    href: 'https://discord.com/invite/YujKpFN49',
+    label: 'Discord',
+    external: true,
+    icon: DiscordIcon,
+  },
+  {
+    href: 'https://x.com/OpenKnowledgeAI',
+    label: 'X',
+    external: true,
+    icon: XIcon,
+    iconOnly: true,
+  },
 ];
 
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -66,27 +96,36 @@ export function SiteNav() {
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm text-slide-muted md:flex uppercase font-mono">
-          {navLinks.map((link) =>
-            link.external ? (
+          {navLinks.map((link) => {
+            const Icon = link.icon;
+            const content = (
+              <>
+                {Icon ? <Icon className="size-4 shrink-0" aria-hidden="true" /> : null}
+                {link.iconOnly ? null : link.label}
+              </>
+            );
+            return link.external ? (
               <a
                 key={link.href}
                 href={link.href}
                 target="_blank"
                 rel="noreferrer"
-                className="transition-colors hover:text-slide-text"
+                aria-label={link.iconOnly ? link.label : undefined}
+                className="inline-flex items-center gap-1.5 transition-colors hover:text-slide-text"
               >
-                {link.label}
+                {content}
               </a>
             ) : (
               <Link
                 key={link.href}
                 href={link.href}
-                className="transition-colors hover:text-slide-text"
+                aria-label={link.iconOnly ? link.label : undefined}
+                className="inline-flex items-center gap-1.5 transition-colors hover:text-slide-text"
               >
-                {link.label}
+                {content}
               </Link>
-            ),
-          )}
+            );
+          })}
           <MarketingButton href={DOWNLOAD_URL} size="sm">
             Download
           </MarketingButton>
@@ -116,27 +155,36 @@ export function SiteNav() {
         className="border-t bg-fd-background md:hidden"
       >
         <nav className="container mx-auto flex flex-col gap-1 px-6 py-4 text-base uppercase font-mono">
-          {navLinks.map((link) =>
-            link.external ? (
+          {navLinks.map((link) => {
+            const Icon = link.icon;
+            const content = (
+              <>
+                {Icon ? <Icon className="size-4 shrink-0" aria-hidden="true" /> : null}
+                {link.iconOnly ? null : link.label}
+              </>
+            );
+            return link.external ? (
               <a
                 key={link.href}
                 href={link.href}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-md px-3 py-2 text-slide-text transition-colors hover:bg-slide-bg-elevated"
+                aria-label={link.iconOnly ? link.label : undefined}
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-slide-text transition-colors hover:bg-slide-bg-elevated"
               >
-                {link.label}
+                {content}
               </a>
             ) : (
               <Link
                 key={link.href}
                 href={link.href}
-                className="rounded-md px-3 py-2 text-slide-text transition-colors hover:bg-slide-bg-elevated"
+                aria-label={link.iconOnly ? link.label : undefined}
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-slide-text transition-colors hover:bg-slide-bg-elevated"
               >
-                {link.label}
+                {content}
               </Link>
-            ),
-          )}
+            );
+          })}
           <MarketingButton href={DOWNLOAD_URL} size="md" className="text-base" showIcon>
             Download
           </MarketingButton>

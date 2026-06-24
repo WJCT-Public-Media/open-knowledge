@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { DOWNLOAD_URL } from '@/lib/site';
 import { useIsInView } from '@/lib/use-is-in-view';
@@ -102,9 +103,6 @@ export function CallToAction() {
           </SectionHeading>
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-5">
-            <MarketingButton href="/docs" variant="minimal" size="lg">
-              Read the docs
-            </MarketingButton>
             <MarketingButton
               href={DOWNLOAD_URL}
               target="_blank"
@@ -114,6 +112,12 @@ export function CallToAction() {
             >
               Download for macOS
             </MarketingButton>
+            <Link
+              href="/docs/reference/cli"
+              className="font-mono text-base text-slide-muted underline-offset-4 transition-colors hover:text-slide-text hover:underline"
+            >
+              or CLI
+            </Link>
           </div>
         </div>
       </div>

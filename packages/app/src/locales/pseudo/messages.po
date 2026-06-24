@@ -1896,6 +1896,10 @@ msgstr ""
 msgid "Do you want to permanently delete instead?"
 msgstr ""
 
+#: src/components/HelpPopover.tsx
+msgid "Docs"
+msgstr ""
+
 #: src/components/CommandPalette.tsx
 msgid "Docs tagged #{tagDocsName}"
 msgstr ""
@@ -1923,10 +1927,6 @@ msgstr ""
 
 #: src/components/empty-state/use-create-suggestions.ts
 msgid "Document the architecture of this repo: create an overview page that links to a page per major module describing its responsibilities and entry points."
-msgstr ""
-
-#: src/components/HelpPopover.tsx
-msgid "Documentation"
 msgstr ""
 
 #: src/components/FileTree.tsx
@@ -6171,10 +6171,6 @@ msgstr ""
 
 #: src/components/settings/SettingsDialogBody.tsx
 msgid "We'll create a repository and start syncing — no terminal needed."
-msgstr ""
-
-#: src/components/HelpPopover.tsx
-msgid "Website"
 msgstr ""
 
 #: src/components/ConfigSharingInfoTooltip.tsx
