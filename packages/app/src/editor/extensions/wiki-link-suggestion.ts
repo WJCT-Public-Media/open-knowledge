@@ -1,7 +1,10 @@
 import {
+  BacklinksSuccessSchema,
   createWorkspaceSearchCorpus,
   createWorkspaceSearchDocument,
+  ForwardLinksSuccessSchema,
   type HeadingEntry,
+  MAX_WORKSPACE_SEARCH_LIMIT,
   PageHeadingsSuccessSchema,
   PagesSuccessSchema,
   ProblemDetailsSchema,
@@ -15,6 +18,7 @@ import { ReactRenderer } from '@tiptap/react';
 import Suggestion, { type SuggestionKeyDownProps, type SuggestionProps } from '@tiptap/suggestion';
 import { HttpResponseParseError } from '../http-client';
 import { WikiLinkSuggestionMenu } from '../wiki-link-suggestion/WikiLinkSuggestionMenu';
+import { getEditorDocName } from './doc-context';
 import { getEditorSourceMode } from './editor-mode-context';
 import {
   createSuggestionPopup,
@@ -45,6 +49,37 @@ interface ParsedQuery {
 
 const MAX_ITEMS = 8;
 
+export interface WikiLinkContext {
+  currentDocName: string | null;
+  connectedDocNames: ReadonlySet<string>;
+}
+
+const EMPTY_WIKI_LINK_CONTEXT: WikiLinkContext = {
+  currentDocName: null,
+  connectedDocNames: new Set(),
+};
+
+const SKILL_FOLDER_SEGMENTS: ReadonlySet<string> = new Set(['.agents', '.claude', '.cursor']);
+
+const SKILL_FOLDER_PENALTY = 200;
+const LINK_GRAPH_BOOST = 100;
+const CURRENT_PAGE_BOOST = 50;
+
+export function isSkillFolderDoc(docName: string): boolean {
+  return docName.split('/').some((segment) => SKILL_FOLDER_SEGMENTS.has(segment));
+}
+
+export function autocompleteBoost(docName: string, context: WikiLinkContext): number {
+  let boost = 0;
+  if (isSkillFolderDoc(docName)) boost -= SKILL_FOLDER_PENALTY;
+  if (context.currentDocName !== null && docName === context.currentDocName) {
+    boost += CURRENT_PAGE_BOOST;
+  } else if (context.connectedDocNames.has(docName)) {
+    boost += LINK_GRAPH_BOOST;
+  }
+  return boost;
+}
+
 interface SuggestionSearchCorpus<T> {
   fingerprint: string;
   byPath: ReadonlyMap<string, T>;
@@ -66,14 +101,33 @@ export function parseQuery(query: string): ParsedQuery {
   return { mode: 'page', pageTarget: '', anchorQuery: '' };
 }
 
-export function filterPages(pages: PageItem[], query: string): PageItem[] {
-  if (!query) return pages.slice(0, MAX_ITEMS);
+export function filterPages(
+  pages: PageItem[],
+  query: string,
+  context: WikiLinkContext = EMPTY_WIKI_LINK_CONTEXT,
+): PageItem[] {
+  if (!query) {
+    return pages
+      .map((page, index) => ({ page, index, boost: autocompleteBoost(page.docName, context) }))
+      .sort((a, b) => b.boost - a.boost || a.index - b.index)
+      .slice(0, MAX_ITEMS)
+      .map((entry) => entry.page);
+  }
   const searchCorpus = getCachedPageSearchCorpus(pages);
   return searchWorkspaceCorpus(searchCorpus.corpus, query, {
     intent: 'autocomplete',
-    limit: MAX_ITEMS,
+    limit: MAX_WORKSPACE_SEARCH_LIMIT,
   })
-    .map((result) => searchCorpus.byPath.get(result.document.path))
+    .map((result) => ({
+      result,
+      adjusted: result.score + autocompleteBoost(result.document.path, context),
+    }))
+    .sort(
+      (a, b) =>
+        b.adjusted - a.adjusted || a.result.document.path.localeCompare(b.result.document.path),
+    )
+    .slice(0, MAX_ITEMS)
+    .map((entry) => searchCorpus.byPath.get(entry.result.document.path))
     .filter((page) => !!page);
 }
 
@@ -132,8 +186,12 @@ export function filterHeadings(headings: HeadingEntry[], anchorQuery: string): H
     .filter((heading) => !!heading);
 }
 
-export function buildSuggestionItems(pages: PageItem[], query: string): WikiLinkSuggestionItem[] {
-  const filtered = filterPages(pages, query);
+export function buildSuggestionItems(
+  pages: PageItem[],
+  query: string,
+  context: WikiLinkContext = EMPTY_WIKI_LINK_CONTEXT,
+): WikiLinkSuggestionItem[] {
+  const filtered = filterPages(pages, query, context);
   if (filtered.length > 0) {
     return filtered.map((item) =>
       item.kind === 'asset'
@@ -289,10 +347,55 @@ export async function fetchHeadings(docName: string): Promise<HeadingEntry[]> {
   return success.data.headings ?? [];
 }
 
+async function fetchForwardLinkTargets(docName: string): Promise<string[]> {
+  try {
+    const r = await fetch(`/api/forward-links?docName=${encodeURIComponent(docName)}`);
+    if (!r.ok) {
+      console.warn('[wiki-link-suggestion] /api/forward-links responded', r.status, docName);
+      return [];
+    }
+    const success = ForwardLinksSuccessSchema.safeParse(await r.json());
+    if (!success.success) return [];
+    return success.data.forwardLinks.flatMap((link) => (link.kind === 'doc' ? [link.docName] : []));
+  } catch (err) {
+    console.warn('[wiki-link-suggestion] Failed to fetch forward links:', err);
+    return [];
+  }
+}
+
+async function fetchBacklinkSources(docName: string): Promise<string[]> {
+  try {
+    const r = await fetch(`/api/backlinks?docName=${encodeURIComponent(docName)}`);
+    if (!r.ok) {
+      console.warn('[wiki-link-suggestion] /api/backlinks responded', r.status, docName);
+      return [];
+    }
+    const success = BacklinksSuccessSchema.safeParse(await r.json());
+    if (!success.success) return [];
+    return success.data.backlinks.map((link) => link.source);
+  } catch (err) {
+    console.warn('[wiki-link-suggestion] Failed to fetch backlinks:', err);
+    return [];
+  }
+}
+
+export async function loadWikiLinkContext(currentDocName: string | null): Promise<WikiLinkContext> {
+  if (!currentDocName) return EMPTY_WIKI_LINK_CONTEXT;
+  const [outgoing, incoming] = await Promise.all([
+    fetchForwardLinkTargets(currentDocName),
+    fetchBacklinkSources(currentDocName),
+  ]);
+  const connectedDocNames = new Set<string>([...outgoing, ...incoming]);
+  connectedDocNames.delete(currentDocName);
+  return { currentDocName, connectedDocNames };
+}
+
 export function configureWikiLinkSuggestion(editor: Editor) {
   let cachedPages: PageItem[] = [];
   let pagesLoaded = false;
   let pagesPromise: Promise<PageItem[]> | null = null;
+  let cachedContext: WikiLinkContext = EMPTY_WIKI_LINK_CONTEXT;
+  let contextPromise: Promise<WikiLinkContext> | null = null;
   let cachedHeadings = new Map<string, HeadingEntry[]>();
   let anchorFetchingFor: string | null = null;
   let fetchError: string | null = null;
@@ -330,20 +433,31 @@ export function configureWikiLinkSuggestion(editor: Editor) {
 
       if (!pagesLoaded) {
         pagesPromise ||= fetchPages();
-        try {
-          cachedPages = await pagesPromise;
+        contextPromise ||= loadWikiLinkContext(getEditorDocName(editor));
+        const [pagesResult, contextResult] = await Promise.allSettled([
+          pagesPromise,
+          contextPromise,
+        ]);
+        if (pagesResult.status === 'fulfilled') {
+          cachedPages = pagesResult.value;
           fetchError = null;
-        } catch (err) {
-          console.error('[wiki-link-suggestion] Failed to fetch pages:', err);
+        } else {
+          console.error('[wiki-link-suggestion] Failed to fetch pages:', pagesResult.reason);
           fetchError =
             'Failed to load pages. Press Escape and type [[ again to retry, or continue typing to insert an unresolved link.';
           cachedPages = [];
-        } finally {
-          pagesLoaded = true;
-          pagesPromise = null;
         }
+        if (contextResult.status === 'fulfilled') {
+          cachedContext = contextResult.value;
+        } else {
+          console.warn('[wiki-link-suggestion] link context load rejected:', contextResult.reason);
+          cachedContext = EMPTY_WIKI_LINK_CONTEXT;
+        }
+        pagesLoaded = true;
+        pagesPromise = null;
+        contextPromise = null;
       }
-      return buildSuggestionItems(cachedPages, query);
+      return buildSuggestionItems(cachedPages, query, cachedContext);
     },
 
     command: ({ editor, range, props: item }) => {
@@ -514,11 +628,13 @@ export function configureWikiLinkSuggestion(editor: Editor) {
           currentProps = null;
           selectedIndex = 0;
           cachedPages = [];
+          cachedContext = EMPTY_WIKI_LINK_CONTEXT;
           cachedHeadings = new Map();
           fetchError = null;
           anchorFetchError = null;
           pagesLoaded = false;
           pagesPromise = null;
+          contextPromise = null;
           anchorFetchingFor = null;
         },
       };

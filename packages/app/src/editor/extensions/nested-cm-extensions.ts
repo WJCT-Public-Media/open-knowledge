@@ -93,6 +93,7 @@ interface NestedCMOptions {
   wordWrapCompartment?: Compartment;
   wordWrap?: boolean;
   extraKeymaps?: Extension;
+  currentDocName?: string | null;
 }
 
 export function createNestedCMExtensions(options: NestedCMOptions): Extension[] {
@@ -102,7 +103,7 @@ export function createNestedCMExtensions(options: NestedCMOptions): Extension[] 
 
   return [
     markdown({ base: markdownLanguage, extensions: [GFM], codeLanguages }),
-    createWikiLinkSourceExtension(),
+    createWikiLinkSourceExtension(options.currentDocName ?? null),
     createMdLinkSourceExtension(),
     ...(ydoc ? [createAgentFlashSourceExtension(ydoc)] : []),
     keymap.of([]),

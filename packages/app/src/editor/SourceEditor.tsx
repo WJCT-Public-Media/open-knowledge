@@ -153,6 +153,7 @@ export function SourceEditor({
                 ydoc: provider.document,
                 wordWrapCompartment,
                 wordWrap,
+                currentDocName: resolvedDocName,
               }),
               createSourcePolishExtension(),
               sourceClipboard,

@@ -1,12 +1,17 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import type { HeadingEntry } from '@inkeep/open-knowledge-core';
 import {
+  autocompleteBoost,
   buildAnchorItems,
   buildSuggestionItems,
   computeFallbackAttrs,
   fetchPages,
+  filterPages,
+  isSkillFolderDoc,
+  loadWikiLinkContext,
   type PageItem,
   parseQuery,
+  type WikiLinkContext,
   wikiLinkMatcher,
 } from './wiki-link-suggestion';
 
@@ -367,5 +372,225 @@ describe('fetchPages', () => {
 
     const result = await fetchPages();
     expect(result.some((item) => item.kind === 'folder')).toBe(false);
+  });
+});
+
+describe('isSkillFolderDoc', () => {
+  test('matches docs under .agents / .claude / .cursor at any depth', () => {
+    expect(isSkillFolderDoc('.claude/skills/foo/SKILL')).toBe(true);
+    expect(isSkillFolderDoc('.agents/rules/bar')).toBe(true);
+    expect(isSkillFolderDoc('.cursor/rules/baz')).toBe(true);
+    expect(isSkillFolderDoc('public/open-knowledge/.claude/skills/x')).toBe(true);
+  });
+
+  test('does not match ordinary docs or look-alike folder names', () => {
+    expect(isSkillFolderDoc('guides/getting-started')).toBe(false);
+    expect(isSkillFolderDoc('claude/notes')).toBe(false); // no leading dot
+    expect(isSkillFolderDoc('agents-overview')).toBe(false);
+  });
+});
+
+describe('autocompleteBoost', () => {
+  const ctx = (over: Partial<WikiLinkContext> = {}): WikiLinkContext => ({
+    currentDocName: null,
+    connectedDocNames: new Set(),
+    ...over,
+  });
+
+  test('penalizes skill-folder docs', () => {
+    expect(autocompleteBoost('.claude/skills/foo/SKILL', ctx())).toBe(-200);
+  });
+
+  test('boosts the current page and link-graph neighbors, neighbor > current', () => {
+    expect(autocompleteBoost('current', ctx({ currentDocName: 'current' }))).toBe(50);
+    expect(autocompleteBoost('neighbor', ctx({ connectedDocNames: new Set(['neighbor']) }))).toBe(
+      100,
+    );
+  });
+
+  test('combines penalty and link boost additively (a linked skill is still demoted)', () => {
+    const linkedSkill = autocompleteBoost(
+      '.claude/skills/foo/SKILL',
+      ctx({ connectedDocNames: new Set(['.claude/skills/foo/SKILL']) }),
+    );
+    expect(linkedSkill).toBe(-100);
+  });
+
+  test('returns 0 for an ordinary doc with empty context', () => {
+    expect(autocompleteBoost('guides/intro', ctx())).toBe(0);
+  });
+});
+
+describe('context-aware ranking', () => {
+  test('empty query: neighbors and current page float up, skills sink', () => {
+    const corpus: PageItem[] = [
+      { docName: 'alpha', title: 'Alpha' },
+      { docName: '.claude/skills/foo/SKILL', title: 'Foo' },
+      { docName: 'beta', title: 'Beta' },
+      { docName: 'gamma', title: 'Gamma' },
+    ];
+    const context: WikiLinkContext = {
+      currentDocName: 'beta',
+      connectedDocNames: new Set(['gamma']),
+    };
+    expect(filterPages(corpus, '', context).map((p) => p.docName)).toEqual([
+      'gamma', // linked neighbor (+100)
+      'beta', // current page (+50)
+      'alpha', // ordinary (0)
+      '.claude/skills/foo/SKILL', // skill (-200)
+    ]);
+  });
+
+  test('empty query without context preserves source order (byte-identical to slice)', () => {
+    const corpus: PageItem[] = [
+      { docName: 'alpha', title: 'Alpha' },
+      { docName: 'beta', title: 'Beta' },
+      { docName: 'gamma', title: 'Gamma' },
+    ];
+    expect(filterPages(corpus, '').map((p) => p.docName)).toEqual(['alpha', 'beta', 'gamma']);
+  });
+
+  test('typed query: a skill is deprioritized below a stronger non-skill match but still listed', () => {
+    const corpus: PageItem[] = [
+      { docName: '.claude/skills/notes/SKILL', title: 'Project notes overview' },
+      { docName: 'notes', title: 'Notes' },
+    ];
+    expect(filterPages(corpus, 'notes').map((p) => p.docName)).toEqual([
+      'notes',
+      '.claude/skills/notes/SKILL',
+    ]);
+  });
+
+  test('typed query: a linked neighbor outranks an equal-tier non-linked match', () => {
+    const corpus: PageItem[] = [
+      { docName: 'guide-alpha', title: 'Guide alpha' },
+      { docName: 'guide-beta', title: 'Guide beta' },
+    ];
+    const context: WikiLinkContext = {
+      currentDocName: 'somewhere-else',
+      connectedDocNames: new Set(['guide-beta']),
+    };
+    expect(filterPages(corpus, 'guide', context).map((p) => p.docName)).toEqual([
+      'guide-beta',
+      'guide-alpha',
+    ]);
+  });
+
+  test('typed query: a boosted neighbor ranked outside the natural top-8 still surfaces', () => {
+    const corpus: PageItem[] = Array.from({ length: 9 }, (_, i) => ({
+      docName: `item-${i + 1}`,
+      title: `Item ${i + 1}`,
+    }));
+    const noContext = filterPages(corpus, 'item').map((p) => p.docName);
+    expect(noContext).toHaveLength(8);
+    expect(noContext).not.toContain('item-9');
+
+    const withNeighbor = filterPages(corpus, 'item', {
+      currentDocName: 'elsewhere',
+      connectedDocNames: new Set(['item-9']),
+    }).map((p) => p.docName);
+    expect(withNeighbor).toContain('item-9');
+  });
+});
+
+describe('loadWikiLinkContext', () => {
+  const realFetch = globalThis.fetch;
+
+  function stubLinks(routes: {
+    forward?: { status?: number; body: unknown };
+    back?: { status?: number; body: unknown };
+  }) {
+    globalThis.fetch = mock(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      const route = url.startsWith('/api/forward-links')
+        ? routes.forward
+        : url.startsWith('/api/backlinks')
+          ? routes.back
+          : undefined;
+      const status = route?.status ?? (route ? 200 : 404);
+      return new Response(JSON.stringify(route?.body ?? {}), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof globalThis.fetch;
+  }
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  test('returns an empty context for a null docName without fetching', async () => {
+    let called = false;
+    globalThis.fetch = mock(async () => {
+      called = true;
+      return new Response('{}', { status: 200 });
+    }) as typeof globalThis.fetch;
+    const ctx = await loadWikiLinkContext(null);
+    expect(ctx).toEqual({ currentDocName: null, connectedDocNames: new Set() });
+    expect(called).toBe(false);
+  });
+
+  test('merges outgoing doc links with incoming sources and excludes external links', async () => {
+    stubLinks({
+      forward: {
+        body: {
+          docName: 'me',
+          forwardLinks: [
+            { kind: 'doc', docName: 'out-a', anchor: null, title: 'A', snippet: null },
+            { kind: 'external', url: 'https://example.com', title: 'x', snippet: null },
+          ],
+        },
+      },
+      back: {
+        body: {
+          docName: 'me',
+          backlinks: [{ source: 'in-b', anchor: null, title: 'B', snippet: null }],
+        },
+      },
+    });
+    const ctx = await loadWikiLinkContext('me');
+    expect(ctx.currentDocName).toBe('me');
+    expect([...ctx.connectedDocNames].sort()).toEqual(['in-b', 'out-a']);
+  });
+
+  test('drops a self-link so the current page earns the current-page boost, not the neighbor boost', async () => {
+    stubLinks({
+      forward: {
+        body: {
+          docName: 'me',
+          forwardLinks: [
+            { kind: 'doc', docName: 'me', anchor: null, title: 'self', snippet: null },
+            { kind: 'doc', docName: 'friend', anchor: null, title: 'F', snippet: null },
+          ],
+        },
+      },
+      back: { body: { docName: 'me', backlinks: [] } },
+    });
+    const ctx = await loadWikiLinkContext('me');
+    expect(ctx.connectedDocNames.has('me')).toBe(false);
+    expect(autocompleteBoost('me', ctx)).toBe(50);
+    expect(autocompleteBoost('friend', ctx)).toBe(100);
+  });
+
+  test('degrades to the still-successful side when one endpoint errors (HTTP 500)', async () => {
+    stubLinks({
+      forward: { status: 500, body: {} },
+      back: {
+        body: {
+          docName: 'me',
+          backlinks: [{ source: 'in-b', anchor: null, title: 'B', snippet: null }],
+        },
+      },
+    });
+    const ctx = await loadWikiLinkContext('me');
+    expect(ctx.currentDocName).toBe('me');
+    expect([...ctx.connectedDocNames]).toEqual(['in-b']);
+  });
+
+  test('degrades to no neighbors when a response body is malformed', async () => {
+    stubLinks({ forward: { body: { wrong: 'shape' } }, back: { body: { nope: true } } });
+    const ctx = await loadWikiLinkContext('me');
+    expect(ctx.currentDocName).toBe('me');
+    expect(ctx.connectedDocNames.size).toBe(0);
   });
 });

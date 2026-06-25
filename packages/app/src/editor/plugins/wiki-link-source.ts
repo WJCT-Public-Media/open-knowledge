@@ -16,7 +16,9 @@ import {
   fetchPages,
   filterHeadings,
   filterPages,
+  loadWikiLinkContext,
   type PageItem,
+  type WikiLinkContext,
 } from '../extensions/wiki-link-suggestion';
 import {
   openHashHrefInNewTab,
@@ -30,6 +32,17 @@ let pagesCache: PageItem[] | null = null;
 let pagesCacheTime = 0;
 let knownTargetSet: Set<string> | null = null;
 const headingsCache = new Map<string, { headings: HeadingEntry[]; time: number }>();
+const contextCache = new Map<string, { context: WikiLinkContext; time: number }>();
+
+async function getWikiLinkContext(docName: string | null): Promise<WikiLinkContext> {
+  if (!docName) return loadWikiLinkContext(null);
+  const now = Date.now();
+  const cached = contextCache.get(docName);
+  if (cached !== undefined && now - cached.time < PAGES_CACHE_TTL_MS) return cached.context;
+  const context = await loadWikiLinkContext(docName);
+  contextCache.set(docName, { context, time: now });
+  return context;
+}
 
 async function getPages(): Promise<PageItem[]> {
   const now = Date.now();
@@ -214,6 +227,7 @@ const wikiLinkClickHandler = EditorView.domEventHandlers({
 
 async function wikiLinkCompletionSource(
   context: CompletionContext,
+  currentDocName: string | null,
 ): Promise<CompletionResult | null> {
   const textBefore = context.state.doc.sliceString(0, context.pos);
 
@@ -252,11 +266,14 @@ async function wikiLinkCompletionSource(
     };
   }
 
-  const pages = await getPages().catch((err) => {
-    console.warn('[wiki-link-source] Failed to fetch pages:', err);
-    return [] as PageItem[];
-  });
-  const filtered = filterPages(pages, query);
+  const [pages, linkContext] = await Promise.all([
+    getPages().catch((err) => {
+      console.warn('[wiki-link-source] Failed to fetch pages:', err);
+      return [] as PageItem[];
+    }),
+    getWikiLinkContext(currentDocName),
+  ]);
+  const filtered = filterPages(pages, query, linkContext);
 
   return {
     from: triggerPos,
@@ -287,11 +304,14 @@ const wikiLinkTheme = EditorView.theme({
   },
 });
 
-export function createWikiLinkSourceExtension(): Extension {
+export function createWikiLinkSourceExtension(currentDocName: string | null = null): Extension {
   return [
     wikiLinkDecorations,
     wikiLinkClickHandler,
     wikiLinkTheme,
-    markdownLanguage.data.of({ autocomplete: wikiLinkCompletionSource }),
+    markdownLanguage.data.of({
+      autocomplete: (context: CompletionContext) =>
+        wikiLinkCompletionSource(context, currentDocName),
+    }),
   ];
 }
