@@ -2,15 +2,12 @@
 
 OpenKnowledge is a beautiful, local-first markdown editor and LLM wiki with integrations for Claude, Codex, and Cursor. 
 
-<picture>
-  <source srcset="assets/hero.webp" type="image/webp" />
-  <img
-    src="assets/hero.gif"
-    alt="OpenKnowledge editor with an AI agent drafting a launch recap"
-    width="100%"
-    style="border-radius: 10px"
-  />
-</picture>
+<img
+  src="assets/hero.webp"
+  alt="OpenKnowledge editor with an AI agent drafting a launch recap"
+  width="100%"
+  style="border-radius: 10px"
+/>
 
 Available as [macOS app](https://github.com/inkeep/open-knowledge/releases/latest/download/Open-Knowledge-arm64.dmg) or [Web app/CLI](https://openknowledge.ai/docs/get-started/quickstart#ok-install-web-app-linux-intel-mac) for Windows and Linux.
 
@@ -18,9 +15,9 @@ Available as [macOS app](https://github.com/inkeep/open-knowledge/releases/lates
 
 Key highlights:
 - Full **WYSIWYG** so that editing markdown files feels like editing a Google Doc or Notion page. 
-- Collaborative **AI-editing** with Claude, Codex, and Cursor desktop apps. 
+- Collaborative **AI-editing** with **Claude, Codex, and Cursor desktop apps**. 
 - Out-of-the-box **MCP**, **skills**, and templates for LLM Wikis, Agent Second brains, and spec-driven development
-- No-code **Team Sharing** powered by GitHub and git under the hood
+- No-code **Team Sharing** and **Auto-sync** powered by git/GitHub under the hood
 - **Built-in TUI** and CLI for terminal users
 
 Docs for general usage: <https://openknowledge.ai/docs>.
