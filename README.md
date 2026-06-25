@@ -2,14 +2,17 @@
 
 OpenKnowledge is a beautiful, local-first markdown editor and LLM wiki with integrations for Claude, Codex, and Cursor. 
 
-<img
-  src="assets/hero.gif"
-  alt="OpenKnowledge editor with an AI agent drafting a launch recap"
-  width="100%"
-  style="border-radius: 10px"
-/>
+<picture>
+  <source srcset="assets/hero.webp" type="image/webp" />
+  <img
+    src="assets/hero.gif"
+    alt="OpenKnowledge editor with an AI agent drafting a launch recap"
+    width="100%"
+    style="border-radius: 10px"
+  />
+</picture>
 
-Available as [macOS app](https://github.com/inkeep/open-knowledge/releases/latest/download/Open-Knowledge-arm64.dmg) or [Web app/CLI](https://openknowledge.ai/docs/reference/cli). 
+Available as [macOS app](https://github.com/inkeep/open-knowledge/releases/latest/download/Open-Knowledge-arm64.dmg) or [Web app/CLI](https://openknowledge.ai/docs/get-started/quickstart#ok-install-web-app-linux-intel-mac) for Windows and Linux.
 
 # Features
 
@@ -26,13 +29,13 @@ Docs for general usage: <https://openknowledge.ai/docs>.
 
 **macOS:** download the desktop app — open the DMG, drag **Open Knowledge** to **Applications**, and launch it. [Latest release](https://github.com/inkeep/open-knowledge/releases/latest).
 
-**Linux or an Intel Mac:** run the same editor as a local web app via the CLI (Windows isn't supported yet) ([Node.js 24+](https://nodejs.org) required):
+**Linux, Windows, or Intel Mac:** run the same editor as a local web app via the CLI ([Node.js 24+](https://nodejs.org) required):
 
 ```bash
 npm install -g @inkeep/open-knowledge
 cd your-project
 ok init          # scaffold the project + wire up Claude Code, Cursor, and Codex
-ok start --open  # serve the editor and open it in your browser
+ok start --open  # serve the web editor and open it in your browser
 ```
 
 ## Contributions

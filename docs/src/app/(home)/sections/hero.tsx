@@ -55,7 +55,7 @@ export function Hero() {
             Download for macOS
           </MarketingButton>
           <Link
-            href="/docs/reference/cli"
+            href="/docs/get-started/quickstart#ok-install-web-app-linux-intel-mac"
             className="font-mono text-sm text-slide-muted underline-offset-4 transition-colors hover:text-slide-text hover:underline"
           >
             or CLI

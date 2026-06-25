@@ -12,9 +12,12 @@ export function McpInstall({ editor, children }: { editor: string; children?: Re
         </li>
         <li>
           <strong>Web app / terminal</strong> (Linux, Intel Mac — see the{' '}
-          <a href="/docs/reference/cli">web app guide</a>). Run <code>ok init</code> in your
-          project: it registers the OpenKnowledge MCP server with {editor} and the other editors it
-          detects. Every <code>ok start</code> refreshes the entry.
+          <a href="/docs/get-started/quickstart#ok-install-web-app-linux-intel-mac">
+            web app guide
+          </a>
+          ). Run <code>ok init</code> in your project: it registers the OpenKnowledge MCP server
+          with {editor} and the other editors it detects. Every <code>ok start</code> refreshes the
+          entry.
         </li>
       </ul>
       {children}
