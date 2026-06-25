@@ -20,6 +20,7 @@ import { protectFromMdx, restoreFromMdx } from './autolink-void-html-guard.ts';
 import { encodeBackslashEscapes, restoreBackslashEscapesPlugin } from './backslash-escape-guard.ts';
 import { calloutTransformerPlugin, REMARK_GITHUB_ALERTS_OPTIONS } from './callout-transformer.ts';
 import { commentPromoterPlugin } from './comment-promoter.ts';
+import { dedentBlockJsxClose } from './dedent-block-jsx-close.ts';
 import { detailsAccordionPromoterPlugin } from './details-accordion-promoter.ts';
 import { encodeEntityRefs, restoreEntityRefsPlugin } from './entity-ref-guard.ts';
 import { highlightPromoterPlugin } from './highlight-promoter.ts';
@@ -230,7 +231,8 @@ function readDocBoundary(value: unknown): SourceDocBoundary | undefined {
 }
 
 export function parseMd(rawSource: string, processor: Processor): PmNode {
-  const { source, hadBom } = splitDocumentHeadBom(rawSource);
+  const { source: rawAfterBom, hadBom } = splitDocumentHeadBom(rawSource);
+  const source = dedentBlockJsxClose(rawAfterBom);
   const protectedFr14 = encodeBackslashEscapes(source);
   const protectedR23 = protectFromMdx(protectedFr14);
   const protected_ = encodeEntityRefs(protectedR23);
@@ -246,7 +248,8 @@ export function parseMd(rawSource: string, processor: Processor): PmNode {
 }
 
 export function parseMdToMdast(rawSource: string, processor: Processor): MdastRoot {
-  const { source, hadBom } = splitDocumentHeadBom(rawSource);
+  const { source: rawAfterBom, hadBom } = splitDocumentHeadBom(rawSource);
+  const source = dedentBlockJsxClose(rawAfterBom);
   const protected_ = encodeEntityRefs(protectFromMdx(encodeBackslashEscapes(source)));
   const file = new VFile(protected_);
   const tree = processor.parse(file);

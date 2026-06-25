@@ -23,6 +23,7 @@ import { RawMdxFallback } from './raw-mdx-fallback';
 import { SelectionStatePlugin } from './selection-state-plugin';
 import { SlashCommand } from './slash-command';
 import { SourceDirtyObserver } from './source-dirty-observer';
+import { TabFocusTrap } from './tab-focus-trap';
 import { TableInsertControls } from './table-insert-controls';
 import { TagClickPlugin } from './tag-click-plugin';
 import { Tag } from './tag-view';
@@ -61,6 +62,7 @@ export const sharedExtensions = [
     },
   }),
   FormattingShortcuts,
+  TabFocusTrap,
   FileHandler.configure({
     onDrop(editor, files, pos) {
       for (const file of files) {

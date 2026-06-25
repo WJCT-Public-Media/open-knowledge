@@ -160,6 +160,10 @@ export const KeyboardNav = Extension.create({
         const { state } = editor;
 
         if (state.selection instanceof NodeSelection) {
+          if (state.selection.$from.depth === 0) {
+            editor.commands.blur();
+            return true;
+          }
           const pos = state.selection.from + state.selection.node.nodeSize;
           const $pos = state.doc.resolve(Math.min(pos, state.doc.content.size));
           const sel = TextSelection.near($pos);
