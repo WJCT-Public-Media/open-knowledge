@@ -17,10 +17,14 @@ const TERMINAL_PANEL_ID = 'terminal-dock-panel';
 /** A concurrent terminal session the dock hosts as a tab. `id` is a stable
  *  client-side identity (not the async PTY id — the session resolves its own PTY
  *  on mount). `launch` is the one-shot intent the session writes once it is live;
- *  sessions opened from the tab strip carry none. */
+ *  sessions opened from the tab strip carry none. `title` is the latest title the
+ *  running program set via an OSC 0/2 escape sequence (shell prompt, `vim`, the
+ *  `claude` TUI); null until the program sets one, falling back to the positional
+ *  `Terminal N` default. Titles live for the session lifetime only. */
 interface TerminalSessionDescriptor {
   readonly id: string;
   readonly launch: TerminalLaunchIntent | null;
+  readonly title: string | null;
 }
 
 function makeSessionId(counter: number): string {
@@ -59,7 +63,7 @@ export function TerminalDock({
   const [isCollapsed, setIsCollapsed] = useState(!visible);
 
   const [sessions, setSessions] = useState<readonly TerminalSessionDescriptor[]>(() =>
-    visible ? [{ id: makeSessionId(1), launch }] : [],
+    visible ? [{ id: makeSessionId(1), launch, title: null }] : [],
   );
   const [activeSessionId, setActiveSessionId] = useState(() => (visible ? makeSessionId(1) : ''));
   const activeSessionIdRef = useRef(activeSessionId);
@@ -71,8 +75,16 @@ export function TerminalDock({
   function openSession(launchForSession: TerminalLaunchIntent | null) {
     sessionCounterRef.current += 1;
     const id = makeSessionId(sessionCounterRef.current);
-    setSessions((prev) => [...prev, { id, launch: launchForSession }]);
+    setSessions((prev) => [...prev, { id, launch: launchForSession, title: null }]);
     setActiveSessionId(id);
+  }
+
+  function setSessionTitle(id: string, title: string) {
+    const next = title.trim() === '' ? null : title.trim();
+    setSessions((prev) => {
+      if (!prev.some((session) => session.id === id && session.title !== next)) return prev;
+      return prev.map((session) => (session.id === id ? { ...session, title: next } : session));
+    });
   }
   const openSessionRef = useRef(openSession);
 
@@ -196,7 +208,7 @@ export function TerminalDock({
 
   const tabDescriptors = sessions.map((session, index) => ({
     id: session.id,
-    label: t`Terminal ${index + 1}`,
+    label: session.title ?? t`Terminal ${index + 1}`,
   }));
 
   return (
@@ -280,6 +292,7 @@ export function TerminalDock({
                 <TerminalGate
                   bridge={bridge}
                   launch={session.launch}
+                  onTitleChange={(title) => setSessionTitle(session.id, title)}
                   onClose={() => closeSession(session.id)}
                 />
               </TabsContent>

@@ -1,4 +1,3 @@
-
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import type { TerminalCli } from '@inkeep/open-knowledge-core';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
@@ -34,6 +33,7 @@ class MockTerminal {
     this.onDataCb = cb;
     return { dispose() {} };
   });
+  onTitleChange = mock((_cb: (title: string) => void) => ({ dispose() {} }));
   attachCustomKeyEventHandler = mock((h: (e: KeyboardEvent) => boolean) => {
     this.keyHandler = h;
   });

@@ -1,4 +1,3 @@
-
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type {
@@ -36,6 +35,11 @@ class MockTerminal {
   });
   onData = mock((cb: (d: string) => void) => {
     this.onDataCb = cb;
+    return { dispose() {} };
+  });
+  onTitleChangeCb: ((title: string) => void) | null = null;
+  onTitleChange = mock((cb: (title: string) => void) => {
+    this.onTitleChangeCb = cb;
     return { dispose() {} };
   });
   attachCustomKeyEventHandler = mock((h: (e: KeyboardEvent) => boolean) => {
@@ -152,6 +156,32 @@ describe('TerminalPanel', () => {
 
     await waitFor(() => expect(terminal.create).toHaveBeenCalledTimes(1));
     expect(terminal.create).toHaveBeenCalledWith({ cols: 80, rows: 24 });
+  });
+
+  test('forwards xterm OSC 0/2 title changes to onTitleChange', async () => {
+    const { bridge } = makeBridge({ ok: true, ptyId: 'pty-1' });
+    const onTitleChange = mock((_title: string) => {});
+    render(<TerminalPanel bridge={bridge} onTitleChange={onTitleChange} />);
+
+    await waitFor(() => expect(lastTerm?.onTitleChangeCb).toBeTruthy());
+
+    act(() => lastTerm?.onTitleChangeCb?.('claude — repo'));
+    expect(onTitleChange).toHaveBeenCalledWith('claude — repo');
+
+    act(() => lastTerm?.onTitleChangeCb?.('claude — done'));
+    expect(onTitleChange).toHaveBeenLastCalledWith('claude — done');
+  });
+
+  test('disposes the title listener on unmount', async () => {
+    const { bridge } = makeBridge({ ok: true, ptyId: 'pty-1' });
+    const onTitleChange = mock((_title: string) => {});
+    const { unmount } = render(<TerminalPanel bridge={bridge} onTitleChange={onTitleChange} />);
+    await waitFor(() => expect(lastTerm?.onTitleChangeCb).toBeTruthy());
+
+    unmount();
+    onTitleChange.mockClear();
+    act(() => lastTerm?.onTitleChangeCb?.('late'));
+    expect(onTitleChange).not.toHaveBeenCalled();
   });
 
   test('writes shell output to the terminal and drains the consumed code-unit count for backpressure', async () => {

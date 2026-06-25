@@ -1,4 +1,3 @@
-
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -51,23 +50,41 @@ mock.module('@/components/ui/resizable', () => ({
   ),
 }));
 
+const titleEmitters = new Map<string, (title: string) => void>();
+function emitTitle(ptyId: string, title: string): boolean {
+  const emit = titleEmitters.get(ptyId);
+  if (emit == null) return false;
+  emit(title);
+  return true;
+}
+
 mock.module('./TerminalGate', () => ({
   // biome-ignore lint/suspicious/noExplicitAny: test stub
-  TerminalGate: ({ bridge, launch }: any) => {
+  TerminalGate: ({ bridge, launch, onTitleChange }: any) => {
     const ptyIdRef = useRef<string | null>(null);
     const cancelledRef = useRef(false);
+    const onTitleChangeRef = useRef(onTitleChange);
+    useEffect(() => {
+      onTitleChangeRef.current = onTitleChange;
+    });
     useEffect(() => {
       cancelledRef.current = false;
       void Promise.resolve(bridge?.terminal?.create?.({ cols: 80, rows: 24 })).then(
         (result: { ok?: boolean; ptyId?: string } | undefined) => {
           if (!result?.ok || result.ptyId == null) return;
           if (cancelledRef.current) bridge?.terminal?.kill?.(result.ptyId);
-          else ptyIdRef.current = result.ptyId;
+          else {
+            ptyIdRef.current = result.ptyId;
+            titleEmitters.set(result.ptyId, (title: string) => onTitleChangeRef.current?.(title));
+          }
         },
       );
       return () => {
         cancelledRef.current = true;
-        if (ptyIdRef.current != null) bridge?.terminal?.kill?.(ptyIdRef.current);
+        if (ptyIdRef.current != null) {
+          titleEmitters.delete(ptyIdRef.current);
+          bridge?.terminal?.kill?.(ptyIdRef.current);
+        }
       };
     }, [bridge]);
     return (
@@ -184,6 +201,7 @@ describe('TerminalDock multi-session', () => {
     panelHandle.resize.mockClear();
     panelHandle.expand.mockClear();
     sharedPanelRef.current = panelHandle;
+    titleEmitters.clear();
   });
   afterEach(() => {
     cleanup();
@@ -287,6 +305,52 @@ describe('TerminalDock multi-session', () => {
 
     expect(screen.getAllByTestId('terminal-session')).toHaveLength(1);
     expect(activePanelId()).toBe(activeBefore);
+  });
+
+  test("a session's OSC title becomes its tab label; siblings keep the default", async () => {
+    const user = userEvent.setup();
+    const view = renderDock(true);
+    await user.click(screen.getByRole('button', { name: 'New terminal' }));
+    await waitFor(() => expect(view.create).toHaveBeenCalledTimes(2));
+
+    act(() => emitTitle('pty-1', 'claude — repo'));
+
+    expect(screen.getByRole('tab', { name: 'claude — repo' })).toBeDefined();
+    expect(screen.getByRole('tab', { name: 'Terminal 2' })).toBeDefined();
+  });
+
+  test('a later OSC title replaces an earlier one (live binding)', async () => {
+    renderDock(true);
+    await waitFor(() => expect(emitTitle('pty-1', 'first')).toBe(true));
+
+    act(() => emitTitle('pty-1', 'first'));
+    expect(screen.getByRole('tab', { name: 'first' })).toBeDefined();
+
+    act(() => emitTitle('pty-1', 'second'));
+    expect(screen.queryByRole('tab', { name: 'first' })).toBeNull();
+    expect(screen.getByRole('tab', { name: 'second' })).toBeDefined();
+  });
+
+  test('an empty OSC title reverts the tab to its positional default', async () => {
+    renderDock(true);
+    await waitFor(() => expect(emitTitle('pty-1', 'busy')).toBe(true));
+
+    act(() => emitTitle('pty-1', 'busy'));
+    expect(screen.getByRole('tab', { name: 'busy' })).toBeDefined();
+
+    act(() => emitTitle('pty-1', ''));
+    expect(screen.getByRole('tab', { name: 'Terminal 1' })).toBeDefined();
+  });
+
+  test('a whitespace-only OSC title reverts the tab to its positional default', async () => {
+    renderDock(true);
+    await waitFor(() => expect(emitTitle('pty-1', 'busy')).toBe(true));
+
+    act(() => emitTitle('pty-1', 'busy'));
+    expect(screen.getByRole('tab', { name: 'busy' })).toBeDefined();
+
+    act(() => emitTitle('pty-1', '   '));
+    expect(screen.getByRole('tab', { name: 'Terminal 1' })).toBeDefined();
   });
 
   test("closing a tab reaps only that session's PTY and leaves the others alive", async () => {

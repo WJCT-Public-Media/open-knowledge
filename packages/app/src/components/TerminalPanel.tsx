@@ -25,6 +25,7 @@ interface TerminalPanelProps {
   readonly className?: string;
   readonly onClose?: () => void;
   readonly onExit?: (info: { readonly exitCode: number; readonly signal: number | null }) => void;
+  readonly onTitleChange?: (title: string) => void;
   readonly launch?: TerminalLaunchIntent | null;
 }
 
@@ -33,6 +34,7 @@ export function TerminalPanel({
   className,
   onClose,
   onExit,
+  onTitleChange,
   launch = null,
 }: TerminalPanelProps) {
   const { t } = useLingui();
@@ -52,6 +54,7 @@ export function TerminalPanel({
           bridge={bridge}
           onClose={onClose}
           onExit={onExit}
+          onTitleChange={onTitleChange}
           onRestart={() => setRestartKey((k) => k + 1)}
           launch={launch}
         />
@@ -66,6 +69,7 @@ interface TerminalSessionProps {
   readonly bridge: OkDesktopBridge;
   readonly onClose?: () => void;
   readonly onExit?: (info: { readonly exitCode: number; readonly signal: number | null }) => void;
+  readonly onTitleChange?: (title: string) => void;
   readonly onRestart: () => void;
   readonly launch?: TerminalLaunchIntent | null;
 }
@@ -74,11 +78,13 @@ function TerminalSession({
   bridge,
   onClose,
   onExit,
+  onTitleChange,
   onRestart,
   launch = null,
 }: TerminalSessionProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const onExitRef = useRef(onExit);
+  const onTitleChangeRef = useRef(onTitleChange);
   const { resolvedTheme } = useTheme();
   const termRef = useRef<Terminal | null>(null);
   const initialResolvedThemeRef = useRef(resolvedTheme);
@@ -93,6 +99,7 @@ function TerminalSession({
 
   useEffect(() => {
     onExitRef.current = onExit;
+    onTitleChangeRef.current = onTitleChange;
   });
 
   useEffect(() => {
@@ -103,6 +110,7 @@ function TerminalSession({
     let ptyId: string | null = null;
     let unsubData: (() => void) | undefined;
     let unsubExit: (() => void) | undefined;
+    let titleDisposable: { dispose(): void } | undefined;
     let observer: ResizeObserver | undefined;
 
     const term = new Terminal({
@@ -138,6 +146,10 @@ function TerminalSession({
     }
 
     fit.fit();
+
+    titleDisposable = term.onTitleChange((title) => {
+      if (!cancelled) onTitleChangeRef.current?.(title);
+    });
 
     term.attachCustomKeyEventHandler((event) => {
       if (event.type !== 'keydown' || !event.shiftKey) return true;
@@ -232,6 +244,7 @@ function TerminalSession({
       observer?.disconnect();
       unsubData?.();
       unsubExit?.();
+      titleDisposable?.dispose();
       term.dispose();
       if (ptyId)
         void bridge.terminal
