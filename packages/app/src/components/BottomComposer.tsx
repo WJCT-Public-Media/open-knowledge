@@ -1,4 +1,3 @@
-
 import { type TargetData, TERMINAL_CLI_IDS, type TerminalCli } from '@inkeep/open-knowledge-core';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { ChevronDown, Loader2, SquareTerminal, TextQuote, X } from 'lucide-react';
@@ -165,8 +164,7 @@ export function BottomComposer({
           if (overlap <= 0) return;
           const scroller = view.dom.closest('.editor-doc-scroll');
           if (scroller instanceof HTMLElement) scroller.scrollTop += overlap;
-        } catch {
-        }
+        } catch {}
       });
     };
     const card = cardRef.current;
@@ -397,10 +395,14 @@ export function BottomComposer({
         >
           <ChevronDown className="size-3.5" aria-hidden />
         </Button>
-        {/* Removable top-row file-context chips — the set of files touched while
-            drafting (minus dismissed, minus any referenced inline). Typed
-            `@`-mentions stay inline as their own chips, never duplicated here.
-            X'ing a chip sticky-dismisses its path for this draft. */}
+        {/* One wrapping context row. The removable file-context chips (files
+            touched while drafting, minus dismissed / inline `@`-mentions; typed
+            `@`-mentions stay inline as their own chips) and the captured-selection
+            pill are siblings in a single flex-wrap row, so they sit on the same
+            line and only break to a second line on overflow. X'ing a file chip
+            sticky-dismisses its path for this draft. The expanded selection
+            preview carries `basis-full`, dropping onto its own line beneath the
+            chips. */}
         <ComposerContextChips
           files={fileChips}
           onRemoveFile={(path) =>
@@ -410,65 +412,66 @@ export function BottomComposer({
               return next;
             })
           }
-        />
-        {pinnedSelection ? (
-          <div className="flex flex-col items-start gap-1">
-            <span
-              data-testid="composer-selection-pill"
-              className="group/chip inline-flex max-w-[16rem] items-center gap-1 rounded-md border bg-muted/40 py-0.5 pr-1.5 pl-1 text-muted-foreground text-xs"
-            >
-              {/* The LEADING glyph IS the remove control (mirrors the file chip):
-                  a fixed-size cell holding the selection's TextQuote glyph and an
-                  X, cross-faded by opacity on chip hover / `:focus-within` / button
-                  focus. The cell never resizes, so the pill box is identical at
-                  rest vs hover → no reflow. TextQuote stays the at-rest icon (this
-                  is a text selection). opacity only — never layout. */}
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={t`Remove selection`}
-                onClick={() => {
-                  setPinnedSelection(null);
-                  setSelectionExpanded(false);
-                }}
-                className="group/remove relative size-3.5 shrink-0 rounded-sm text-muted-foreground/80 hover:text-foreground"
+        >
+          {pinnedSelection ? (
+            <>
+              <span
+                data-testid="composer-selection-pill"
+                className="group/chip inline-flex max-w-[16rem] items-center gap-1 rounded-md border bg-muted/40 py-0.5 pr-1.5 pl-1 text-muted-foreground text-xs"
               >
-                <TextQuote
-                  className="absolute top-1/2 left-1/2 size-3 -translate-x-1/2 -translate-y-1/2 opacity-100 transition-opacity duration-150 ease-out group-hover/chip:opacity-0 group-focus-within/chip:opacity-0 motion-reduce:transition-none"
-                  aria-hidden
-                />
-                <X
-                  className="absolute top-1/2 left-1/2 size-3 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-150 ease-out group-hover/chip:opacity-100 group-focus-within/chip:opacity-100 motion-reduce:transition-none"
-                  aria-hidden
-                />
-              </Button>
-              {/* The chip label is compact (`name (range)`); clicking it peeks
-                  the light-rendered preview (expand/collapse), Cursor-style. */}
-              <Button
-                type="button"
-                variant="ghost"
-                aria-expanded={selectionExpanded}
-                aria-label={
-                  selectionExpanded ? t`Hide selection preview` : t`Show selection preview`
-                }
-                onClick={() => setSelectionExpanded((open) => !open)}
-                data-testid="composer-selection-peek"
-                className="h-auto min-h-0 min-w-0 justify-start truncate px-0 py-0 text-left font-normal text-muted-foreground text-xs hover:bg-transparent hover:text-foreground"
-              >
-                {pinnedLabel}
-              </Button>
-            </span>
-            {selectionExpanded && pinnedPreview !== '' ? (
-              <p
-                className="max-h-24 w-full overflow-y-auto whitespace-pre-wrap text-2xs text-muted-foreground/80 subtle-scrollbar"
-                data-testid="composer-selection-preview"
-              >
-                {pinnedPreview}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
+                {/* The LEADING glyph IS the remove control (mirrors the file chip):
+                    a fixed-size cell holding the selection's TextQuote glyph and an
+                    X, cross-faded by opacity on chip hover / `:focus-within` / button
+                    focus. The cell never resizes, so the pill box is identical at
+                    rest vs hover → no reflow. TextQuote stays the at-rest icon (this
+                    is a text selection). opacity only — never layout. */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t`Remove selection`}
+                  onClick={() => {
+                    setPinnedSelection(null);
+                    setSelectionExpanded(false);
+                  }}
+                  className="group/remove relative size-3.5 shrink-0 rounded-sm text-muted-foreground/80 hover:text-foreground"
+                >
+                  <TextQuote
+                    className="absolute top-1/2 left-1/2 size-3 -translate-x-1/2 -translate-y-1/2 opacity-100 transition-opacity duration-150 ease-out group-hover/chip:opacity-0 group-focus-within/chip:opacity-0 motion-reduce:transition-none"
+                    aria-hidden
+                  />
+                  <X
+                    className="absolute top-1/2 left-1/2 size-3 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-150 ease-out group-hover/chip:opacity-100 group-focus-within/chip:opacity-100 motion-reduce:transition-none"
+                    aria-hidden
+                  />
+                </Button>
+                {/* The chip label is compact (`name (range)`); clicking it peeks
+                    the light-rendered preview (expand/collapse), Cursor-style. */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  aria-expanded={selectionExpanded}
+                  aria-label={
+                    selectionExpanded ? t`Hide selection preview` : t`Show selection preview`
+                  }
+                  onClick={() => setSelectionExpanded((open) => !open)}
+                  data-testid="composer-selection-peek"
+                  className="h-auto min-h-0 min-w-0 justify-start truncate px-0 py-0 text-left font-normal text-muted-foreground text-xs hover:bg-transparent hover:text-foreground"
+                >
+                  {pinnedLabel}
+                </Button>
+              </span>
+              {selectionExpanded && pinnedPreview !== '' ? (
+                <p
+                  className="max-h-24 w-full basis-full overflow-y-auto whitespace-pre-wrap text-2xs text-muted-foreground/80 subtle-scrollbar"
+                  data-testid="composer-selection-preview"
+                >
+                  {pinnedPreview}
+                </p>
+              ) : null}
+            </>
+          ) : null}
+        </ComposerContextChips>
         <div className="flex items-end gap-2">
           <div className="relative flex-1">
             <ComposerMentionInput

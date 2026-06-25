@@ -258,8 +258,7 @@ beforeEach(() => {
   toastErrors.length = 0;
   try {
     window.localStorage.clear();
-  } catch {
-  }
+  } catch {}
 });
 
 afterEach(() => {

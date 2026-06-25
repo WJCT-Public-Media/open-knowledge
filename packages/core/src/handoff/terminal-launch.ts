@@ -1,4 +1,3 @@
-
 import type { HandoffTarget } from './types.ts';
 
 export function shellSingleQuote(s: string): string {

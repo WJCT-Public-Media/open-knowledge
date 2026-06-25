@@ -1,4 +1,3 @@
-
 import {
   existsSync as fsExistsSync,
   mkdirSync as fsMkdirSync,
@@ -105,7 +104,6 @@ function removeLegacyUserSkillDirs(home: string, fs: SkillFsOps, logger: SkillRe
   }
 }
 
-
 type UserSkillReclaimEntry =
   | { kind: 'central'; path: string; status: 'written' | 'overwritten' | 'failed'; error?: string }
   | {
@@ -191,8 +189,7 @@ export async function reclaimUserSkillsOnLaunch(
         outcome: 'failed',
         reason: `bundle-missing:${error}`,
       })
-      .catch(() => {
-      });
+      .catch(() => {});
     return { status: 'skipped', reason: 'bundle-missing' };
   }
 
@@ -330,7 +327,6 @@ export async function reclaimUserSkillsOnLaunch(
 
   return { status: 'done', version, entries };
 }
-
 
 type ProjectSkillReclaimEntry = {
   editorId: string;
