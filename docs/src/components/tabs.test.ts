@@ -55,8 +55,8 @@ describe('slugifyTabId', () => {
 describe('composeTabId (groupId-prefix URL composition)', () => {
   test('groupId + label → prefixed slug (the docs quickstart shape)', () => {
     expect(composeTabId('macOS app', 'ok-install')).toBe('ok-install-macos-app');
-    expect(composeTabId('Web app (Linux · Intel Mac)', 'ok-install')).toBe(
-      'ok-install-web-app-linux-intel-mac',
+    expect(composeTabId('Web app (Linux, Windows, Intel Mac)', 'ok-install')).toBe(
+      'ok-install-web-app-linux-windows-intel-mac',
     );
   });
 
