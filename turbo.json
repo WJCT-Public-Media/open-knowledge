@@ -29,7 +29,7 @@
     "test": {
       "dependsOn": ["^build"],
       "cache": true,
-      "inputs": ["src/**/*.ts", "src/**/*.tsx"]
+      "inputs": ["src/**/*.ts", "src/**/*.tsx", "tests/contract/**/*.ts"]
     },
     "test:dom": {
       "dependsOn": ["^build"],
@@ -70,21 +70,6 @@
         "../server/src/**/*.ts"
       ]
     },
-    "test:fidelity": {
-      "dependsOn": ["^build"],
-      "cache": true,
-      "inputs": [
-        "tests/fidelity/**/*.ts",
-        "tests/fidelity/**/*.json",
-        "tests/fixtures/**",
-        "src/editor/**/*.ts",
-        "../core/src/**/*.ts",
-        "../core/src/markdown/fixtures/**/*.json",
-        "../md-conformance/src/**/*.ts",
-        "../../patches/@handlewithcare%2Fremark-prosemirror@0.1.5.patch"
-      ],
-      "env": ["STRESS_FIDELITY"]
-    },
     "test:e2e": {
       "dependsOn": ["^build"],
       "cache": false
@@ -116,25 +101,6 @@
         "tests/perf/markdown-bench.test.ts"
       ],
       "env": ["RUN_BENCH", "BENCH_RUNNER_CLASS"]
-    },
-    "test:perf:fallback": {
-      "dependsOn": [],
-      "cache": false,
-      "inputs": [
-        "src/markdown/**/*.ts",
-        "src/markdown/fixtures/perf/*.md",
-        "src/markdown/parse-with-fallback.test.ts"
-      ],
-      "env": ["RUN_BENCH"]
-    },
-    "test:perf:r15-guard": {
-      "dependsOn": [],
-      "cache": false,
-      "inputs": [
-        "src/markdown/autolink-void-html-guard.ts",
-        "src/markdown/autolink-void-html-guard.perf.test.ts"
-      ],
-      "env": ["RUN_BENCH"]
     },
     "test:perf:regression:unit": {
       "dependsOn": [],

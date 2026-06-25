@@ -160,6 +160,25 @@ The rule does NOT catch:
 
 Plugin: [`biome-plugins/playwright-prefer-to-have-count.grit`](playwright-prefer-to-have-count.grit). Fixture: [`biome-plugins/__fixtures__/playwright-prefer-to-have-count.fixture.tsx`](__fixtures__/playwright-prefer-to-have-count.fixture.tsx). Test: [`packages/app/tests/lint-plugins/playwright-prefer-to-have-count.test.ts`](../packages/app/tests/lint-plugins/playwright-prefer-to-have-count.test.ts). See [PRECEDENTS.md #42](../PRECEDENTS.md#custom-lint-enforcement-precedent-42) for the GritQL-plugin convention.
 
+### `no-roundtrip-identity-oracle.grit`
+
+Forbids the byte-fidelity round-trip oracle in public-mirrored tests. Asserting that re-serializing a freshly-parsed document yields back the *same* input — `serialize(parse(x))` (or the MarkdownManager method form `m.serialize(m.parse(x))`) compared equal to that same `x` via `.toBe` / `.toEqual` / `.toStrictEqual` or `===` — is the engine's byte-identity correctness oracle. That oracle is private quality-bar IP that the engine fidelity suite owns; this rule keeps a new public test from reintroducing it on the public mirror.
+
+**Identity, not contract.** The rule fires only when the parse input and the expected value are the *same expression* — GritQL metavariable reuse (`$x` … `$x`) enforces textual equality. That is what separates the oracle from the assertions that must stay public and green:
+
+- A **contract test** pins a *fixed expected literal* (`expect(serialize(parse('# H'))).toBe('# H\n')`) — the expected differs from the input, so it does not fire.
+- The **Bridge-invariant comparator** `normalizeBridge(a) === normalizeBridge(b)` (precedent #38, the documented public contract) contains no `serialize(parse(...))` and is never flagged.
+- The **normalizing-construct detector** `serialize(parse(x)) !== x` uses `!==`, a different operator, and is never flagged.
+
+**Scoped via `overrides[].plugins`** to the public-mirrored test surface (`packages/**/*.test.ts`, `*.test.tsx`, `*.e2e.ts`). The engine-test clusters that legitimately own the oracle are excluded as negative globs, mirroring the set excluded from the public mirror: `packages/app/tests/fidelity/**`, `packages/core/src/markdown/**/*.test.ts`, `packages/core/src/bridge/**/*.test.ts`, the enumerated byte-oracle tests, and the private `packages/md-conformance/**` estate. Inside those clusters the identity oracle is the whole point; outside them (the public surface) it is forbidden.
+
+The rule does NOT catch:
+- Round-trip identity through a helper (`mdRoundTrip(x)`, `normalize(...)`) or an intermediate variable (`const out = serialize(parse(x)); expect(out).toBe(x)`) — the pattern matches the inline call shape, not helper bodies or cross-statement data flow. Those forms live in the path-excluded fidelity suite, covered by exclusion.
+- Equality through matchers other than `toBe` / `toEqual` / `toStrictEqual`, or operators other than `===` (e.g. a custom `assertByteIdentical` helper).
+- Any oracle whose two sides are not the same inline expression (e.g. a round-trip compared to a different variable).
+
+Plugin: [`biome-plugins/no-roundtrip-identity-oracle.grit`](no-roundtrip-identity-oracle.grit). Fixture: [`biome-plugins/__fixtures__/no-roundtrip-identity-oracle.fixture.tsx`](__fixtures__/no-roundtrip-identity-oracle.fixture.tsx). Test: [`packages/app/tests/lint-plugins/no-roundtrip-identity-oracle.test.ts`](../packages/app/tests/lint-plugins/no-roundtrip-identity-oracle.test.ts). See [PRECEDENTS.md #42](../PRECEDENTS.md#custom-lint-enforcement-precedent-42) for the GritQL-plugin convention and [PRECEDENTS.md #38](../PRECEDENTS.md) for the Bridge-invariant contract.
+
 ## Suppression
 
 Inline `// biome-ignore` comments silence individual diagnostics. The most specific form names the rule and the reason:
@@ -181,6 +200,7 @@ Current production suppressions:
 - `no-raw-html-interactive-element`: 20 file-level `biome-ignore-all` headers in `packages/app/src/{components,presence}/**` (pre-rule backlog awaiting shadcn migration; see the rule's section above for the ratchet contract)
 - `no-resolved-value-theme-source`: 0 sites
 - `playwright-topass-budget`: 0 sites
+- `no-roundtrip-identity-oracle`: 0 sites
 
 ## Adding a new plugin
 

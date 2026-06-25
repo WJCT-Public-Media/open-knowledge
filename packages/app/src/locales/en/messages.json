@@ -612,7 +612,6 @@
     "HptUxX": ["Number"],
     "Hrz9NY": ["Wiki link"],
     "I1gRhX": ["Failed to rename"],
-    "I1m158": ["Couldn't auto-copy"],
     "I5AfhE": ["Sync status unavailable — server unreachable."],
     "IA1wNb": ["The Claude Desktop App didn't open the file. Is it installed? (", ["msg"], ")"],
     "IA6JW2": ["Detecting"],
@@ -858,6 +857,7 @@
     "PdA9NZ": [["ahead"], " ahead"],
     "Pgu10b": ["Saved as <0>", ["slug"], ".md</0>"],
     "PgzIpb": ["Move to the previous visual-editor find result."],
+    "PiH3UR": ["Copied!"],
     "PkeYXL": ["Expanded graph mode"],
     "Pkw7J9": ["This folder is empty."],
     "PqYWiC": [
@@ -1183,6 +1183,7 @@
       "/ and all files inside? This action cannot be undone."
     ],
     "a9OzSn": ["No pages found for \"", ["trimmedQuery"], "\""],
+    "aByJ8j": ["How does sharing work?"],
     "aE2_XM": ["One pattern per line — appended to <0>.okignore</0>."],
     "aENGMB": [
       "Semantic search adds meaning-based ranking to the search tool so conceptually-related pages surface even without shared keywords."

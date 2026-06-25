@@ -1345,6 +1345,11 @@ msgstr "Copied full path"
 msgid "Copied relative path"
 msgstr "Copied relative path"
 
+#: src/components/CopyButton.tsx
+msgid "Copied!"
+msgstr "Copied!"
+
+#: src/components/CopyButton.tsx
 #: src/components/empty-state/CopyablePromptList.tsx
 #: src/components/InstallInClaudeDesktopDialog.tsx
 msgid "Copy"
@@ -1513,10 +1518,6 @@ msgstr "Could not validate folder. Please try again."
 #: src/components/CreateProjectDialog.tsx
 msgid "Could not write project files. Try a different location."
 msgstr "Could not write project files. Try a different location."
-
-#: src/components/ShareButton.tsx
-msgid "Couldn't auto-copy"
-msgstr "Couldn't auto-copy"
 
 #: src/components/settings/EmbeddingsKeySection.tsx
 msgid "Couldn't clear the key — please try again."
@@ -2827,6 +2828,10 @@ msgstr "Horizontal rule that divides sections."
 #: src/components/settings/SettingsDialogShell.tsx
 msgid "Hotkeys"
 msgstr "Hotkeys"
+
+#: src/components/ShareButton.tsx
+msgid "How does sharing work?"
+msgstr "How does sharing work?"
 
 #: src/editor/slash-command/embed-starter-items.tsx
 msgid "HTML"

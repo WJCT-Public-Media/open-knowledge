@@ -1340,6 +1340,11 @@ msgstr ""
 msgid "Copied relative path"
 msgstr ""
 
+#: src/components/CopyButton.tsx
+msgid "Copied!"
+msgstr ""
+
+#: src/components/CopyButton.tsx
 #: src/components/empty-state/CopyablePromptList.tsx
 #: src/components/InstallInClaudeDesktopDialog.tsx
 msgid "Copy"
@@ -1507,10 +1512,6 @@ msgstr ""
 
 #: src/components/CreateProjectDialog.tsx
 msgid "Could not write project files. Try a different location."
-msgstr ""
-
-#: src/components/ShareButton.tsx
-msgid "Couldn't auto-copy"
 msgstr ""
 
 #: src/components/settings/EmbeddingsKeySection.tsx
@@ -2821,6 +2822,10 @@ msgstr ""
 #: src/components/settings/SettingsDialogBody.tsx
 #: src/components/settings/SettingsDialogShell.tsx
 msgid "Hotkeys"
+msgstr ""
+
+#: src/components/ShareButton.tsx
+msgid "How does sharing work?"
 msgstr ""
 
 #: src/editor/slash-command/embed-starter-items.tsx

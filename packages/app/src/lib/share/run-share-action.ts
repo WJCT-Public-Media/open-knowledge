@@ -41,7 +41,7 @@ export type RunShareActionResult =
   | { kind: 'transport-error' };
 
 const TRANSPORT_ERROR_TOAST = 'Could not construct share URL.';
-const CLIPBOARD_ERROR_TOAST = 'Link ready but could not copy to clipboard.';
+export const CLIPBOARD_ERROR_TOAST = 'Link ready but could not copy to clipboard.';
 
 export async function requestShareConstructUrl(
   body: ShareConstructUrlRequest,

@@ -88,16 +88,13 @@
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
-    "test": "bun test src/",
+    "test": "bun test src/ tests/contract/",
     "test:perf:bench": "RUN_BENCH=1 bun test tests/perf/markdown-bench.test.ts",
-    "test:perf:fallback": "RUN_BENCH=1 bun test src/markdown/parse-with-fallback.test.ts",
-    "test:perf:r15-guard": "RUN_BENCH=1 bun test src/markdown/autolink-void-html-guard.perf.test.ts",
     "test:perf:regression:unit": "bun test tests/perf/regression-gate.test.ts",
     "test:perf:regression": "bun run tests/perf/run-regression-gate.ts",
     "test:health:unit": "bun test tests/health/parse-health-gate.test.ts",
     "test:health": "bun run tests/health/parse-health-gate.ts tests/health/baseline.json",
-    "regen-schema-snapshot": "bun run scripts/regen-schema-snapshot.ts",
-    "gen:guard-flanking-matrix": "OK_UPDATE_GUARD_FLANKING_MATRIX=1 bun test src/markdown/guard-flanking-matrix.test.ts && biome check --write src/markdown/guard-flanking-matrix.json"
+    "regen-schema-snapshot": "bun run scripts/regen-schema-snapshot.ts"
   },
   "devDependencies": {
     "@standard-schema/spec": "^1.1.0",

@@ -1,4 +1,9 @@
+import { existsSync } from 'node:fs';
 import type { KnipConfig } from 'knip';
+
+const fidelityOnlyAppDeps = existsSync('packages/app/tests/fidelity')
+  ? []
+  : ['fast-check', 'commonmark.json', 'remark-mdx', 'remark-parse'];
 
 export default {
   tags: ['-lintignore'],
@@ -85,6 +90,7 @@ export default {
         'fuzzysort', // installed by PR #361 (workspace omnibar search) ahead of the consumer wire-up; same idiom as @hookform/resolvers
         '@testing-library/jest-dom', // side-effect import (`import '@testing-library/jest-dom'`) registers matchers
         'highlight.js', // lowlight's peer dependency — never imported here directly, but lowlight's grammar registrations resolve through it
+        ...fidelityOnlyAppDeps,
       ],
       ignoreFiles: ['src/server/agent-sim.ts'],
     },
