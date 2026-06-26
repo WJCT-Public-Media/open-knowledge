@@ -2,9 +2,14 @@ name: Promote stable
 
 # On-demand stable promotion on inkeep/open-knowledge.
 #
-# Engineer triggers via the GitHub Actions UI with a beta_tag input
-# (e.g., v0.4.0-beta.3). The workflow:
-#   1. Verifies the beta tag exists.
+# Triggered three equivalent ways (all resolve to a single beta tag):
+#   - workflow_dispatch with an explicit beta_tag (e.g., v0.4.0-beta.3).
+#   - workflow_dispatch with a blank beta_tag -> promotes the newest beta.
+#   - repository_dispatch {type: promote-stable-latest} from an external
+#     trigger (e.g., a Slack Workflow Builder button) -> promotes the newest
+#     beta with no inputs; the run resolves the tag itself.
+# The workflow:
+#   1. Resolves + verifies the beta tag.
 #   2. Derives the stable version from the beta tag NAME — strips the
 #      `v` prefix and `-beta.N` suffix (v0.4.0-beta.3 -> 0.4.0). The
 #      tagged commit's package.json is NOT read: release.yml's zero-
@@ -54,9 +59,17 @@ on:
   workflow_dispatch:
     inputs:
       beta_tag:
-        description: "Beta tag to promote (e.g., v0.4.0-beta.3)"
-        required: true
+        description: "Beta tag to promote (e.g., v0.4.0-beta.3). Leave blank to promote the newest beta."
+        required: false
         type: string
+  # Codeless external trigger (e.g., a Slack Workflow Builder button) fires
+  # this via POST /repos/inkeep/open-knowledge/dispatches with body
+  # {"event_type": "promote-stable-latest"}. No client_payload is read — the
+  # run resolves the newest vX.Y.Z-beta.N tag itself (see "Resolve beta tag
+  # to promote"), so "promote the latest beta" is a parameterless action.
+  # repository_dispatch only fires the workflow file on the default branch.
+  repository_dispatch:
+    types: [promote-stable-latest]
 
 permissions:
   # Workflow-default GITHUB_TOKEN keeps contents: write so non-tag operations
@@ -75,7 +88,7 @@ concurrency:
 
 jobs:
   promote:
-    name: Promote ${{ inputs.beta_tag }} to stable
+    name: Promote ${{ inputs.beta_tag || 'newest beta' }} to stable
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -110,13 +123,41 @@ jobs:
           # workflow scripts (this file) live next to a writable working
           # tree.
 
+      - name: Resolve beta tag to promote
+        # workflow_dispatch may carry an explicit beta_tag; repository_dispatch
+        # (and a blank manual dispatch) carry none, so promote the newest beta.
+        # Every candidate shares the vX.Y.Z-beta.<digits> shape, so version sort
+        # (versioncmp: numeric digit-run compare) orders BOTH the X.Y.Z and the
+        # beta.N components correctly — head of the descending sort is the
+        # current cycle head. `inputs.beta_tag` is empty (not an error) on
+        # repository_dispatch, which routes us into the auto-resolve branch.
+        id: resolve
+        env:
+          INPUT_BETA_TAG: ${{ inputs.beta_tag }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${INPUT_BETA_TAG:-}" ]]; then
+            RESOLVED="$INPUT_BETA_TAG"
+            echo "Using explicitly provided beta tag: $RESOLVED"
+          else
+            RESOLVED=$(git tag --list 'v*-beta.*' --sort=-version:refname \
+              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$' \
+              | head -n 1 || true)
+            if [[ -z "$RESOLVED" ]]; then
+              echo "::error::No vX.Y.Z-beta.N tags found to promote. Did the auto-cadence beta release run?"
+              exit 1
+            fi
+            echo "Auto-resolved newest beta tag: $RESOLVED"
+          fi
+          echo "beta_tag=$RESOLVED" >> "$GITHUB_OUTPUT"
+
       - name: Verify beta tag exists
         env:
-          BETA_TAG: ${{ inputs.beta_tag }}
+          BETA_TAG: ${{ steps.resolve.outputs.beta_tag }}
         run: |
           set -euo pipefail
           # actions/checkout fetches all refs with fetch-depth: 0; verify
-          # the supplied tag is present.
+          # the resolved tag is present.
           if ! git rev-parse "refs/tags/${BETA_TAG}" >/dev/null 2>&1; then
             echo "::error::Beta tag '${BETA_TAG}' not found on legacy. Did the auto-cadence release run?"
             exit 1
@@ -126,7 +167,7 @@ jobs:
       - name: Compute stable version from beta tag
         id: ver
         env:
-          BETA_TAG: ${{ inputs.beta_tag }}
+          BETA_TAG: ${{ steps.resolve.outputs.beta_tag }}
         run: |
           set -euo pipefail
           # Derive the version from the beta tag NAME, not from package.json
@@ -186,13 +227,13 @@ jobs:
           STABLE_TAG: ${{ steps.ver.outputs.stable_tag }}
           BETA_SHA: ${{ steps.ver.outputs.beta_sha }}
           STABLE_VERSION: ${{ steps.ver.outputs.stable_version }}
-          # Pass `inputs.beta_tag` via env to keep ${{ }} expression
+          # Pass the resolved beta tag via env to keep ${{ }} expression
           # interpolation out of the run: block — direct ${{ }} substitution
           # in shell is a script-injection foothold (a malicious tag value
           # like `v1; curl evil.example` would expand textually before bash
           # parsed the printf invocation). Defense-in-depth even though
-          # workflow_dispatch requires repo write access.
-          BETA_TAG_INPUT: ${{ inputs.beta_tag }}
+          # dispatching this workflow requires repo write access.
+          BETA_TAG_INPUT: ${{ steps.resolve.outputs.beta_tag }}
         run: |
           set -euo pipefail
           BODY_FILE=$(mktemp)
