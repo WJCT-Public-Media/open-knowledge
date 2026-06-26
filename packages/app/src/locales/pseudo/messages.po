@@ -1698,6 +1698,10 @@ msgid "Create a file from the current document or folder context."
 msgstr ""
 
 #: src/lib/keyboard-shortcuts.ts
+msgid "Create a folder from the current document or folder context."
+msgstr ""
+
+#: src/lib/keyboard-shortcuts.ts
 msgid "Create a new list item from the current list item."
 msgstr ""
 
@@ -3593,6 +3597,7 @@ msgstr ""
 #: src/components/FileSidebar.tsx
 #: src/components/FileTree.tsx
 #: src/components/NewItemDialog.tsx
+#: src/lib/keyboard-shortcuts.ts
 msgid "New folder"
 msgstr ""
 

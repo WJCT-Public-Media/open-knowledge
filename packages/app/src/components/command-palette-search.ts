@@ -1,8 +1,6 @@
 import {
   createWorkspaceSearchCorpus,
   createWorkspaceSearchDocument,
-  type InlineAssetMediaKind,
-  mediaKindForSidebarAssetExtension,
   searchWorkspaceCorpus,
   type WorkspaceSearchCorpus,
   type WorkspaceSearchDocument,
@@ -16,22 +14,9 @@ export interface WorkspaceEntry {
   path: string;
   name: string;
   title?: string;
+  docExt?: string;
   modifiedTs?: number;
   bodyIndexed?: boolean;
-  assetExt?: string;
-  mediaKind?: InlineAssetMediaKind | null;
-}
-
-function fileIconFields(path: string): {
-  assetExt?: string;
-  mediaKind?: InlineAssetMediaKind | null;
-} {
-  const dot = path.lastIndexOf('.');
-  const slash = path.lastIndexOf('/');
-  if (dot <= slash + 1) return {};
-  const assetExt = path.slice(dot + 1).toLowerCase();
-  if (assetExt === '') return {};
-  return { assetExt, mediaKind: mediaKindForSidebarAssetExtension(assetExt) };
 }
 
 export interface WorkspaceSearchEntry extends WorkspaceEntry {
@@ -85,14 +70,16 @@ export function buildWorkspaceEntries(
 
   for (const path of pages) {
     seenFilePaths.add(path);
-    const modified = pageMeta.get(path)?.modified;
+    const meta = pageMeta.get(path);
+    const modified = meta?.modified;
     const title = pageTitles.get(path);
     entries.push({
       kind: 'file',
       path,
       name: workspaceSearchBasename(path),
-      ...(title ? { title } : {}),
-      ...(modified ? { modifiedTs: Date.parse(modified) } : {}),
+      ...(title && { title }),
+      ...(meta?.docExt && { docExt: meta.docExt }),
+      ...(modified && { modifiedTs: Date.parse(modified) }),
     });
   }
   for (const path of filePaths) {
@@ -103,7 +90,6 @@ export function buildWorkspaceEntries(
       path,
       name: workspaceSearchBasename(path),
       bodyIndexed: false,
-      ...fileIconFields(path),
     });
   }
   for (const path of folderPaths) {
@@ -152,7 +138,7 @@ function workspaceEntriesFingerprint(entries: readonly WorkspaceEntry[]): string
   return entries
     .map(
       (entry) =>
-        `${entry.kind}\u0000${entry.path}\u0000${entry.title ?? ''}\u0000${entry.modifiedTs ?? 0} ${entry.bodyIndexed === false ? '0' : '1'}`,
+        `${entry.kind}\u0000${entry.path}\u0000${entry.title ?? ''}\u0000${entry.docExt ?? ''}\u0000${entry.modifiedTs ?? 0} ${entry.bodyIndexed === false ? '0' : '1'}`,
     )
     .join('\u0001');
 }
@@ -246,15 +232,14 @@ function toWorkspaceSearchEntry(
   }
   const name = workspaceSearchBasename(row.path);
   const kind = row.kind === 'folder' ? 'folder' : 'file';
-  const iconFields = row.kind === 'file' ? fileIconFields(row.path) : {};
   return {
     kind,
     path: row.path,
     name,
+    ...(row.kind === 'file' && { bodyIndexed: false }),
     ...(row.title && { title: row.title }),
     ...(row.snippet && { snippet: row.snippet }),
     ...(typeof row.score === 'number' && { score: row.score }),
-    ...iconFields,
   };
 }
 

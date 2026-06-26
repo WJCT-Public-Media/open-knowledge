@@ -125,6 +125,14 @@ const KEYBOARD_SHORTCUT_DEFINITIONS = [
     ],
   },
   {
+    id: 'new-folder',
+    category: 'general',
+    title: msg`New folder`,
+    description: msg`Create a folder from the current document or folder context.`,
+    scope: msg`OK Desktop`,
+    bindings: [{ mac: '⇧⌘ N', windowsLinux: 'Ctrl Shift N' }],
+  },
+  {
     id: 'toggle-files-sidebar',
     category: 'general',
     title: msg`Show or hide Files`,

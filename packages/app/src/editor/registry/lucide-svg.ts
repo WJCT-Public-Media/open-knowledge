@@ -1,4 +1,14 @@
-import { FileText, Film, FolderOpen, Image, type LucideIcon, Volume2, X } from 'lucide-react';
+import {
+  File,
+  FileText,
+  Film,
+  FolderOpen,
+  Image,
+  ImageIcon,
+  type LucideIcon,
+  Volume2,
+  X,
+} from 'lucide-react';
 
 const ICON_BODIES = new Map<LucideIcon, string>([
   [
@@ -12,6 +22,14 @@ const ICON_BODIES = new Map<LucideIcon, string>([
   [
     Image,
     '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+  ],
+  [
+    ImageIcon,
+    '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+  ],
+  [
+    File,
+    '<path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/>',
   ],
   [
     Film,

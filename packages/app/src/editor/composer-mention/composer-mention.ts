@@ -7,6 +7,7 @@ import { PluginKey } from '@tiptap/pm/state';
 import { ReactRenderer } from '@tiptap/react';
 import Suggestion, { type SuggestionKeyDownProps, type SuggestionProps } from '@tiptap/suggestion';
 import { X } from 'lucide-react';
+import { fileEntryPathIconToSvgString } from '@/components/file-entry-icon';
 import { docNameToRelativePath } from '@/lib/workspace-paths';
 import {
   createSuggestionPopup,
@@ -14,7 +15,6 @@ import {
   type SuggestionPositionState,
 } from '../extensions/suggestion-floating-ui';
 import { fetchPages, filterPages, type PageItem } from '../extensions/wiki-link-suggestion';
-import { getFileIcon, mentionPathToDescriptor } from '../registry/file-icons';
 import { lucideIconToSvgString } from '../registry/lucide-svg';
 import { ComposerMentionMenu } from './ComposerMentionMenu';
 
@@ -132,7 +132,7 @@ const ComposerMention = Node.create({
       const fileIcon = document.createElement('span');
       fileIcon.className = 'composer-mention-glyph composer-mention-glyph-icon';
       fileIcon.setAttribute('aria-hidden', 'true');
-      fileIcon.innerHTML = lucideIconToSvgString(getFileIcon(mentionPathToDescriptor(path)));
+      fileIcon.innerHTML = fileEntryPathIconToSvgString(path);
       remove.appendChild(fileIcon);
 
       const xIcon = document.createElement('span');

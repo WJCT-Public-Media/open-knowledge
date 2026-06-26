@@ -19,6 +19,8 @@ describe('keyboard shortcut registry', () => {
     expect(formatShortcut('command-palette', 'windowsLinux')).toBe('Ctrl K');
     expect(formatShortcut('new-item', 'mac')).toBe('⌘ N');
     expect(formatShortcut('new-item', 'windowsLinux')).toBe('Ctrl N');
+    expect(formatShortcut('new-folder', 'mac')).toBe('⇧⌘ N');
+    expect(formatShortcut('new-folder', 'windowsLinux')).toBe('Ctrl Shift N');
     expect(formatShortcut('edit-with-ai', 'mac')).toBe('⇧⌘ I');
   });
 
@@ -121,6 +123,23 @@ describe('keyboard shortcut registry', () => {
         { metaKey: true, ctrlKey: false, altKey: false, shiftKey: true, key: 'N', code: 'KeyN' },
         'new-item',
         'mac',
+      ),
+    ).toBe(false);
+  });
+
+  test('new folder shortcut is desktop-only and not handled by renderer matching', () => {
+    expect(
+      matchesKeyboardShortcut(
+        { metaKey: true, ctrlKey: false, altKey: false, shiftKey: true, key: 'N', code: 'KeyN' },
+        'new-folder',
+        'mac',
+      ),
+    ).toBe(false);
+    expect(
+      matchesKeyboardShortcut(
+        { metaKey: false, ctrlKey: true, altKey: false, shiftKey: true, key: 'N', code: 'KeyN' },
+        'new-folder',
+        'windowsLinux',
       ),
     ).toBe(false);
   });

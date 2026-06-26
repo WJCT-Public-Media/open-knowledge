@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Content, JSONContent } from '@tiptap/core';
 import { Editor } from '@tiptap/core';
-import { FileText, FolderOpen } from 'lucide-react';
 import { createRef } from 'react';
+import { fileEntryPathIconToSvgString } from '@/components/file-entry-icon';
 import { getEditorForDoc, registerEditor, unregisterEditor } from './active-editor';
 import { ComposerMentionInput, type ComposerMentionInputHandle } from './ComposerMentionInput';
 import {
@@ -12,8 +12,6 @@ import {
   isComposerEmpty,
   serializeComposerContent,
 } from './composer-mention/composer-mention';
-import { getFileIcon, mentionPathToDescriptor } from './registry/file-icons';
-import { lucideIconToSvgString } from './registry/lucide-svg';
 
 function makeEditor(content?: Content) {
   return new Editor({ extensions: composerMentionExtensions(), content });
@@ -182,8 +180,7 @@ describe('ComposerMentionInput (component)', () => {
     expect(restIcon?.textContent).not.toContain('@');
     expect(hoverIcon?.textContent).not.toContain('×');
     const restSvg = restIcon?.querySelector('svg');
-    expect(restSvg?.getAttribute('stroke')).toBe('currentColor');
-    expect(restSvg?.getAttribute('fill')).toBe('none');
+    expect(restSvg?.getAttribute('fill')).toBe('currentColor');
     expect(ref.current?.getContent().mentions).toEqual(['notes.md']);
 
     fireEvent.click(removeBtn);
@@ -191,7 +188,7 @@ describe('ComposerMentionInput (component)', () => {
     expect(screen.queryByRole('button', { name: /Remove Notes/i })).toBeNull();
   });
 
-  test('the inline chip resting glyph is the type-aware icon for the path (folder → FolderOpen, page → FileText)', () => {
+  test('the inline chip resting glyph is the type-aware file-entry icon for the path', () => {
     const ref = createRef<ComposerMentionInputHandle>();
     render(
       <ComposerMentionInput
@@ -204,6 +201,8 @@ describe('ComposerMentionInput (component)', () => {
             mentionNode('specs/foo', 'foo'),
             { type: 'text', text: ' ' },
             mentionNode('notes.md', 'Notes'),
+            { type: 'text', text: ' ' },
+            mentionNode('clips/demo.mp4', 'Demo'),
           ) as JSONContent
         }
       />,
@@ -218,20 +217,21 @@ describe('ComposerMentionInput (component)', () => {
       .querySelector('.composer-mention-glyph-icon')
       ?.querySelector('svg')?.outerHTML;
     expect(folderSvg).toBeDefined();
-    expect(folderSvg).toBe(
-      normalizeSvg(lucideIconToSvgString(getFileIcon(mentionPathToDescriptor('specs/foo')))),
-    );
-    expect(folderSvg).toBe(normalizeSvg(lucideIconToSvgString(FolderOpen)));
+    expect(folderSvg).toBe(normalizeSvg(fileEntryPathIconToSvgString('specs/foo')));
 
     const pageBtn = screen.getByRole('button', { name: /Remove Notes from context/i });
     const pageSvg = pageBtn
       .querySelector('.composer-mention-glyph-icon')
       ?.querySelector('svg')?.outerHTML;
     expect(pageSvg).toBeDefined();
-    expect(pageSvg).toBe(
-      normalizeSvg(lucideIconToSvgString(getFileIcon(mentionPathToDescriptor('notes.md')))),
-    );
-    expect(pageSvg).toBe(normalizeSvg(lucideIconToSvgString(FileText)));
+    expect(pageSvg).toBe(normalizeSvg(fileEntryPathIconToSvgString('notes.md')));
+
+    const videoBtn = screen.getByRole('button', { name: /Remove Demo from context/i });
+    const videoSvg = videoBtn
+      .querySelector('.composer-mention-glyph-icon')
+      ?.querySelector('svg')?.outerHTML;
+    expect(videoSvg).toBeDefined();
+    expect(videoSvg).toBe(normalizeSvg(fileEntryPathIconToSvgString('clips/demo.mp4')));
 
     expect(folderSvg).not.toBe(pageSvg);
   });

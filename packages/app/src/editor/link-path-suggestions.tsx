@@ -1,6 +1,5 @@
 import { autoUpdate, computePosition, flip, offset, shift, size } from '@floating-ui/dom';
 import { useLingui } from '@lingui/react/macro';
-import { FileText, FolderOpen, Paperclip } from 'lucide-react';
 import {
   type ComponentProps,
   type KeyboardEvent,
@@ -12,6 +11,7 @@ import {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { FileEntryIcon } from '@/components/file-entry-icon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -39,14 +39,21 @@ export function preventLinkPathSuggestionDialogDismiss(event: {
   }
 }
 
-function suggestionIcon(kind: LinkPathSuggestionKind) {
-  switch (kind) {
+function suggestionIcon(suggestion: LinkPathSuggestion) {
+  switch (suggestion.kind) {
     case 'page':
-      return <FileText className="size-3.5 shrink-0" aria-hidden="true" />;
+      return <FileEntryIcon className="size-3.5" docExt=".md" kind="file" path={suggestion.path} />;
     case 'folder':
-      return <FolderOpen className="size-3.5 shrink-0" aria-hidden="true" />;
+      return <FileEntryIcon className="size-3.5" kind="folder" path={suggestion.path} />;
     case 'asset':
-      return <Paperclip className="size-3.5 shrink-0" aria-hidden="true" />;
+      return (
+        <FileEntryIcon
+          bodyIndexed={false}
+          className="size-3.5"
+          kind="file"
+          path={suggestion.path}
+        />
+      );
   }
 }
 
@@ -281,7 +288,7 @@ export function LinkPathSuggestionInput({
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => selectSuggestion(suggestion)}
             >
-              {suggestionIcon(suggestion.kind)}
+              {suggestionIcon(suggestion)}
               <span className="min-w-0 flex-1 truncate">/{suggestion.path}</span>
               <span className="shrink-0 text-muted-foreground text-xs">{kindLabel}</span>
             </Button>

@@ -57,6 +57,7 @@ import {
   type TagDocEntry,
 } from '@/components/command-palette-tag-search';
 import { requestDocPanelTab } from '@/components/doc-panel-events';
+import { FileEntryIcon } from '@/components/file-entry-icon';
 import { defaultInitialDir } from '@/components/file-tree-utils';
 import { NewItemDialog } from '@/components/NewItemDialog';
 import { usePageList } from '@/components/PageListContext';
@@ -72,7 +73,6 @@ import {
 } from '@/components/ui/command';
 import { useDocumentContext } from '@/editor/DocumentContext';
 import type { TagSummaryEntry } from '@/editor/extensions/tag-suggestion';
-import { getFileIcon } from '@/editor/registry/file-icons';
 import { useIsEmbedded } from '@/hooks/use-is-embedded';
 import { useSemanticSearchStatus } from '@/hooks/use-semantic-search-status';
 import type { OkDesktopBridge, RecentProjectEntry } from '@/lib/desktop-bridge-types';
@@ -128,10 +128,11 @@ export function NavigationItem({
   onSelect: () => void;
   disabled?: boolean;
 }) {
-  const Icon = getFileIcon(entry);
   const title =
     'title' in entry && entry.title ? entry.title : (entry.path.split('/').pop() ?? entry.path);
   const snippet = 'snippet' in entry ? entry.snippet : undefined;
+  const docExt = 'docExt' in entry ? entry.docExt : undefined;
+  const bodyIndexed = 'bodyIndexed' in entry ? entry.bodyIndexed : undefined;
 
   return (
     <CommandItem
@@ -141,7 +142,13 @@ export function NavigationItem({
       data-testid={`command-palette-nav-${entry.kind}-${entry.path}`}
       className="items-start"
     >
-      <Icon className="mt-0.5" />
+      <FileEntryIcon
+        bodyIndexed={bodyIndexed}
+        className="mt-0.5 size-4"
+        docExt={docExt}
+        kind={entry.kind}
+        path={entry.path}
+      />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="truncate font-medium">
           <HighlightedText query={query} text={title} />
@@ -1043,6 +1050,7 @@ export function CommandPalette({ bridge = null, open, onOpenChange }: CommandPal
                   <span>
                     <Trans>New file</Trans>
                   </span>
+                  <CommandShortcut>{formatShortcut('new-item')}</CommandShortcut>
                 </CommandItem>
               ) : null}
               {showCreateFolder ? (
@@ -1058,6 +1066,9 @@ export function CommandPalette({ bridge = null, open, onOpenChange }: CommandPal
                   <span>
                     <Trans>New folder</Trans>
                   </span>
+                  {bridge ? (
+                    <CommandShortcut>{formatShortcut('new-folder')}</CommandShortcut>
+                  ) : null}
                 </CommandItem>
               ) : null}
               {showGraphCommand ? (

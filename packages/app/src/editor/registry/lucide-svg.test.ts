@@ -1,5 +1,15 @@
 import { describe, expect, test } from 'bun:test';
-import { FileText, Film, FolderOpen, Image, type LucideIcon, Volume2, X } from 'lucide-react';
+import {
+  File,
+  FileText,
+  Film,
+  FolderOpen,
+  Image,
+  ImageIcon,
+  type LucideIcon,
+  Volume2,
+  X,
+} from 'lucide-react';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { lucideIconToSvgString } from './lucide-svg.ts';
@@ -17,6 +27,8 @@ const CURATED: ReadonlyArray<[string, LucideIcon]> = [
   ['FolderOpen', FolderOpen],
   ['FileText', FileText],
   ['Image', Image],
+  ['ImageIcon', ImageIcon],
+  ['File', File],
   ['Film', Film],
   ['Volume2', Volume2],
   ['X', X],

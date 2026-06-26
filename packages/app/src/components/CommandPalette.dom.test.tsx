@@ -280,6 +280,12 @@ describe('CommandPalette DOM behavior', () => {
     expect(switchProject.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
     expect(document.body.textContent).not.toContain('Start fresh in a new folder');
 
+    expect(screen.getByTestId('command-palette-new-file').textContent).toMatch(/⌘ N|Ctrl N/);
+    expect(screen.getByTestId('command-palette-new-folder').textContent).toMatch(
+      /⇧⌘ N|Ctrl Shift N/,
+    );
+    expect(screen.getByTestId('command-palette-open-folder').textContent).toMatch(/⌘ O|Ctrl O/);
+
     fireEvent.click(switchProject);
     await waitFor(() => expect(bridge.navigator.open).toHaveBeenCalledTimes(1));
 
@@ -307,6 +313,15 @@ describe('CommandPalette DOM behavior', () => {
 
     await setQuery('manage');
     expect(screen.queryByTestId('command-palette-switch-project')).toBeNull();
+  });
+
+  test('new-folder shortcut is desktop-only while new-file shortcut is always visible', async () => {
+    await renderPalette({ bridge: null });
+
+    expect(screen.getByTestId('command-palette-new-file').textContent).toMatch(/⌘ N|Ctrl N/);
+    expect(screen.getByTestId('command-palette-new-folder').textContent).not.toMatch(
+      /⇧⌘ N|Ctrl Shift N/,
+    );
   });
 
   test('settings command is searchable by preferences/config, closes the palette, and routes through the canonical hash', async () => {
@@ -560,5 +575,107 @@ describe('NavigationItem path subtitle', () => {
     const rowB = screen.getByTestId('command-palette-nav-file-exports/legacy/data.csv');
     expect(rowA.textContent).toContain('reports/q3/data.csv');
     expect(rowB.textContent).toContain('exports/legacy/data.csv');
+  });
+
+  test('file and folder rows render sidebar-aligned icons and extension badges', async () => {
+    const { NavigationItem } = await import('./CommandPalette');
+    render(
+      <>
+        <NavigationItem
+          entry={{ kind: 'file' as const, path: 'notes/readme', name: 'readme' }}
+          onSelect={() => {}}
+        />
+        <NavigationItem
+          entry={{
+            kind: 'file' as const,
+            path: 'docs/component',
+            name: 'component',
+            docExt: '.mdx',
+          }}
+          onSelect={() => {}}
+        />
+        <NavigationItem
+          entry={{
+            kind: 'file' as const,
+            path: 'assets/photo.png',
+            name: 'photo.png',
+            bodyIndexed: false,
+          }}
+          onSelect={() => {}}
+        />
+        <NavigationItem
+          entry={{
+            kind: 'file' as const,
+            path: 'media/demo.mp4',
+            name: 'demo.mp4',
+            bodyIndexed: false,
+          }}
+          onSelect={() => {}}
+        />
+        <NavigationItem
+          entry={{
+            kind: 'file' as const,
+            path: 'audio/theme.mp3',
+            name: 'theme.mp3',
+            bodyIndexed: false,
+          }}
+          onSelect={() => {}}
+        />
+        <NavigationItem
+          entry={{
+            kind: 'file' as const,
+            path: 'src/index.ts',
+            name: 'index.ts',
+            bodyIndexed: false,
+          }}
+          onSelect={() => {}}
+        />
+        <NavigationItem
+          entry={{
+            kind: 'file' as const,
+            path: 'recents/screenshot.png',
+            name: 'screenshot.png',
+          }}
+          onSelect={() => {}}
+        />
+        <NavigationItem
+          entry={{ kind: 'folder' as const, path: 'docs', name: 'docs' }}
+          onSelect={() => {}}
+        />
+      </>,
+    );
+
+    const markdownRow = screen.getByTestId('command-palette-nav-file-notes/readme');
+    expect(markdownRow.querySelector('[data-testid="file-entry-icon-markdown"]')).not.toBeNull();
+    expect(markdownRow.querySelector('[data-testid="file-entry-extension-badge"]')).toBeNull();
+
+    const mdxRow = screen.getByTestId('command-palette-nav-file-docs/component');
+    expect(mdxRow.querySelector('[data-testid="file-entry-icon-markdown"]')).not.toBeNull();
+    expect(mdxRow.textContent).toContain('MDX');
+
+    const pngRow = screen.getByTestId('command-palette-nav-file-assets/photo.png');
+    expect(pngRow.querySelector('[data-testid="file-entry-icon-image"]')).not.toBeNull();
+    expect(pngRow.textContent).toContain('PNG');
+
+    const videoRow = screen.getByTestId('command-palette-nav-file-media/demo.mp4');
+    expect(videoRow.querySelector('[data-testid="file-entry-icon-video"]')).not.toBeNull();
+    expect(videoRow.textContent).toContain('MP4');
+
+    const audioRow = screen.getByTestId('command-palette-nav-file-audio/theme.mp3');
+    expect(audioRow.querySelector('[data-testid="file-entry-icon-audio"]')).not.toBeNull();
+    expect(audioRow.textContent).toContain('MP3');
+
+    const genericFileRow = screen.getByTestId('command-palette-nav-file-src/index.ts');
+    expect(genericFileRow.querySelector('[data-testid="file-entry-icon-file"]')).not.toBeNull();
+    expect(genericFileRow.querySelector('[data-testid="file-entry-icon-image"]')).toBeNull();
+    expect(genericFileRow.textContent).toContain('TS');
+
+    const recentPngRow = screen.getByTestId('command-palette-nav-file-recents/screenshot.png');
+    expect(recentPngRow.querySelector('[data-testid="file-entry-icon-image"]')).not.toBeNull();
+    expect(recentPngRow.querySelector('[data-testid="file-entry-icon-markdown"]')).toBeNull();
+
+    const folderRow = screen.getByTestId('command-palette-nav-folder-docs');
+    expect(folderRow.querySelector('[data-file-entry-icon="folder"]')).not.toBeNull();
+    expect(folderRow.querySelector('[data-testid="file-entry-extension-badge"]')).toBeNull();
   });
 });

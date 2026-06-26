@@ -37,15 +37,33 @@ describe('ComposerContextChips', () => {
     expect(chip.querySelectorAll('button').length).toBe(1);
   });
 
-  test('the leading icon is type-aware: a folder chip shows a different glyph than a page chip', async () => {
-    await renderChips(['specs/foo', 'notes.md']);
+  test('the leading icon is type-aware across folders, pages, video, and audio', async () => {
+    await renderChips(['specs/foo', 'notes.md', 'clips/demo.mp4', 'audio/theme.mp3']);
     const folderChip = screen.getByTestId('composer-context-chip-file-specs/foo');
     const pageChip = screen.getByTestId('composer-context-chip-file-notes.md');
+    const videoChip = screen.getByTestId('composer-context-chip-file-clips/demo.mp4');
+    const audioChip = screen.getByTestId('composer-context-chip-file-audio/theme.mp3');
+    expect(
+      folderChip.querySelector('button > span:first-child [data-file-entry-icon="folder"]'),
+    ).not.toBeNull();
+    expect(
+      pageChip.querySelector('button > span:first-child [data-testid="file-entry-icon-markdown"]'),
+    ).not.toBeNull();
+    expect(
+      videoChip.querySelector('button > span:first-child [data-testid="file-entry-icon-video"]'),
+    ).not.toBeNull();
+    expect(
+      audioChip.querySelector('button > span:first-child [data-testid="file-entry-icon-audio"]'),
+    ).not.toBeNull();
     const folderIcon = folderChip.querySelector('button svg')?.outerHTML;
     const pageIcon = pageChip.querySelector('button svg')?.outerHTML;
+    const videoIcon = videoChip.querySelector('button svg')?.outerHTML;
+    const audioIcon = audioChip.querySelector('button svg')?.outerHTML;
     expect(folderIcon).toBeDefined();
     expect(pageIcon).toBeDefined();
-    expect(folderIcon).not.toBe(pageIcon);
+    expect(videoIcon).toBeDefined();
+    expect(audioIcon).toBeDefined();
+    expect(new Set([folderIcon, pageIcon, videoIcon, audioIcon]).size).toBe(4);
   });
 
   test('renders nothing when the file set is empty', async () => {

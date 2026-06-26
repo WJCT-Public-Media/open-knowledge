@@ -1,8 +1,8 @@
 import { useLingui } from '@lingui/react/macro';
 import { X } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { FileEntryPathIcon } from '@/components/file-entry-icon';
 import { Button } from '@/components/ui/button';
-import { getFileIcon, mentionPathToDescriptor } from '@/editor/registry/file-icons';
 import { cn } from '@/lib/utils';
 
 /** Last path segment of a workspace-relative path — the compact chip label
@@ -17,7 +17,6 @@ function FileChip({ path, onRemove }: { path: string; onRemove: () => void }) {
   const { t } = useLingui();
   const label = chipBasename(path);
   const removeLabel = t`Remove ${label} from context`;
-  const FileIcon = getFileIcon(mentionPathToDescriptor(path));
   return (
     <span
       data-testid={`composer-context-chip-file-${path}`}
@@ -47,10 +46,9 @@ function FileChip({ path, onRemove }: { path: string; onRemove: () => void }) {
         }}
         className="group/remove relative size-3.5 shrink-0 rounded-sm text-muted-foreground/80 hover:text-foreground"
       >
-        <FileIcon
-          className="absolute top-1/2 left-1/2 size-3 -translate-x-1/2 -translate-y-1/2 opacity-100 transition-opacity duration-150 ease-out group-hover/chip:opacity-0 group-focus-within/chip:opacity-0 motion-reduce:transition-none"
-          aria-hidden
-        />
+        <span className="absolute top-1/2 left-1/2 inline-flex size-3 -translate-x-1/2 -translate-y-1/2 opacity-100 transition-opacity duration-150 ease-out group-hover/chip:opacity-0 group-focus-within/chip:opacity-0 motion-reduce:transition-none">
+          <FileEntryPathIcon path={path} className="size-3" />
+        </span>
         <X
           className="absolute top-1/2 left-1/2 size-3 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-150 ease-out group-hover/chip:opacity-100 group-focus-within/chip:opacity-100 motion-reduce:transition-none"
           aria-hidden

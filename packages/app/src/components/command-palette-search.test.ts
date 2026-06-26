@@ -47,8 +47,6 @@ describe('buildWorkspaceEntries', () => {
         path: 'data/example.csv',
         name: 'example.csv',
         bodyIndexed: false,
-        assetExt: 'csv',
-        mediaKind: null,
       },
       { kind: 'folder', path: 'notes', name: 'notes' },
       { kind: 'file', path: 'notes/guide', name: 'guide' },
@@ -57,10 +55,26 @@ describe('buildWorkspaceEntries', () => {
         path: 'packages/app/src/index.ts',
         name: 'index.ts',
         bodyIndexed: false,
-        assetExt: 'ts',
-        mediaKind: 'text',
       },
     ]);
+  });
+
+  test('threads page docExt metadata onto markdown page entries', () => {
+    const entries = buildWorkspaceEntries(
+      new Set(['docs/component']),
+      new Set(),
+      new Map(),
+      new Map([
+        ['docs/component', { size: 100, modified: '2026-06-24T00:00:00.000Z', docExt: '.mdx' }],
+      ]),
+    );
+
+    expect(entries[0]).toMatchObject({
+      kind: 'file',
+      path: 'docs/component',
+      name: 'component',
+      docExt: '.mdx',
+    });
   });
   test('skips a non-markdown file already present in pages', () => {
     const entries = buildWorkspaceEntries(
@@ -315,15 +329,15 @@ describe('fetchWorkspaceSearchEntries', () => {
     });
   });
 
-  test('maps a kind:file server row to a client kind:file entry', async () => {
+  test('maps a kind:file server row to a client kind:file name-only entry', async () => {
     globalThis.fetch = (async () =>
       new Response(
         JSON.stringify({
           results: [
             {
               kind: 'file',
-              path: 'data/example.csv',
-              title: 'data/example.csv',
+              path: 'assets/photo.png',
+              title: 'assets/photo.png',
               score: 7,
             },
           ],
@@ -336,12 +350,11 @@ describe('fetchWorkspaceSearchEntries', () => {
     expect(entries).toEqual([
       {
         kind: 'file',
-        path: 'data/example.csv',
-        name: 'example.csv',
-        title: 'data/example.csv',
+        path: 'assets/photo.png',
+        name: 'photo.png',
+        bodyIndexed: false,
+        title: 'assets/photo.png',
         score: 7,
-        assetExt: 'csv',
-        mediaKind: null,
       },
     ]);
   });

@@ -1,15 +1,12 @@
 import { useLingui } from '@lingui/react/macro';
 import { useEffect, useId, useRef } from 'react';
-import { getFileIcon, mentionPathToDescriptor } from '../registry/file-icons';
+import { FileEntryPathIcon } from '@/components/file-entry-icon';
+import { mentionPathToDescriptor } from '../registry/file-icons';
 import type { MentionItem } from './composer-mention';
 
 function mentionItemKind(path: string): 'folder' | 'page' | 'asset' {
   const kind = mentionPathToDescriptor(path).kind;
   return kind === 'folder' || kind === 'asset' ? kind : 'page';
-}
-
-function mentionItemIcon(path: string) {
-  return getFileIcon(mentionPathToDescriptor(path));
 }
 
 interface ComposerMentionMenuProps {
@@ -84,7 +81,6 @@ export function ComposerMentionMenu({
             const active = index === selectedIndex;
             const kind = mentionItemKind(item.path);
             const isFolder = kind === 'folder';
-            const Icon = mentionItemIcon(item.path);
             const displayPath = isFolder ? `${item.path}/` : item.path;
             return (
               <button
@@ -104,7 +100,10 @@ export function ComposerMentionMenu({
                   onSelect(item);
                 }}
               >
-                <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <FileEntryPathIcon
+                  path={item.path}
+                  className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                />
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="flex items-baseline gap-1.5">
                     <span className="truncate text-sm font-medium">{item.title}</span>
