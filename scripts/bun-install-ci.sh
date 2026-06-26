@@ -140,7 +140,14 @@ fi
 if [ -n "$BUN_INSTALL_CMD" ]; then
   INSTALL_ARGV=("$BUN_INSTALL_CMD")
 else
-  INSTALL_ARGV=(bun install --frozen-lockfile)
+  # --minimum-release-age=0: this is a REPRODUCTION install of the committed,
+  # reviewed bun.lock, so it must not re-apply the supply-chain cooldown
+  # (bunfig.toml minimumReleaseAge) and reject an already-locked but recently
+  # published dependency. bun enforces minimumReleaseAge during frozen
+  # range-resolution and has no trust-the-lockfile opt-out (oven-sh/bun#30525,
+  # #30526), so we neutralize it here. The cooldown still gates `bun add` /
+  # `bun update` (admission), which is where supply-chain protection belongs.
+  INSTALL_ARGV=(bun install --frozen-lockfile --minimum-release-age=0)
 fi
 
 # Run one attempt directly (no watchdog). Used when BUN_INSTALL_ATTEMPT_TIMEOUT

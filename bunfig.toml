@@ -1,1 +1,9 @@
 strictEngines = true
+
+[install]
+# Supply-chain cooldown (admission-time): refuse npm versions published less than
+# 3 days ago, to dodge freshly-published malware. Unit = SECONDS (259200 = 3 days).
+# Own-org packages (@inkeep/*) are exempt. NOTE: bun's exclude key is PLURAL
+# (minimumReleaseAgeExcludes); pnpm's is singular (minimumReleaseAgeExclude).
+minimumReleaseAge = 259200
+minimumReleaseAgeExcludes = ["@inkeep/*"]
