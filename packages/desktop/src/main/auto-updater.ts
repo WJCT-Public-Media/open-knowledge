@@ -1,8 +1,12 @@
+import type { OutgoingHttpHeaders } from 'node:http';
 import type { IpcMain, IpcMainInvokeEvent } from 'electron';
 import type { EventChannels } from '../shared/ipc-events.ts';
 import { createHandler } from '../shared/ipc-handler.ts';
 import { type SendableWebContents, sendToRenderer } from '../shared/ipc-send.ts';
 import type { AppState, UpdateChannel } from './state-store.ts';
+
+const GITHUB_OWNER = 'inkeep';
+const GITHUB_REPO = 'open-knowledge';
 
 export interface UpdaterLike {
   autoDownload: boolean;
@@ -11,7 +15,13 @@ export interface UpdaterLike {
   allowPrerelease: boolean;
   allowDowngrade: boolean;
   forceDevUpdateConfig: boolean;
-  setFeedURL(urlOrOptions: string): void;
+  setFeedURL(
+    urlOrOptions:
+      | string
+      | { provider: 'generic'; url: string }
+      | { provider: 'github'; owner: string; repo: string },
+  ): void;
+  requestHeaders: OutgoingHttpHeaders | null;
   on(event: 'checking-for-update', listener: () => void): this;
   on(event: 'update-available', listener: (info: { version?: string }) => void): this;
   on(event: 'update-not-available', listener: (info: { version?: string }) => void): this;
@@ -66,6 +76,7 @@ interface StartAutoUpdaterOpts {
   isPackaged: boolean;
   forceDevBypass?: boolean;
   feedUrl?: string;
+  proxyFeed?: { base: string; channels: ReadonlySet<UpdateChannel> };
   whenRendererReady?: (fn: () => void) => void;
   prepareForRelaunch?: () => void | Promise<void>;
   showCheckNowResult?: (result: CheckNowResult) => void;
@@ -223,6 +234,7 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
     isPackaged,
     forceDevBypass = false,
     feedUrl,
+    proxyFeed,
     whenRendererReady,
     showCheckNowResult,
     clock = DEFAULT_CLOCK,
@@ -238,12 +250,53 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
   applyChannelSettings(updater, buildChannel);
 
   updater.forceDevUpdateConfig = forceDevBypass;
+  let usingProxyFeed = false;
+  let proxyFallbackTried = false;
   if (feedUrl) {
     updater.setFeedURL(feedUrl);
     logger.info('setFeedURL (dev override) — updater will pull manifest from local mock', {
       feedUrl,
     });
+  } else if (proxyFeed?.channels.has(buildChannel)) {
+    const channelPath = buildChannel === 'beta' ? 'beta' : 'stable';
+    updater.setFeedURL({ provider: 'generic', url: `${proxyFeed.base}/${channelPath}` });
+    updater.requestHeaders = {
+      'x-ok-from-version': getAppVersion(),
+      'x-ok-channel': channelPath,
+    };
+    usingProxyFeed = true;
+    logger.info('setFeedURL (proxy) — updater feed pointed at the openknowledge.ai proxy', {
+      channel: channelPath,
+    });
   }
+
+  const revertToGithubFeed = (cause: string): void => {
+    if (!usingProxyFeed || proxyFallbackTried) return;
+    proxyFallbackTried = true;
+    usingProxyFeed = false;
+    updater.requestHeaders = null;
+    try {
+      updater.setFeedURL({ provider: 'github', owner: GITHUB_OWNER, repo: GITHUB_REPO });
+    } catch (err) {
+      logger.error('proxy-feed fallback setFeedURL threw', {
+        cause,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return;
+    }
+    logger.warn('proxy feed failed — reverted to GitHub provider for this session', { cause });
+    void updater.checkForUpdates().catch((err: Error & { code?: string }) => {
+      const ctx = {
+        code: err?.code,
+        message: err instanceof Error ? err.message : String(err),
+      };
+      if (isClassifiedUpdaterError(err)) {
+        logger.warn('post-fallback checkForUpdates rejected', ctx);
+      } else {
+        logger.debug('post-fallback checkForUpdates rejected', ctx);
+      }
+    });
+  };
 
   const broadcast = <K extends keyof EventChannels>(
     channel: K,
@@ -501,6 +554,7 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
       });
       onDispatch?.('error-unclassified');
     }
+    revertToGithubFeed(err.code ?? err.message);
     if (relaunchInFlight) {
       failRelaunch(
         relaunchInFlight.version,
@@ -696,6 +750,7 @@ export function startAutoUpdater(opts: StartAutoUpdaterOpts): StartAutoUpdaterHa
         logger.debug('first-launch checkForUpdates rejected', {
           message: err instanceof Error ? err.message : String(err),
         });
+        revertToGithubFeed('first-check-rejected');
         startPeriodicChecks();
       });
   } else {

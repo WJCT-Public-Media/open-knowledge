@@ -1,5 +1,6 @@
 import { describe, expect, mock, test } from 'bun:test';
 import { EventEmitter } from 'node:events';
+import type { OutgoingHttpHeaders } from 'node:http';
 import {
   bootAutoUpdater,
   buildCheckNowResultFromError,
@@ -36,7 +37,15 @@ class FakeUpdater extends EventEmitter implements UpdaterLike {
   allowPrerelease = true; // deliberately non-default so the lock-down is observable
   allowDowngrade = true;
   forceDevUpdateConfig = false;
-  setFeedURL = mock((_urlOrOptions: string) => {});
+  requestHeaders: OutgoingHttpHeaders | null = null;
+  setFeedURL = mock(
+    (
+      _urlOrOptions:
+        | string
+        | { provider: 'generic'; url: string }
+        | { provider: 'github'; owner: string; repo: string },
+    ) => {},
+  );
   checkForUpdates = mock(() => Promise.resolve(undefined));
   downloadUpdate = mock(() => Promise.resolve([] as unknown[]));
   quitAndInstall = mock(() => {});
@@ -141,6 +150,8 @@ function makeRig(
     isPackaged?: boolean;
     forceDevBypass?: boolean;
     feedUrl?: string;
+    proxyFeed?: { base: string; channels: ReadonlySet<'latest' | 'beta'> };
+    updaterSetup?: (u: FakeUpdater) => void;
     extraWindowCount?: number;
     prepareForRelaunch?: () => void;
     showCheckNowResult?: Parameters<typeof startAutoUpdater>[0]['showCheckNowResult'];
@@ -155,6 +166,8 @@ function makeRig(
     isPackaged = true,
     forceDevBypass,
     feedUrl,
+    proxyFeed,
+    updaterSetup,
     extraWindowCount = 0,
     prepareForRelaunch,
     showCheckNowResult,
@@ -185,6 +198,7 @@ function makeRig(
     rig.windows.push(buf);
     fanOutTargets.push(makeFakeWindow(buf));
   }
+  updaterSetup?.(rig.updater as FakeUpdater);
   const handle = startAutoUpdater({
     updater: rig.updater,
     ipcMain: rig.ipc,
@@ -198,6 +212,7 @@ function makeRig(
     isPackaged,
     forceDevBypass,
     feedUrl,
+    proxyFeed,
     prepareForRelaunch,
     showCheckNowResult,
     clock: rig.clock,
@@ -289,6 +304,153 @@ describe('startAutoUpdater — initial configuration (parent §8.10 LOCKED)', ()
     const beta = makeRig({ appVersion: '0.4.0-beta.36' });
     expect(beta.rig.updater.channel).toBe('beta');
     expect(beta.rig.updater.allowPrerelease).toBe(true);
+  });
+
+  const PROXY_BASE = 'https://openknowledge.ai/updates';
+
+  test('proxyFeed: beta build with beta enabled → generic feed + version/channel headers', () => {
+    const { rig } = makeRig({
+      appVersion: '0.4.0-beta.7',
+      proxyFeed: { base: PROXY_BASE, channels: new Set(['beta']) },
+    });
+    expect(rig.updater.setFeedURL).toHaveBeenCalledWith({
+      provider: 'generic',
+      url: `${PROXY_BASE}/beta`,
+    });
+    expect(rig.updater.requestHeaders).toEqual({
+      'x-ok-from-version': '0.4.0-beta.7',
+      'x-ok-channel': 'beta',
+    });
+  });
+
+  test('proxyFeed: stable build maps the latest channel to the proxy /stable path', () => {
+    const { rig } = makeRig({
+      appVersion: '0.4.0',
+      proxyFeed: { base: PROXY_BASE, channels: new Set(['latest']) },
+    });
+    expect(rig.updater.setFeedURL).toHaveBeenCalledWith({
+      provider: 'generic',
+      url: `${PROXY_BASE}/stable`,
+    });
+    expect(rig.updater.requestHeaders).toEqual({
+      'x-ok-from-version': '0.4.0',
+      'x-ok-channel': 'stable',
+    });
+  });
+
+  test('proxyFeed: default-off — channel not in the set leaves the GitHub default', () => {
+    const { rig } = makeRig({
+      appVersion: '0.4.0', // stable build
+      proxyFeed: { base: PROXY_BASE, channels: new Set(['beta']) }, // only beta enabled
+    });
+    expect(rig.updater.setFeedURL).not.toHaveBeenCalled();
+    expect(rig.updater.requestHeaders).toBeNull();
+  });
+
+  test('proxyFeed: a dev feedUrl override takes precedence over the proxy', () => {
+    const { rig } = makeRig({
+      appVersion: '0.4.0',
+      feedUrl: 'http://127.0.0.1:54321',
+      proxyFeed: { base: PROXY_BASE, channels: new Set(['latest']) },
+    });
+    expect(rig.updater.setFeedURL).toHaveBeenCalledTimes(1);
+    expect(rig.updater.setFeedURL).toHaveBeenCalledWith('http://127.0.0.1:54321');
+    expect(rig.updater.requestHeaders).toBeNull();
+  });
+
+  test('proxyFeed: a first-check failure reverts to the GitHub provider for the session', async () => {
+    const { rig } = makeRig({
+      appVersion: '0.4.0-beta.7',
+      proxyFeed: { base: PROXY_BASE, channels: new Set(['beta']) },
+      updaterSetup: (u) => {
+        let firstCall = true;
+        u.checkForUpdates = mock(() => {
+          if (firstCall) {
+            firstCall = false;
+            return Promise.reject(new Error('proxy 503'));
+          }
+          return Promise.resolve(undefined);
+        });
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(rig.updater.setFeedURL).toHaveBeenCalledWith({
+      provider: 'github',
+      owner: 'inkeep',
+      repo: 'open-knowledge',
+    });
+    expect(rig.updater.requestHeaders).toBeNull();
+    expect(rig.clock.setTimeout).toHaveBeenCalledTimes(1);
+  });
+
+  test('proxyFeed: an error EVENT (not a rejection) reverts to the GitHub provider', async () => {
+    const { rig } = makeRig({
+      appVersion: '0.4.0-beta.7',
+      proxyFeed: { base: PROXY_BASE, channels: new Set(['beta']) },
+    });
+    expect(rig.updater.setFeedURL).toHaveBeenLastCalledWith({
+      provider: 'generic',
+      url: `${PROXY_BASE}/beta`,
+    });
+    expect(rig.updater.requestHeaders).not.toBeNull();
+
+    rig.updater.emit(
+      'error',
+      Object.assign(new Error('proxy 503'), { code: 'ERR_UPDATER_INVALID_RELEASE_FEED' }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(rig.updater.setFeedURL).toHaveBeenCalledWith({
+      provider: 'github',
+      owner: 'inkeep',
+      repo: 'open-knowledge',
+    });
+    expect(rig.updater.requestHeaders).toBeNull();
+  });
+
+  test('proxyFeed: a second error event after fallback is a no-op (idempotency guard)', async () => {
+    const { rig } = makeRig({
+      appVersion: '0.4.0-beta.7',
+      proxyFeed: { base: PROXY_BASE, channels: new Set(['beta']) },
+    });
+    rig.updater.emit(
+      'error',
+      Object.assign(new Error('proxy 503'), { code: 'ERR_UPDATER_INVALID_RELEASE_FEED' }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const callsAfterFallback = rig.updater.setFeedURL.mock.calls.length;
+    expect(callsAfterFallback).toBe(2);
+
+    rig.updater.emit(
+      'error',
+      Object.assign(new Error('still broken'), { code: 'ERR_UPDATER_INVALID_RELEASE_FEED' }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(rig.updater.setFeedURL.mock.calls.length).toBe(callsAfterFallback);
+  });
+
+  test('proxyFeed: a throw from the fallback setFeedURL is contained (no re-check)', async () => {
+    const { rig } = makeRig({
+      appVersion: '0.4.0-beta.7',
+      proxyFeed: { base: PROXY_BASE, channels: new Set(['beta']) },
+      updaterSetup: (u) => {
+        const original = u.setFeedURL;
+        u.setFeedURL = mock((arg) => {
+          if (typeof arg === 'object' && arg?.provider === 'github') {
+            throw new Error('setFeedURL boom');
+          }
+          return original(arg);
+        });
+      },
+    });
+    const checksBeforeError = rig.updater.checkForUpdates.mock.calls.length;
+    rig.updater.emit(
+      'error',
+      Object.assign(new Error('proxy 503'), { code: 'ERR_UPDATER_INVALID_RELEASE_FEED' }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(rig.updater.checkForUpdates.mock.calls.length).toBe(checksBeforeError);
+    expect(rig.logger.error).toHaveBeenCalled();
   });
 });
 

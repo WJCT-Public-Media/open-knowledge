@@ -221,6 +221,7 @@ import {
   setLastUsedProjectParent,
   setProjectSessionState,
   setSpellCheckEnabled as setSpellCheckEnabledState,
+  type UpdateChannel,
 } from './state-store.ts';
 import { isTerminalConsented, isTerminalConsentedWithGrace } from './terminal-consent.ts';
 import { type TerminalReaper, wireWindowTerminalReap } from './terminal-lifecycle.ts';
@@ -2802,6 +2803,10 @@ function bootPrimaryInstance(): void {
         isPackaged: app.isPackaged,
         forceDevBypass: process.env.OK_UPDATER_FORCE_DEV === '1',
         feedUrl: process.env.OK_UPDATER_FEED_URL || undefined,
+        proxyFeed: {
+          base: 'https://openknowledge.ai/updates',
+          channels: new Set<UpdateChannel>(),
+        },
         whenRendererReady: (fn) => {
           const tryFire = (win: BrowserWindow): void => {
             if (win.webContents.isLoading() || win.webContents.getURL() === '') {
