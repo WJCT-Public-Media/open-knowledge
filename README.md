@@ -1,4 +1,3 @@
-# OpenKnowledge 
 <p>
   <a  href="https://openknowledge.ai"><picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/ok-wordmark-dark.svg">
@@ -7,7 +6,8 @@
 </p>
 
 <p>
-<b>OpenKnowledge</b> is a beautiful WYSIWYG markdown editing app with integrations for Claude, Codex, and other harnesses. For notes, knowledge bases, specs, and LLM wikis. Private, local, and free.
+<b>OpenKnowledge</b> is a beautiful markdown IDE with a WYSIWYG editor and integrations with Claude, Codex, and other harnesses. For knowledge bases, LLM wikis, specs, and notes. Private, local, and free.
+
 </p>
 
 <div >
@@ -35,6 +35,7 @@
 
 Highlights:
 - Full true **WYSIWYG** so that editing markdown files feels like editing a Google Doc or Notion page. 
+- MacOS app and web UI with file navigator, search, tabs, graph wiki link viewer, and more. 
 - Collaborative **AI-editing** with **Claude, Codex, and Cursor desktop apps**. Can be used with any harness/agent via MCP/CLI, like OpenCode.
 - Out-of-the-box **MCP**, **skills**, and **agentic search** for LLM Wikis, agent second brains, and knowledge graphs.
 - No-code **Team sharing** and **Auto-sync** powered by git/GitHub under the hood.
@@ -56,11 +57,11 @@ ok start --open  # serve the web editor and open it in your browser
 
 ## Usage
 
-Use OpenKnowledge by opening any existing folder on your computer that contains markdown or mdx files. Can be used with existing codebases, wikis, Obsidian vaults, etc.
+Use OpenKnowledge by opening any existing folder on your computer that contains markdown or mdx files. The app can be used with existing codebases, wikis, Obsidian vaults, etc.
 
 Think of it as Notion meets VSCode. 
 
-You can also start from scratch with one of the starter packs, which include e.g. a quickstart for an LLM Wiki.
+You can also start from scratch with one of the starter packs, which include e.g. a template for an LLM Wiki.
 
 The app will automatically initialize your project with MCP and skill configs for agent harnesses detected on your computer. Git sync and sharing can optionally be enabled.
 
