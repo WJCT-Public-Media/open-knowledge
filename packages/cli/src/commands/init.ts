@@ -47,6 +47,7 @@ import {
 } from './editors.ts';
 import { LAUNCH_JSON_PORT } from './ui.ts';
 
+
 function readJsonConfig(path: string): Record<string, unknown> {
   if (!existsSync(path)) return {};
   const raw = readFileSync(path, 'utf-8');
@@ -92,6 +93,7 @@ function writeTomlConfig(path: string, config: Record<string, unknown>): void {
   const serialized = stringifyToml(config);
   atomicWriteFileSync(path, serialized.endsWith('\n') ? serialized : `${serialized}\n`);
 }
+
 
 type McpScope = 'user' | 'project' | 'both';
 
@@ -180,6 +182,7 @@ export async function resolveSharingMode(opts: {
   return prompt(seed);
 }
 
+
 export interface EditorMcpResult {
   editorId: EditorId;
   label: string;
@@ -251,6 +254,7 @@ export type SharingOutcome =
        *  existed; formatInitResult surfaces a clear warning. */
       localOnlyRequested: boolean;
     };
+
 
 const LAUNCH_JSON_VERSION = '0.0.1';
 export const LAUNCH_CONFIG_NAME = 'open-knowledge-ui';
@@ -358,6 +362,7 @@ exec node "${resolveDevCliDistPath()}" start --ui-port "$UIPORT"`;
     };
   }
 }
+
 
 function isEditorTargetAvailable(target: EditorMcpTarget, cwd: string, home?: string): boolean {
   try {
@@ -515,6 +520,7 @@ function collectProjectConfig(
   };
 }
 
+
 export interface UserMcpConfigsOptions {
   editors: EditorId[];
   home?: string;
@@ -581,6 +587,7 @@ export function classifyExistingMcpEntry(
   if (!isObject(existing)) return { kind: 'no-entry' };
   return { kind: 'present', entry: existing };
 }
+
 
 export async function runInit(options: InitCommandOptions = {}): Promise<InitCommandResult> {
   const cwd = resolve(options.cwd ?? process.cwd());
@@ -666,7 +673,8 @@ export async function runInit(options: InitCommandOptions = {}): Promise<InitCom
       let configPath = '';
       try {
         configPath = target.configPath(projectRoot, options.home);
-      } catch {}
+      } catch {
+      }
       editorResults.push({
         editorId: target.id,
         label: target.label,
@@ -719,6 +727,7 @@ export async function runInit(options: InitCommandOptions = {}): Promise<InitCom
   const hasClaude = availableTargets.some((target) => target.id === 'claude');
   const launchJson =
     hasClaude && !skipMcp ? scaffoldLaunchJson(projectRoot, installOptions) : undefined;
+
 
   const installSkill = options.installUserSkill ?? installUserSkill;
   const skillInstall = await installSkill({ home: options.home });
@@ -845,6 +854,7 @@ function summarizeApplied(
     removed: result.removed,
   };
 }
+
 
 export function formatInitResult(result: InitCommandResult, cwd: string): string {
   const lines: string[] = [];
@@ -1007,6 +1017,7 @@ export function formatInitResult(result: InitCommandResult, cwd: string): string
     );
   }
 
+
   if (result.skillInstall) {
     lines.push('');
     lines.push(accent('User-global skill:'));
@@ -1029,6 +1040,7 @@ export function formatInitResult(result: InitCommandResult, cwd: string): string
         break;
     }
   }
+
 
   if (result.preview) {
     lines.push('');
@@ -1071,6 +1083,7 @@ export function formatInitResult(result: InitCommandResult, cwd: string): string
 
   return lines.join('\n');
 }
+
 
 export function detectInstalledEditors(cwd: string, home?: string): EditorId[] {
   const detected: EditorId[] = [];
@@ -1169,6 +1182,7 @@ export function initCommand(): Command {
       },
     );
 }
+
 
 export function formatSharingOutcome(outcome: SharingOutcome, cwd: string): string[] {
   const lines: string[] = [];

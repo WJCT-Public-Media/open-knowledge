@@ -113,6 +113,7 @@ type WriteOneResult =
     }
   | { docName: string; ok: false; error: string };
 
+
 function frontmatterIgnoredNote(position: string, markdown: string | undefined): string | null {
   if ((position !== 'prepend' && position !== 'append') || !markdown) return null;
   if (stripFrontmatter(markdown).frontmatter.trim() === '') return null;
@@ -320,6 +321,7 @@ async function writeOneDoc(
     raw: result,
   };
 }
+
 
 async function handleFolder(
   folder: { path: string; frontmatter?: FrontmatterPatch },
@@ -583,6 +585,7 @@ async function handleSkillWrite(
   return textPlusStructured(lines.filter(Boolean).join('\n'), structured, anyFileFailed);
 }
 
+
 async function handleBatch(
   documents: DocSpec[],
   cwd: string,
@@ -707,6 +710,7 @@ async function handleSingleDoc(
   const warning = noPreviewAnywhere ? buildPreviewAttachWarning(preview, autoOpen) : undefined;
   return textPlusStructured(text, nestDocResult(preview, warning, document));
 }
+
 
 export function register(server: ServerInstance, deps: WriteDeps): void {
   const docTargetShape = {

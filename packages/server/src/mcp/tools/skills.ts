@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BUNDLE_SKILL_NAME } from '../../skill-bundles.ts';
 import {
   type ConfigOrResolver,
   HOCUSPOCUS_NOT_RUNNING_ERROR,
@@ -16,6 +17,16 @@ import { resolveSkillFilePath, SkillScopeArg } from './verb-schemas.ts';
 
 function bundleFileKind(path: string): 'reference' | 'script' {
   return path.replace(/\\/g, '/').startsWith('scripts/') ? 'script' : 'reference';
+}
+
+const INTERNAL_BUNDLE_SKILL_NAMES = new Set<string>(Object.values(BUNDLE_SKILL_NAME));
+
+function internalSkillHint(name: string): string {
+  return [
+    `"${name}" is one of OpenKnowledge's built-in agent skills — it is NOT managed by this tool and cannot be read or listed here.`,
+    "It is already provided to you in your loaded skill list (a hidden runtime skill projected into your editor); don't fetch or re-load it — just follow the skill you already have.",
+    'The `skills` tool only covers skills authored as KB content (`.ok/skills` = project, `~/.ok/skills` = global). Built-in `open-knowledge*` skills never appear in either scope.',
+  ].join(' ');
 }
 
 const SCOPE_FIELD_DESCRIBE =
@@ -63,6 +74,8 @@ const DESCRIPTION = [
   '',
   'This is how you find and read skills. Skills are addressed by `name` + `scope`, NOT by path — do NOT `ls`/`cat` `.ok/skills/` or pass raw `.ok/...` paths; `.ok/` is opaque internal state.',
   '',
+  "Covers only skills authored as KB content. OpenKnowledge's own built-in `open-knowledge*` skills (e.g. the `open-knowledge` project skill) are runtime skills already loaded in your skill list — they are NOT here, and you never fetch them through this tool.",
+  '',
   '**Three modes:**',
   '- **List** (omit `name`): every skill across BOTH levels — Project (this KB) and Global (user-level). Returns name, scope, description, installed/hosts, and (for starter packs) `updateAvailable`.',
   "- **Read skill** (pass `name`): that skill's description + body + a `files` list (`{ path, kind }`, no inline text) of its `references/**`+`scripts/**` bundle files. `scope` optional — omitted, it resolves by name (preferring Project when a name exists at both levels).",
@@ -108,6 +121,10 @@ export function register(server: ServerInstance, deps: SkillsToolDeps): void {
       }),
     },
     async (args: { name?: string; file?: string; scope?: SkillScope; cwd?: string }) => {
+      if (args.name !== undefined && INTERNAL_BUNDLE_SKILL_NAMES.has(args.name)) {
+        return textResult(`Error: ${internalSkillHint(args.name)}`, true);
+      }
+
       const context = await resolveProjectServerContext(
         deps.resolveCwd,
         deps.config,

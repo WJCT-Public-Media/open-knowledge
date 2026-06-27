@@ -1,3 +1,4 @@
+
 import { readFileSync, realpathSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import {
@@ -112,7 +113,10 @@ interface CreateProjectWindowOpts {
 }
 
 export interface WindowManagerDeps {
-  createWindow(opts: { additionalArguments: string[]; title: string }): BrowserWindowLike;
+  createWindow(opts: {
+    additionalArguments: string[];
+    title: string;
+  }): BrowserWindowLike;
   forkUtility(
     entry: string,
     args: string[],
@@ -516,7 +520,8 @@ export class WindowManager {
         try {
           const raw = readFileSync(join(lockDir, SPAWN_ERROR_LOG), 'utf-8');
           stderrTail = raw.length > STDERR_TAIL_BYTES ? `…${raw.slice(-STDERR_TAIL_BYTES)}` : raw;
-        } catch {}
+        } catch {
+        }
         const messageBase = `OpenKnowledge server did not bind a port within ${POLL_DEADLINE_MS}ms after spawn (pid=${handle.pid}).`;
         const err = Object.assign(
           new Error(stderrTail ? `${messageBase}\n--- stderr ---\n${stderrTail}` : messageBase),
@@ -638,7 +643,8 @@ export class WindowManager {
               'utility pid still alive 1s after exit event — sending SIGTERM',
             );
             this.deps.killProbe(pid, 'SIGTERM');
-          } catch {}
+          } catch {
+          }
         }, 1000);
       }
     });
@@ -818,7 +824,8 @@ export class WindowManager {
       try {
         const raw = readFileSync(join(lockDir, SPAWN_ERROR_LOG), 'utf-8');
         stderrTail = raw.length > STDERR_TAIL_BYTES ? `…${raw.slice(-STDERR_TAIL_BYTES)}` : raw;
-      } catch {}
+      } catch {
+      }
       const messageBase = `OpenKnowledge server did not bind a port within ${POLL_DEADLINE_MS}ms after ephemeral spawn (pid=${handle.pid}).`;
       throw Object.assign(
         new Error(stderrTail ? `${messageBase}\n--- stderr ---\n${stderrTail}` : messageBase),
