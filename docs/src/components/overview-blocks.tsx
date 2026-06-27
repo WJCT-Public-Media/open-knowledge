@@ -17,25 +17,24 @@ const LAYERS: Layer[] = [
     role: 'What you touch',
     desc: (
       <>
-        A beautiful editor for your <code>.md</code> files: WYSIWYG or source mode, backlinks, the{' '}
-        <code>[[Page]]</code> wiki-link syntax, frontmatter, asset embeds, and version history, with
-        a live preview as agents work.
+        A beautiful "what you see is what you get" editor for your markdown files. Supports
+        interactive HTML and JS, Mermaid diagrams, LaTeX, Videos, PDFs, and more.
       </>
     ),
   },
   {
     k: 'LAYER 02',
     Icon: Bot,
-    title: 'Knowledge Engine',
-    role: 'The connective layer',
-    desc: 'Thin MCP wrappers around system functions. Agents read and write through them, so every change automatically carries frontmatter, backlinks, and edit history.',
+    title: 'Agent tools',
+    role: 'Knowledge graph',
+    desc: 'MCP and skills that improve agent search and discovery, and help agents ingest, organize, and maintain knowledge.',
   },
   {
     k: 'LAYER 03',
     Icon: Database,
     title: 'Content',
     role: 'Your source of truth',
-    desc: 'Plain markdown files in your project, version-controlled in git. No new database, no migration; your knowledge stays portable.',
+    desc: 'Plain markdown or mdx files in your project, version-controlled in git.',
   },
 ];
 
@@ -82,18 +81,18 @@ interface Path {
 const PATHS: Path[] = [
   {
     href: '/docs/get-started/quickstart',
-    title: 'New to OpenKnowledge? Run the Quickstart',
+    title: 'Try the Quickstart',
     desc: 'Install the desktop app and get your first agent-driven edit in under five minutes.',
   },
   {
     href: '/docs/integrations/claude-code',
     title: 'Setting up an editor?',
-    desc: 'Pick yours from Integrations: Claude, Cursor, Codex, or OpenCode.',
+    desc: 'Use with Claude, Cursor, Codex, or OpenCode.',
   },
   {
-    href: '/docs/reference/mcp',
-    title: 'Looking up a tool or config field?',
-    desc: 'Head to the MCP and Configuration reference.',
+    href: '/docs/workflows/karpathy-llm-wiki',
+    title: 'Set up an LLM Wiki',
+    desc: 'Build a Karpathy-style LLM Wiki',
   },
 ];
 

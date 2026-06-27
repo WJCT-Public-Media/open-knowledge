@@ -6,16 +6,16 @@
 </p>
 
 <p>
-<b>OpenKnowledge</b> is a beautiful markdown IDE with a WYSIWYG editor and integrations with Claude, Codex, and other harnesses. For knowledge bases, LLM wikis, specs, and notes. Private, local, and free.
+<b>OpenKnowledge</b> is a beautiful markdown editor with integrations with Claude, Codex, and other harnesses. For knowledge bases, LLM wikis, specs, and notes. Private, local, and free.
 
 </p>
 
 <div >
-  <a href="https://openknowledge.ai">Website</a>
+  <a href="https://openknowledge.ai">website</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="https://github.com/inkeep/open-knowledge/releases/latest/download/OpenKnowledge-arm64.dmg">macOS app</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-  <a href="https://openknowledge.ai/docs/get-started/quickstart#ok-install-web-app-linux-windows-intel-mac">Web view + CLI</a>
+  <a href="https://openknowledge.ai/docs/get-started/quickstart#ok-install-web-app-linux-windows-intel-mac">web view + cli</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="https://x.com/OpenKnowledgeAI">𝕏</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
@@ -35,7 +35,7 @@
 
 Highlights:
 - Full true **WYSIWYG** so that editing markdown files feels like editing a Google Doc or Notion page. 
-- MacOS app and web UI with file navigator, search, tabs, graph wiki link viewer, and more. 
+- **macOS app** and **web UI** with file navigator, search, tabs, graph wiki link viewer, and more. 
 - Collaborative **AI-editing** with **Claude, Codex, and Cursor desktop apps**. Can be used with any harness/agent via MCP/CLI, like OpenCode.
 - Out-of-the-box **MCP**, **skills**, and **agentic search** for LLM Wikis, agent second brains, and knowledge graphs.
 - No-code **Team sharing** and **Auto-sync** powered by git/GitHub under the hood.
