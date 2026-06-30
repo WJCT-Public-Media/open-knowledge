@@ -405,6 +405,59 @@ jobs:
             echo "Promoted ${RELEASE_TAG} to published (draft=false, latest=false; channel=${CHANNEL})."
           fi
 
+      # Announce STABLE releases to Slack. Gated on channel=latest so betas
+      # stay silent — every *-beta.N cut also flows through this job (on
+      # channel=beta) and must not post (see Detect channel step above).
+      # Placed AFTER the promote step and gated on success() so we only
+      # announce a release that is actually published (draft=false), never a
+      # stuck draft. Skipped on the workflow_dispatch recovery flow so a
+      # manual DMG re-upload for an older tag does not re-announce it.
+      #
+      # The webhook URL lives in the SLACK_WEBHOOK_URL secret on
+      # inkeep/open-knowledge. When it is absent (a fork, or before the
+      # secret is provisioned) the step no-ops cleanly; a Slack delivery
+      # error is downgraded to a ::warning:: — the release is "done" once
+      # published, so the announcement is strictly best-effort and must
+      # never fail an otherwise-successful release.
+      - name: Announce stable release to Slack
+        if: success() && steps.channel.outputs.channel == 'latest' && github.event_name != 'workflow_dispatch'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RELEASE_TAG: ${{ github.event.client_payload.release_tag || inputs.release_tag }}
+          VERSION: ${{ steps.channel.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SLACK_WEBHOOK_URL:-}" ]]; then
+            echo "::notice::SLACK_WEBHOOK_URL not set — skipping Slack announcement for ${RELEASE_TAG}."
+            exit 0
+          fi
+          RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}"
+          # Build the Block Kit payload with jq so $VERSION / $RELEASE_URL are
+          # JSON-escaped — a stray quote in a tag would otherwise corrupt the
+          # body. `text` is the notification/a11y fallback Slack recommends
+          # alongside blocks; the header is plain_text, the section mrkdwn.
+          payload="$(jq -n \
+            --arg version "$VERSION" \
+            --arg release_url "$RELEASE_URL" \
+            '{
+              text: ("OpenKnowledge \($version) released — " + $release_url),
+              blocks: [
+                { type: "header",
+                  text: { type: "plain_text", text: "🎉 OpenKnowledge \($version) released", emoji: true } },
+                { type: "section",
+                  text: { type: "mrkdwn",
+                          text: ("A new stable release is live.\n\n*<\($release_url)|Release notes & downloads>*  ·  *<https://openknowledge.ai/download|Get the app>*") } }
+              ]
+            }')"
+          # The failing curl sits in an `if` condition, which `set -e` does
+          # not treat as fatal — a Slack outage routes to the else/warning
+          # and the step still exits 0.
+          if curl -sS --fail -X POST -H 'Content-type: application/json' --data "$payload" "$SLACK_WEBHOOK_URL"; then
+            echo "Posted stable-release announcement for ${RELEASE_TAG} to Slack."
+          else
+            echo "::warning::Slack announcement failed for ${RELEASE_TAG} (release is published; notification is best-effort)."
+          fi
+
       # Lightweight discoverability for stuck-draft state when the promote
       # step (or the build/upload step before it) fails. NOT a substitute
       # for the full paging-design observability deferred in the PR body —
