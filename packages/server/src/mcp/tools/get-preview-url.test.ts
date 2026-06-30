@@ -37,6 +37,7 @@ interface EnsureDeps {
   offCwdResolverDeps?: OffCwdResolverDeps;
   ensureSingleFileSession?: (absFile: string) => Promise<boolean>;
   resolveUserAutoOpen?: () => boolean;
+  isDesktopTerminal?: boolean;
 }
 
 function captureRegistration(
@@ -123,6 +124,100 @@ describe('preview_url tool — UI running', () => {
     const handler = captureRegistration(cwd);
     await handler({ folder: 'specs/foo', armPaneTarget: true });
     expect(readArmedPaneTarget(resolveLockDir(cwd))).toBe('#/specs/foo/');
+  });
+
+  describe('isDesktopTerminal steer (OK Desktop built-in terminal)', () => {
+    test('document: response leads with `ok open <doc>` and tells the agent not to navigate the URL', async () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'ok-get-preview-url-'));
+      bindTestUiLock(cwd);
+      const handler = captureRegistration(cwd, BASE_CONFIG, { isDesktopTerminal: true });
+      const result = await handler({ document: 'specs/foo/SPEC' });
+      const text = result.content[0]?.text ?? '';
+      expect(text).toContain('ok open specs/foo/SPEC');
+      expect(text).toMatch(/Don't navigate the URL|reference only/);
+      expect(result.structuredContent?.running).toBe(true);
+      expect(result.structuredContent?.okOpenCommand).toBe('ok open specs/foo/SPEC');
+    });
+
+    test('folder: steers to `ok open <folder>`', async () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'ok-get-preview-url-'));
+      bindTestUiLock(cwd);
+      const handler = captureRegistration(cwd, BASE_CONFIG, { isDesktopTerminal: true });
+      const result = await handler({ folder: 'specs/foo' });
+      expect(result.content[0]?.text ?? '').toContain('ok open specs/foo');
+      expect(result.structuredContent?.okOpenCommand).toBe('ok open specs/foo');
+    });
+
+    test('skill default scope (project): steers to `ok open <name> --skill` (no --scope)', async () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'ok-get-preview-url-'));
+      bindTestUiLock(cwd);
+      const handler = captureRegistration(cwd, BASE_CONFIG, { isDesktopTerminal: true });
+      const result = await handler({ skill: { name: 'trip-log' } });
+      expect(result.content[0]?.text ?? '').toContain('ok open trip-log --skill');
+      expect(result.content[0]?.text ?? '').not.toContain('--scope');
+      expect(result.structuredContent?.okOpenCommand).toBe('ok open trip-log --skill');
+    });
+
+    test('skill --scope global: steers to `ok open <name> --skill --scope global`', async () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'ok-get-preview-url-'));
+      bindTestUiLock(cwd);
+      const handler = captureRegistration(cwd, BASE_CONFIG, { isDesktopTerminal: true });
+      const result = await handler({ skill: { name: 'trip-log', scope: 'global' } });
+      expect(result.content[0]?.text ?? '').toContain('ok open trip-log --skill --scope global');
+      expect(result.structuredContent?.okOpenCommand).toBe(
+        'ok open trip-log --skill --scope global',
+      );
+    });
+
+    test('no target (root): no steer — nothing to `ok open`', async () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'ok-get-preview-url-'));
+      bindTestUiLock(cwd);
+      const handler = captureRegistration(cwd, BASE_CONFIG, { isDesktopTerminal: true });
+      const result = await handler({});
+      expect(result.content[0]?.text ?? '').not.toContain('ok open');
+    });
+
+    test('NOT a desktop terminal (default): no steer — plain Preview URL', async () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'ok-get-preview-url-'));
+      bindTestUiLock(cwd);
+      const handler = captureRegistration(cwd);
+      const result = await handler({ document: 'specs/foo/SPEC' });
+      expect(result.content[0]?.text ?? '').not.toContain('ok open');
+      expect(result.structuredContent?.okOpenCommand ?? null).toBeNull();
+    });
+
+    test('desktop terminal + no UI running: steer + okOpenCommand still fire (ok open does not need the UI)', async () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'ok-get-preview-url-'));
+      const handler = captureRegistration(cwd, BASE_CONFIG, { isDesktopTerminal: true });
+      const result = await handler({ document: 'specs/foo/SPEC' });
+      expect(result.structuredContent?.running).toBe(false);
+      expect(result.structuredContent?.okOpenCommand).toBe('ok open specs/foo/SPEC');
+      expect(result.content[0]?.text ?? '').toContain('ok open specs/foo/SPEC');
+    });
+
+    test('document with a space: okOpenCommand shell-quotes the path', async () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'ok-get-preview-url-'));
+      bindTestUiLock(cwd);
+      const handler = captureRegistration(cwd, BASE_CONFIG, { isDesktopTerminal: true });
+      const result = await handler({ document: 'notes/My Doc' });
+      expect(result.structuredContent?.okOpenCommand).toBe("ok open 'notes/My Doc'");
+    });
+
+    test('document with an embedded single quote: okOpenCommand POSIX-escapes it', async () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'ok-get-preview-url-'));
+      bindTestUiLock(cwd);
+      const handler = captureRegistration(cwd, BASE_CONFIG, { isDesktopTerminal: true });
+      const result = await handler({ document: "Q&A/what's new" });
+      expect(result.structuredContent?.okOpenCommand).toBe("ok open 'Q&A/what'\\''s new'");
+    });
+
+    test('desktop terminal + no UI + folder: okOpenCommand still fires', async () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'ok-get-preview-url-'));
+      const handler = captureRegistration(cwd, BASE_CONFIG, { isDesktopTerminal: true });
+      const result = await handler({ folder: 'specs/foo' });
+      expect(result.structuredContent?.running).toBe(false);
+      expect(result.structuredContent?.okOpenCommand).toBe('ok open specs/foo');
+    });
   });
 
   test('docName + folder together is rejected (mutually exclusive)', async () => {

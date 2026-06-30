@@ -266,7 +266,12 @@ export { getCurrentMcpLogger, McpLogger, runWithMcpLogger } from './mcp/logger.t
 export { installPrettyZodErrors } from './mcp/pretty-zod-errors.ts';
 export { buildExecResult, type ExecStructuredResult } from './mcp/tools/exec.ts';
 export { registerAllTools } from './mcp/tools/index.ts';
-export { encodeDocName, encodeFolderRoute, resolveUiInfo } from './mcp/tools/preview-url.ts';
+export {
+  encodeDocName,
+  encodeFolderRoute,
+  encodeSkillRoute,
+  resolveUiInfo,
+} from './mcp/tools/preview-url.ts';
 export {
   createMcpHttpHandler,
   type McpHttpHandler,

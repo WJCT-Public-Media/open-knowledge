@@ -142,6 +142,7 @@ export function buildShellEnv(
     if (stripped.has(key)) continue;
     out[key] = value;
   }
+  out.OK_DESKTOP_TERMINAL = '1';
   return out;
 }
 

@@ -8,6 +8,7 @@ describe('parseOpenKnowledgeUrl — valid inputs', () => {
     expect(result).toEqual({
       host: 'open',
       project: '/abs/path',
+      kind: 'doc',
       doc: 'foo.md',
     });
   });
@@ -19,8 +20,31 @@ describe('parseOpenKnowledgeUrl — valid inputs', () => {
     expect(result).toEqual({
       host: 'open',
       project: '/abs/my path',
+      kind: 'doc',
       doc: 'foo bar.md',
     });
+  });
+
+  test('parses a folder= deep link with kind folder', () => {
+    expect(parseOpenKnowledgeUrl('openknowledge://open?project=/abs&folder=specs%2Ffoo')).toEqual({
+      host: 'open',
+      project: '/abs',
+      kind: 'folder',
+      doc: 'specs/foo',
+    });
+  });
+
+  test('rejects when BOTH doc and folder are present (ambiguous)', () => {
+    expect(parseOpenKnowledgeUrl('openknowledge://open?project=/abs&doc=a&folder=b')).toBeNull();
+  });
+
+  test('rejects when NEITHER doc nor folder is present', () => {
+    expect(parseOpenKnowledgeUrl('openknowledge://open?project=/abs')).toBeNull();
+  });
+
+  test('applies the same traversal defense to folder= as doc=', () => {
+    expect(parseOpenKnowledgeUrl('openknowledge://open?project=/abs&folder=a%2F..%2Fb')).toBeNull();
+    expect(parseOpenKnowledgeUrl('openknowledge://open?project=/abs&folder=%2Fabs')).toBeNull();
   });
 
   test('accepts flat doc-name', () => {

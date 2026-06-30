@@ -52,6 +52,7 @@ const DESCRIPTION = [
 interface GetPreviewUrlDeps {
   config: ConfigOrResolver;
   resolveCwd: (explicit?: string) => Promise<string>;
+  isDesktopTerminal?: boolean;
   serverUrl?: ServerUrlOrResolver;
   uiBindWait?: { timeoutMs?: number; pollIntervalMs?: number };
   offCwdResolverDeps?: OffCwdResolverDeps;
@@ -126,6 +127,13 @@ const OutputSchema = outputSchemaWithText({
     .describe(
       'User-scoped preview-auto-open preference (`appearance.preview.autoOpen`). When `true`, the agent should route the preview using capability-based routing (in-app browser if available, system browser as fallback). When `false`, the user is managing their own preview view (OK Desktop window, a browser tab they opened, etc.) — the agent must NOT open or refresh any preview UI, and should surface this URL only on direct user ask. Resolved fresh on every call; defaults to `true`.',
     ),
+  okOpenCommand: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      'Machine-readable form of the desktop-terminal steer: when this MCP server runs inside OK Desktop’s built-in terminal AND a doc/folder/skill target was given, the exact `ok open …` command to run to focus it in the OK Desktop window. Prefer running it over navigating `url`. `null`/absent in every other context (navigate `url` per your host instead).',
+    ),
 });
 
 const NO_UI_SERVER_RUNNING_MESSAGE =
@@ -163,6 +171,11 @@ function isServerLive(lockDir: string): boolean {
     );
     return false;
   }
+}
+
+function shellQuoteArg(arg: string): string {
+  if (/^[A-Za-z0-9._/@%+-]+$/.test(arg)) return arg;
+  return `'${arg.replace(/'/g, "'\\''")}'`;
 }
 
 export function register(server: ServerInstance, deps: GetPreviewUrlDeps): void {
@@ -257,6 +270,18 @@ export function register(server: ServerInstance, deps: GetPreviewUrlDeps): void 
             ? `#/${encodeSkillRoute(args.skill.scope ?? 'project', args.skill.name)}`
             : null;
 
+      const okOpenCommand = args.document
+        ? `ok open ${shellQuoteArg(args.document)}`
+        : args.folder
+          ? `ok open ${shellQuoteArg(args.folder)}`
+          : args.skill
+            ? `ok open ${args.skill.name} --skill${args.skill.scope === 'global' ? ' --scope global' : ''}`
+            : null;
+      const desktopTerminalSteer =
+        deps.isDesktopTerminal && okOpenCommand
+          ? `You're in the OK Desktop terminal — run \`${okOpenCommand}\` to focus this in the OK Desktop window. Don't navigate the URL below or open a browser; it's for reference only.\n\n`
+          : '';
+
       if (args.armPaneTarget && routeFragment) {
         try {
           armPaneTarget(lockDir, routeFragment);
@@ -302,21 +327,23 @@ export function register(server: ServerInstance, deps: GetPreviewUrlDeps): void 
         const hint = isServerLive(lockDir)
           ? NO_UI_SERVER_RUNNING_MESSAGE
           : `${NO_SERVER_MESSAGE}${autoStartDisabled ? AUTOSTART_DISABLED_NOTE : ''}`;
-        return textPlusStructured(`${hint}${armNote}`, {
+        return textPlusStructured(`${desktopTerminalSteer}${hint}${armNote}`, {
           url: null,
           baseUrl: null,
           running: false,
           autoOpen,
+          okOpenCommand: deps.isDesktopTerminal ? okOpenCommand : null,
         });
       }
 
       const url = routeFragment ? `${baseUrl}/${routeFragment}` : baseUrl;
 
-      return textPlusStructured(`Preview URL: ${url}${armNote}`, {
+      return textPlusStructured(`${desktopTerminalSteer}Preview URL: ${url}${armNote}`, {
         url,
         baseUrl,
         running: true,
         autoOpen,
+        okOpenCommand: deps.isDesktopTerminal ? okOpenCommand : null,
       });
     },
   );

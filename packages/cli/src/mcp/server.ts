@@ -258,6 +258,7 @@ export async function startGlobalMcpServer(
     resolveCwd,
     config: resolveConfigForCwd,
     identityRef,
+    isDesktopTerminal: process.env.OK_DESKTOP_TERMINAL === '1',
   });
 
   const transport = new StdioServerTransport();

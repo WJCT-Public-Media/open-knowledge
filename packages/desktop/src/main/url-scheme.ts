@@ -20,6 +20,7 @@ function shareTargetPath(target: ShareTarget): string {
 interface ParsedOpenKnowledgeUrl {
   readonly host: 'open';
   readonly project: string;
+  readonly kind: 'doc' | 'folder';
   readonly doc: string;
 }
 
@@ -177,13 +178,17 @@ export function parseOpenKnowledgeUrl(input: string): ParsedOpenKnowledgeUrl | n
 
   const rawProject = parsed.searchParams.get('project');
   const rawDoc = parsed.searchParams.get('doc');
-  if (!rawProject || !rawDoc) return null;
+  const rawFolder = parsed.searchParams.get('folder');
+  if (!rawProject) return null;
+  if ((rawDoc == null) === (rawFolder == null)) return null;
+  const kind: 'doc' | 'folder' = rawDoc != null ? 'doc' : 'folder';
+  const rawTarget = (rawDoc ?? rawFolder) as string;
 
   let project: string;
   let doc: string;
   try {
     project = decodeURIComponent(rawProject);
-    doc = decodeURIComponent(rawDoc);
+    doc = decodeURIComponent(rawTarget);
   } catch {
     return null;
   }
@@ -202,6 +207,7 @@ export function parseOpenKnowledgeUrl(input: string): ParsedOpenKnowledgeUrl | n
   return {
     host: 'open',
     project: resolve(project),
+    kind,
     doc,
   };
 }
@@ -649,11 +655,13 @@ export function registerProtocolHandler(deps: ProtocolHandlerDeps): ProtocolHand
     }
     const existing = deps.focusWindowForProject(parsed.project);
     if (existing) {
-      deps.sendDeepLink(existing, { doc: parsed.doc, kind: 'doc' });
+      deps.sendDeepLink(existing, { doc: parsed.doc, kind: parsed.kind });
       return;
     }
     void deps
-      .openProject(parsed.project, { pendingDeepLinkTarget: { kind: 'doc', path: parsed.doc } })
+      .openProject(parsed.project, {
+        pendingDeepLinkTarget: { kind: parsed.kind, path: parsed.doc },
+      })
       .catch((err) => {
         deps.log?.warn(
           { err: (err as Error).message, project: parsed.project },

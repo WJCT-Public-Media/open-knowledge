@@ -31,6 +31,7 @@ interface RegisterAllToolsOptions {
   config: ConfigOrResolver;
   identityRef?: { current: AgentIdentity };
   logger?: McpLogger;
+  isDesktopTerminal?: boolean;
 }
 
 export function registerAllTools(server: ServerInstance, opts: RegisterAllToolsOptions): void {
@@ -142,6 +143,7 @@ export function registerAllTools(server: ServerInstance, opts: RegisterAllToolsO
     config: opts.config,
     resolveCwd: named('preview_url'),
     serverUrl: opts.serverUrl,
+    isDesktopTerminal: opts.isDesktopTerminal,
     ...(opts.serverUrl ? { ensureSingleFileSession: createEnsureSingleFileSession() } : {}),
   });
   registerConflicts(registrationServer, {

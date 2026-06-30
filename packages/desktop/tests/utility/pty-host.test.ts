@@ -161,6 +161,13 @@ describe('setupPtyHost — create', () => {
     expect(env.OK_LOCK_KIND).toBeUndefined();
     expect(env.PATH).toBe('/usr/bin');
   });
+
+  test('marks the shell as the OK Desktop terminal (OK_DESKTOP_TERMINAL=1)', () => {
+    const h = makeHarness({ env: { SHELL: '/bin/zsh', OK_DESKTOP_TERMINAL: '' } });
+    h.fire(CREATE());
+    const env = h.spawnCalls[0]?.options.env ?? {};
+    expect(env.OK_DESKTOP_TERMINAL).toBe('1');
+  });
 });
 
 describe('setupPtyHost — streaming', () => {
@@ -498,7 +505,7 @@ describe('setupPtyHost — incoming message validation (asIncomingMessage guard)
 });
 
 describe('buildShellEnv', () => {
-  test('strips markers, drops undefined, preserves the rest', () => {
+  test('strips markers, drops undefined, preserves the rest, marks the desktop terminal', () => {
     const env = buildShellEnv({
       PATH: '/usr/bin',
       HOME: '/Users/x',
@@ -506,7 +513,7 @@ describe('buildShellEnv', () => {
       OK_LOCK_KIND: 'interactive',
       MAYBE: undefined,
     });
-    expect(env).toEqual({ PATH: '/usr/bin', HOME: '/Users/x' });
+    expect(env).toEqual({ PATH: '/usr/bin', HOME: '/Users/x', OK_DESKTOP_TERMINAL: '1' });
   });
 });
 

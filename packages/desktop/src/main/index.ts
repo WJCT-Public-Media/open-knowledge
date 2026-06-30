@@ -554,6 +554,9 @@ function ensureWindowManager() {
         );
       return win as unknown as BrowserWindowLike;
     },
+    activateApp: () => {
+      if (process.platform === 'darwin') app.focus({ steal: true });
+    },
     forkUtility: (entry, args, opts) => {
       const child = utilityProcess.fork(entry, args, {
         ...opts,

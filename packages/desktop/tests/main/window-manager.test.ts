@@ -32,7 +32,7 @@ function makeUtility(pid: number): MockUtility {
   };
 }
 
-function makeWindow(opts?: { minimized?: boolean }): BrowserWindowLike & {
+function makeWindow(opts?: { minimized?: boolean; focused?: boolean }): BrowserWindowLike & {
   fireClose: () => void;
   fireDomReady: () => void;
   fireDidFinishLoad: () => void;
@@ -56,6 +56,8 @@ function makeWindow(opts?: { minimized?: boolean }): BrowserWindowLike & {
       minimized = false;
     }),
     isMinimized: mock(() => minimized),
+    moveTop: mock(() => {}),
+    isFocused: mock(() => opts?.focused ?? false),
     isDestroyed: mock(() => destroyed),
     isVisible: mock(() => visible),
     on: mock((_event: 'closed', cb: () => void) => {
@@ -101,6 +103,7 @@ interface TestEnv {
   forkUtilityArgs: string[][];
   timers: Array<{ cb: () => void; ms: number }>;
   killProbe: ReturnType<typeof mock>;
+  activateApp: ReturnType<typeof mock>;
   showGateRegistrations: ShowGateRegistration[];
   deps: WindowManagerDeps;
 }
@@ -112,6 +115,7 @@ function buildEnv(): TestEnv {
   const forkUtilityArgs: string[][] = [];
   const timers: Array<{ cb: () => void; ms: number }> = [];
   const killProbe = mock(() => {});
+  const activateApp = mock(() => {});
   const showGateRegistrations: ShowGateRegistration[] = [];
   const showGate: ShowGateRegistry = {
     register: (window, opts) => {
@@ -135,6 +139,7 @@ function buildEnv(): TestEnv {
     forkUtilityArgs,
     timers,
     killProbe,
+    activateApp,
     showGateRegistrations,
     deps: {
       createWindow: (opts) => {
@@ -157,6 +162,7 @@ function buildEnv(): TestEnv {
         return null;
       },
       killProbe,
+      activateApp,
       showGate,
     },
   };
@@ -1415,6 +1421,36 @@ describe('WindowManager.focusWindowForProject (M4 URL-scheme warm-start)', () =>
     expect(w.isMinimized).toHaveBeenCalled();
     expect(w.restore).toHaveBeenCalled();
     expect(w.focus).toHaveBeenCalled();
+  });
+
+  test('brings a backgrounded window to the front: show + moveTop + focus + app steal', async () => {
+    const wm = new WindowManager(env.deps);
+    const p = wm.createProjectWindow({ projectPath: '/tmp/bg-proj' });
+    env.utilities[0]?.fire({ type: 'ready', port: 51210, apiOrigin: 'http://localhost:51210' });
+    const ctx = await p;
+
+    wm.focusWindowForProject('/tmp/bg-proj');
+    expect(ctx.window.show).toHaveBeenCalled();
+    expect(ctx.window.moveTop).toHaveBeenCalled();
+    expect(ctx.window.focus).toHaveBeenCalled();
+    expect(env.activateApp).toHaveBeenCalled();
+  });
+
+  test('skips the app-level focus steal when the window is already frontmost', async () => {
+    const w = makeWindow({ focused: true });
+    env.deps.createWindow = () => {
+      env.createWindowOpts.push({ additionalArguments: [], title: '' });
+      env.windows.push(w);
+      return w;
+    };
+    const wm = new WindowManager(env.deps);
+    const p = wm.createProjectWindow({ projectPath: '/tmp/frontmost-proj' });
+    env.utilities[0]?.fire({ type: 'ready', port: 51211, apiOrigin: 'http://localhost:51211' });
+    await p;
+
+    wm.focusWindowForProject('/tmp/frontmost-proj');
+    expect(w.focus).toHaveBeenCalled();
+    expect(env.activateApp).not.toHaveBeenCalled();
   });
 
   test('canonicalizes project path before lookup (resolve equivalence)', async () => {

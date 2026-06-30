@@ -1,3 +1,5 @@
+import { statSync } from 'node:fs';
+
 const VALUE_TAKING_GLOBAL_FLAGS = new Set(['--cwd', '--log-level']);
 
 export interface ScannedRootArgv {
@@ -61,7 +63,22 @@ export function decideSingleFileTarget(
 }
 
 /** Markdown-extension test mirroring `SUPPORTED_DOC_EXTENSIONS` — the cheap half
- *  of the fileish predicate (the other half is an existing-file `existsSync`). */
+ *  of the fileish predicate (the other half is an existing-regular-file stat). */
 export function hasMarkdownExtension(token: string): boolean {
   return /\.(md|mdx)$/i.test(token);
+}
+
+export function isFileishTarget(absPath: string, token: string): boolean {
+  if (hasMarkdownExtension(token)) return true;
+  try {
+    return statSync(absPath).isFile();
+  } catch (err) {
+    const code = (err as { code?: string } | null)?.code;
+    if (code !== 'ENOENT' && code !== 'ENOTDIR') {
+      process.stderr.write(
+        `[ok] statSync failed for ${absPath} (${code ?? 'unknown'}); treating as non-fileish\n`,
+      );
+    }
+    return false;
+  }
 }

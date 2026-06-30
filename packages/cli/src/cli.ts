@@ -9,7 +9,6 @@ if (process.argv.includes('--no-color')) {
 }
 
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Config } from '@inkeep/open-knowledge-server';
 import { Command } from 'commander';
@@ -35,7 +34,7 @@ import { shareCommand } from './commands/share/index.ts';
 import { sharingCommand } from './commands/sharing/index.ts';
 import {
   decideSingleFileTarget,
-  hasMarkdownExtension,
+  isFileishTarget,
   scanRootArgv,
 } from './commands/single-file-dispatch.ts';
 import { createRealSingleFileOpenDeps, runSingleFileOpen } from './commands/single-file-open.ts';
@@ -186,7 +185,7 @@ Examples:
     const knownSubcommands = new Set(program.commands.map((c) => c.name()));
     const target = decideSingleFileTarget(scanned.operands, {
       knownSubcommands,
-      isFileish: (t) => hasMarkdownExtension(t) || existsSync(resolve(baseDir, t)),
+      isFileish: (t) => isFileishTarget(resolve(baseDir, t), t),
     });
     if (target !== null) {
       const code = await runSingleFileOpen(

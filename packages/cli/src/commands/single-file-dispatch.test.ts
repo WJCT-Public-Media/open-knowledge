@@ -1,7 +1,11 @@
-import { describe, expect, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   decideSingleFileTarget,
   hasMarkdownExtension,
+  isFileishTarget,
   scanRootArgv,
 } from './single-file-dispatch.ts';
 
@@ -91,5 +95,33 @@ describe('hasMarkdownExtension', () => {
     expect(hasMarkdownExtension('notes.markdown')).toBe(false);
     expect(hasMarkdownExtension('md')).toBe(false);
     expect(hasMarkdownExtension('a.md.txt')).toBe(false);
+  });
+});
+
+describe('isFileishTarget (fs-backed predicate)', () => {
+  let dir: string;
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), 'ok-fileish-'));
+    writeFileSync(join(dir, 'note.md'), '# note');
+    writeFileSync(join(dir, 'data.json'), '{}');
+    mkdirSync(join(dir, 'a-folder'));
+  });
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  test('a markdown-extension token is fileish (even if it does not exist)', () => {
+    expect(isFileishTarget(join(dir, 'missing.md'), 'missing.md')).toBe(true);
+  });
+
+  test('an existing regular file is fileish', () => {
+    expect(isFileishTarget(join(dir, 'data.json'), 'data.json')).toBe(true);
+    expect(isFileishTarget(join(dir, 'note.md'), 'note.md')).toBe(true);
+  });
+
+  test('an existing DIRECTORY is NOT fileish — so `ok open <folder>` falls through to the open command', () => {
+    expect(isFileishTarget(join(dir, 'a-folder'), 'a-folder')).toBe(false);
+  });
+
+  test('a non-existent non-markdown token is not fileish', () => {
+    expect(isFileishTarget(join(dir, 'nope'), 'nope')).toBe(false);
   });
 });

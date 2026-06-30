@@ -41,6 +41,8 @@ export interface BrowserWindowLike {
   isMinimized?(): boolean;
   isDestroyed?(): boolean;
   isVisible?(): boolean;
+  moveTop?(): void;
+  isFocused?(): boolean;
   close?(): void;
   destroy?(): void;
   on(event: 'closed', cb: () => void): void;
@@ -145,6 +147,7 @@ export interface WindowManagerDeps {
   showGate: ShowGateRegistry;
   runClean?(opts: { lockDir: string }): Promise<void>;
   realpathSync?(p: string): string;
+  activateApp?(): void;
   readServerLock?(lockDir: string): ServerLockMetadataLike | null;
   isProcessAlive?(pid: number): boolean;
   hostname?(): string;
@@ -232,11 +235,17 @@ export class WindowManager {
   focusWindowForProject(projectPath: string): BrowserWindowLike | null {
     const ctx = this.windowsByPath.get(this.canonicalizeKey(projectPath));
     if (!ctx) return null;
-    const win = ctx.window;
+    this.bringToFront(ctx.window);
+    return ctx.window;
+  }
+
+  private bringToFront(win: BrowserWindowLike): void {
     if (win.isMinimized?.()) win.restore?.();
     win.show?.();
+    const alreadyFrontmost = win.isFocused?.() === true;
+    win.moveTop?.();
     win.focus();
-    return win;
+    if (!alreadyFrontmost) this.deps.activateApp?.();
   }
 
   getContextForBrowserWindow(win: BrowserWindowLike): ProjectContext | undefined {
@@ -463,7 +472,7 @@ export class WindowManager {
     const existing = this.windowsByPath.get(canonicalKey);
     if (existing) {
       if (existing.window.isDestroyed?.() !== true) {
-        existing.window.focus();
+        this.bringToFront(existing.window);
         return existing;
       }
       this.deps.log?.warn(
@@ -786,7 +795,7 @@ export class WindowManager {
     const existing = this.windowsByPath.get(canonicalKey);
     if (existing) {
       if (existing.window.isDestroyed?.() !== true) {
-        existing.window.focus();
+        this.bringToFront(existing.window);
         return existing;
       }
       this.deps.log?.warn(
@@ -800,7 +809,7 @@ export class WindowManager {
     if (inFlight) {
       const ctx = await inFlight;
       if (ctx.window.isDestroyed?.() !== true) {
-        ctx.window.focus();
+        this.bringToFront(ctx.window);
         return ctx;
       }
       return this.createEphemeralWindow(opts);
