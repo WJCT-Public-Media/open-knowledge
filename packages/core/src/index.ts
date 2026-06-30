@@ -287,6 +287,7 @@ export {
   assertNeverUrnIpcLookup,
   buildClaudeLaunchCommand,
   buildClaudeUrl,
+  buildCliLaunchArgString,
   buildCliLaunchCommand,
   buildCodexUrl,
   buildCursorUrl,

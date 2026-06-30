@@ -1,6 +1,6 @@
 import '@xterm/xterm/css/xterm.css';
 
-import { buildCliLaunchCommand, type TerminalCli } from '@inkeep/open-knowledge-core';
+import { buildCliLaunchArgString, type TerminalCli } from '@inkeep/open-knowledge-core';
 import { useLingui } from '@lingui/react/macro';
 import { FitAddon } from '@xterm/addon-fit';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
@@ -76,6 +76,8 @@ interface TerminalSessionProps {
   readonly onExit?: (info: { readonly exitCode: number; readonly signal: number | null }) => void;
   readonly onTitleChange?: (title: string) => void;
   readonly onRestart: () => void;
+  /** "Open in terminal" launch intent — baked into the PTY spawn when present
+   *  (preflight-gated). See {@link TerminalPanelProps.launch}. */
   readonly launch?: TerminalLaunchIntent | null;
   /** Surviving PTY to adopt on mount instead of spawning a fresh shell; `null`
    *  spawns fresh (the normal path). */
@@ -99,11 +101,8 @@ function TerminalSession({
   const initialResolvedThemeRef = useRef(resolvedTheme);
   const [status, setStatus] = useState<SessionStatus>('starting');
   const [readiness, setReadiness] = useState<ClaudeReadiness | null>(null);
-  const [preflightDone, setPreflightDone] = useState(false);
   const [exitInfo, setExitInfo] = useState<TerminalExitInfo | null>(null);
   const ptyIdRef = useRef<string | null>(null);
-  const [firstOutputSeen, setFirstOutputSeen] = useState(false);
-  const lastLaunchedNonceRef = useRef<number | null>(null);
   const [missingCli, setMissingCli] = useState<TerminalCli | null>(null);
 
   useEffect(() => {
@@ -232,7 +231,6 @@ function TerminalSession({
 
       unsubData = bridge.terminal.onData((msg) => {
         if (msg.ptyId !== ptyId) return;
-        if (!cancelled) setFirstOutputSeen(true);
         term.write(msg.data, () => bridge.terminal.drain(msg.ptyId, msg.data.length));
       });
 
@@ -251,17 +249,58 @@ function TerminalSession({
 
       term.focus();
 
-      bridge.terminal
-        .claudePreflight()
-        .then((readinessResult) => {
-          if (!cancelled) setReadiness(readinessResult);
-        })
-        .catch((err) => {
-          console.warn('[terminal] claude readiness preflight failed', err);
-        })
-        .finally(() => {
-          if (!cancelled) setPreflightDone(true);
-        });
+      const launchOwnsReadiness = launch !== null && adoptPtyId === null;
+      if (!launchOwnsReadiness) {
+        bridge.terminal
+          .claudePreflight()
+          .then((readinessResult) => {
+            if (!cancelled) setReadiness(readinessResult);
+          })
+          .catch((err) => {
+            console.warn('[terminal] claude readiness preflight failed', err);
+          });
+      }
+    };
+
+    const resolveLaunchCommand = async (
+      intent: TerminalLaunchIntent,
+    ): Promise<string | undefined> => {
+      if (intent.cli === 'claude') {
+        try {
+          const fresh = await bridge.terminal.claudePreflight();
+          if (fresh.claude === 'present') {
+            if (!cancelled) setReadiness(fresh);
+            return buildCliLaunchArgString('claude', intent.prompt, {
+              mcpPreApprove: fresh.mcpPreApprovable === true,
+            });
+          }
+          if (!cancelled) {
+            setReadiness(
+              fresh.claude === 'not-found'
+                ? fresh
+                : { claude: 'not-found', mcp: fresh.mcp, mcpPreApprovable: false },
+            );
+          }
+        } catch (err) {
+          console.warn('[terminal] claude launch preflight failed', err);
+          if (!cancelled) {
+            setReadiness({ claude: 'not-found', mcp: 'needs-rewire', mcpPreApprovable: false });
+          }
+        }
+        return undefined;
+      }
+      try {
+        let res = await bridge.terminal.cliPreflight(intent.cli);
+        if (res.onPath === 'unknown') {
+          if (cancelled) return undefined;
+          res = await bridge.terminal.cliPreflight(intent.cli);
+        }
+        if (res.onPath === 'present') return buildCliLaunchArgString(intent.cli, intent.prompt);
+      } catch (err) {
+        console.warn('[terminal] cliPreflight failed', { cli: intent.cli, err });
+      }
+      if (!cancelled) setMissingCli(intent.cli);
+      return undefined;
     };
 
     void (async () => {
@@ -282,9 +321,15 @@ function TerminalSession({
         }
       }
 
+      let launchCommand: string | undefined;
+      if (launch !== null && adoptPtyId === null) {
+        launchCommand = await resolveLaunchCommand(launch);
+        if (cancelled) return;
+      }
+
       let result: Awaited<ReturnType<typeof bridge.terminal.create>>;
       try {
-        result = await bridge.terminal.create({ cols: term.cols, rows: term.rows });
+        result = await bridge.terminal.create({ cols: term.cols, rows: term.rows, launchCommand });
       } catch (err) {
         console.error('[terminal] create() failed:', err);
         if (cancelled) return;
@@ -326,104 +371,13 @@ function TerminalSession({
           .kill(ptyId)
           .catch((err) => console.warn('[terminal] kill on unmount failed:', err));
     };
-  }, [bridge, adoptPtyId]);
+  }, [bridge, adoptPtyId, launch]);
 
   useEffect(() => {
     const term = termRef.current;
     if (term === null) return;
     term.options.theme = xtermThemeForMode(resolvedTheme);
   }, [resolvedTheme]);
-
-  useEffect(() => {
-    if (launch === null) return;
-    if (adoptPtyId !== null) return;
-    if (status !== 'running') return;
-    if (!firstOutputSeen) return;
-    if (lastLaunchedNonceRef.current === launch.nonce) return;
-    const ptyId = ptyIdRef.current;
-    if (ptyId === null) return;
-
-    const nonce = launch.nonce;
-    let cancelled = false;
-
-    if (launch.cli === 'claude') {
-      if (!preflightDone) return;
-      setMissingCli(null);
-      if (readiness?.claude === 'not-found') {
-        lastLaunchedNonceRef.current = nonce; // banner handles remediation; consume
-        return;
-      }
-      const { prompt } = launch;
-      const writeClaude = (mcpPreApprove: boolean) => {
-        if (cancelled) return;
-        const livePtyId = ptyIdRef.current;
-        if (livePtyId === null) return;
-        bridge.terminal.input(
-          livePtyId,
-          buildCliLaunchCommand('claude', prompt, { mcpPreApprove }),
-        );
-        lastLaunchedNonceRef.current = nonce; // commit only after the write lands
-      };
-      void bridge.terminal
-        .claudePreflight()
-        .then((fresh) => {
-          if (cancelled) return;
-          if (fresh.claude === 'present') {
-            writeClaude(fresh.mcpPreApprovable === true);
-            return;
-          }
-          setReadiness(
-            fresh.claude === 'not-found'
-              ? fresh
-              : { claude: 'not-found', mcp: fresh.mcp, mcpPreApprovable: false },
-          );
-          lastLaunchedNonceRef.current = nonce;
-        })
-        .catch((err) => {
-          if (cancelled) return;
-          console.warn('[terminal] claude pre-approval recheck failed', { nonce, err });
-          setReadiness({ claude: 'not-found', mcp: 'needs-rewire', mcpPreApprovable: false });
-          lastLaunchedNonceRef.current = nonce;
-        });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    setMissingCli(null);
-    const { cli, prompt } = launch;
-    const writeLaunch = () => {
-      if (cancelled) return;
-      const livePtyId = ptyIdRef.current;
-      if (livePtyId === null) return;
-      bridge.terminal.input(livePtyId, buildCliLaunchCommand(cli, prompt));
-      lastLaunchedNonceRef.current = nonce; // commit only after the write lands
-    };
-    const suppress = () => {
-      if (cancelled) return;
-      setMissingCli(cli);
-      lastLaunchedNonceRef.current = nonce; // banner handles remediation; consume
-    };
-    void (async () => {
-      try {
-        let res = await bridge.terminal.cliPreflight(cli);
-        if (res.onPath === 'unknown') {
-          if (cancelled) return;
-          res = await bridge.terminal.cliPreflight(cli);
-        }
-        if (cancelled) return;
-        if (res.onPath === 'present') writeLaunch();
-        else suppress();
-      } catch (err) {
-        if (cancelled) return;
-        console.warn('[terminal] cliPreflight failed', { cli, err });
-        suppress();
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [bridge, launch, status, firstOutputSeen, preflightDone, readiness, adoptPtyId]);
 
   return (
     <div className="flex h-full w-full flex-col">

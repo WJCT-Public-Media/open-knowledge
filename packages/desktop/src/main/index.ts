@@ -1589,6 +1589,7 @@ function registerIpcHandlers() {
       projectRoot: projectPath,
       cols: clampPtyDimension(opts.cols, DEFAULT_PTY_COLS),
       rows: clampPtyDimension(opts.rows, DEFAULT_PTY_ROWS),
+      launchCommand: opts.launchCommand,
     });
   });
   handle('ok:pty:input', async (event, req) => {

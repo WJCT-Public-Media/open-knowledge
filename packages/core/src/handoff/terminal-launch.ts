@@ -15,7 +15,7 @@ export interface TerminalCliInfo {
   readonly bin: string;
   /** Claude's MCP pre-approval fragment, inserted verbatim between `<bin>` and
    *  the prompt ONLY when the caller passes `mcpPreApprove: true` (see
-   *  {@link buildCliLaunchCommand}) — i.e. after the launch site has verified the
+   *  {@link buildCliLaunchArgString}) — i.e. after the launch site has verified the
    *  project's `open-knowledge` `.mcp.json` entry is OK's own. An already-shell-
    *  safe fragment (NOT re-quoted); registry-fixed, never user input. Claude-only;
    *  omit for CLIs with no pre-approval. */
@@ -29,7 +29,7 @@ export interface TerminalCliInfo {
   /** Flag that carries the starting prompt for CLIs whose POSITIONAL argument is
    *  NOT the prompt. OpenCode's positional is the project directory, so its
    *  prompt must be passed as `--prompt '<text>'`; claude/codex/cursor take the
-   *  prompt positionally (omit this). When set, {@link buildCliLaunchCommand}
+   *  prompt positionally (omit this). When set, {@link buildCliLaunchArgString}
    *  inserts it immediately before the quoted prompt. */
   readonly promptFlag?: string;
 }
@@ -78,7 +78,7 @@ export interface BuildCliLaunchOptions {
   readonly mcpPreApprove?: boolean;
 }
 
-export function buildCliLaunchCommand(
+export function buildCliLaunchArgString(
   cli: TerminalCli,
   prompt: string,
   opts: BuildCliLaunchOptions = {},
@@ -87,7 +87,15 @@ export function buildCliLaunchCommand(
   const preApprove =
     opts.mcpPreApprove === true && info.mcpPreApproveArg ? `${info.mcpPreApproveArg} ` : '';
   const promptFlag = info.promptFlag ? `${info.promptFlag} ` : '';
-  return `${info.bin} ${preApprove}${promptFlag}${shellSingleQuote(prompt)}\r`;
+  return `${info.bin} ${preApprove}${promptFlag}${shellSingleQuote(prompt)}`;
+}
+
+export function buildCliLaunchCommand(
+  cli: TerminalCli,
+  prompt: string,
+  opts: BuildCliLaunchOptions = {},
+): string {
+  return `${buildCliLaunchArgString(cli, prompt, opts)}\r`;
 }
 
 export function buildClaudeLaunchCommand(prompt: string, opts: BuildCliLaunchOptions = {}): string {

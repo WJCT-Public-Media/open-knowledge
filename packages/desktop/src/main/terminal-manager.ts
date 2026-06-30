@@ -40,6 +40,7 @@ interface TerminalCreateRequest {
   projectRoot: string | null;
   cols: number;
   rows: number;
+  launchCommand?: string;
 }
 
 interface TerminalAddressedRequest {
@@ -298,6 +299,7 @@ export function createTerminalManager(deps: TerminalManagerDeps): TerminalManage
         cwd: req.projectRoot,
         cols: req.cols,
         rows: req.rows,
+        launchCommand: req.launchCommand,
       });
       return { ok: true, ptyId };
     },

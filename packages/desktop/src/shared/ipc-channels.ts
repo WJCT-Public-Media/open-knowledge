@@ -477,7 +477,7 @@ export interface RequestChannels {
   };
 
   'ok:pty:create': {
-    args: [opts: { cols: number; rows: number }];
+    args: [opts: { cols: number; rows: number; launchCommand?: string }];
     result: OkPtyCreateResult;
   };
   'ok:pty:input': {

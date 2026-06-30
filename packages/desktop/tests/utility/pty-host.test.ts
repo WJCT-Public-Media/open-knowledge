@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  buildShellArgs,
   buildShellEnv,
   type HostReapProcess,
   installHostReaping,
@@ -133,6 +134,18 @@ describe('setupPtyHost — create', () => {
     expect(h.spawnCalls[0]?.options.cwd).toBe('/project/root');
     expect(h.spawnCalls[0]?.options.cols).toBe(80);
     expect(h.spawnCalls[0]?.options.rows).toBe(24);
+  });
+
+  test('bakes a launch command into a non-history `-c` spawn with an interactive exec tail', () => {
+    const h = makeHarness({ env: { SHELL: '/bin/zsh', PATH: '/usr/bin' } });
+    h.fire(CREATE({ launchCommand: "claude 'do the thing'" }));
+    expect(h.spawnCalls[0]?.file).toBe('/bin/zsh');
+    expect(h.spawnCalls[0]?.args).toEqual([
+      '-l',
+      '-i',
+      '-c',
+      "claude 'do the thing'; exec '/bin/zsh' -l -i",
+    ]);
   });
 
   test('falls back to /bin/zsh when SHELL is unset', () => {
@@ -496,12 +509,59 @@ describe('setupPtyHost — incoming message validation (asIncomingMessage guard)
     expect(logger.warnings.length).toBeGreaterThan(0);
   });
 
+  test('accepts a create with a string launchCommand and bakes it', () => {
+    const h = makeHarness();
+    h.fireRaw({
+      type: 'create',
+      ptyId: 'p1',
+      cwd: '/x',
+      cols: 80,
+      rows: 24,
+      launchCommand: "x 'y'",
+    });
+    expect(h.spawnCalls).toHaveLength(1);
+    expect(h.spawnCalls[0]?.args).toEqual(['-l', '-i', '-c', "x 'y'; exec '/bin/zsh' -l -i"]);
+  });
+
+  test('drops a create whose launchCommand is present but not a string', () => {
+    const logger = makeLogger();
+    const h = makeHarness({ logger });
+    h.fireRaw({ type: 'create', ptyId: 'p1', cwd: '/x', cols: 80, rows: 24, launchCommand: 123 });
+    expect(h.spawnCalls).toHaveLength(0);
+    expect(logger.warnings.length).toBeGreaterThan(0);
+  });
+
   test('an unknown message type lands in the default warn branch (forward-compat)', () => {
     const logger = makeLogger();
     const h = makeHarness({ logger });
     h.fireRaw({ type: 'bogus-future-type', ptyId: 'p1' });
     expect(h.spawnCalls).toHaveLength(0);
     expect(logger.warnings.length).toBeGreaterThan(0);
+  });
+});
+
+describe('buildShellArgs', () => {
+  test('a plain tab is the bare login interactive shell', () => {
+    expect(buildShellArgs('/bin/zsh')).toEqual(['-l', '-i']);
+    expect(buildShellArgs('/bin/zsh', '')).toEqual(['-l', '-i']);
+  });
+
+  test('a launch bakes the command on `-c` and execs into a fresh interactive shell', () => {
+    expect(buildShellArgs('/bin/zsh', "codex 'hi'")).toEqual([
+      '-l',
+      '-i',
+      '-c',
+      "codex 'hi'; exec '/bin/zsh' -l -i",
+    ]);
+  });
+
+  test('single-quotes the shell path in the exec tail (space/quote-safe)', () => {
+    expect(buildShellArgs("/odd path/o'sh", "claude 'x'")).toEqual([
+      '-l',
+      '-i',
+      '-c',
+      "claude 'x'; exec '/odd path/o'\\''sh' -l -i",
+    ]);
   });
 });
 

@@ -736,7 +736,11 @@ export interface OkDesktopBridge {
   };
 
   terminal: {
-    create(opts: { cols: number; rows: number }): Promise<OkPtyCreateResult>;
+    create(opts: {
+      cols: number;
+      rows: number;
+      launchCommand?: string;
+    }): Promise<OkPtyCreateResult>;
     input(ptyId: string, data: string): void;
     resize(ptyId: string, cols: number, rows: number): void;
     kill(ptyId: string): Promise<void>;

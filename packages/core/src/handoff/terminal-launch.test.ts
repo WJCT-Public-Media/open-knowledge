@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { MCP_SERVER_NAME } from '../constants/mcp.ts';
 import {
   buildClaudeLaunchCommand,
+  buildCliLaunchArgString,
   buildCliLaunchCommand,
   shellSingleQuote,
   TERMINAL_CLI_IDS,
@@ -94,6 +95,29 @@ describe('buildCliLaunchCommand', () => {
     expect(buildClaudeLaunchCommand('hi', { mcpPreApprove: true })).toBe(
       buildCliLaunchCommand('claude', 'hi', { mcpPreApprove: true }),
     );
+  });
+});
+
+describe('buildCliLaunchArgString', () => {
+  it('is the launch command WITHOUT the trailing carriage return', () => {
+    for (const cli of TERMINAL_CLI_IDS) {
+      const arg = buildCliLaunchArgString(cli, 'hi', { mcpPreApprove: true });
+      expect(arg.endsWith('\r')).toBe(false);
+      expect(`${arg}\r`).toBe(buildCliLaunchCommand(cli, 'hi', { mcpPreApprove: true }));
+    }
+  });
+
+  it('keeps the fixed per-CLI shape (registry bin + single-quoted prompt)', () => {
+    expect(buildCliLaunchArgString('claude', 'hi')).toBe("claude 'hi'");
+    expect(buildCliLaunchArgString('codex', 'hi')).toBe("codex 'hi'");
+    expect(buildCliLaunchArgString('cursor', 'hi')).toBe("cursor-agent 'hi'");
+    expect(buildCliLaunchArgString('opencode', 'hi')).toBe("opencode --prompt 'hi'");
+  });
+
+  it('keeps an injection payload inert and contained in the prompt arg', () => {
+    const arg = buildCliLaunchArgString('claude', "'; rm -rf / #");
+    expect(arg).toBe("claude ''\\''; rm -rf / #'");
+    expect(arg.endsWith("''\\''; rm -rf / #'")).toBe(true);
   });
 });
 

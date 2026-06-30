@@ -10,6 +10,7 @@ export interface PtyCreateMessage {
   cols: number;
   rows: number;
   shell?: string;
+  launchCommand?: string;
 }
 interface PtyInputMessage {
   type: 'input';
@@ -105,7 +106,10 @@ function asIncomingMessage(raw: unknown): PtyHostIncomingMessage | null {
   if (typeof m.ptyId !== 'string' || m.ptyId.length === 0) return null;
   switch (m.type) {
     case 'create':
-      return typeof m.cwd === 'string' && typeof m.cols === 'number' && typeof m.rows === 'number'
+      return typeof m.cwd === 'string' &&
+        typeof m.cols === 'number' &&
+        typeof m.rows === 'number' &&
+        (m.launchCommand === undefined || typeof m.launchCommand === 'string')
         ? (raw as PtyHostIncomingMessage)
         : null;
     case 'input':
@@ -131,6 +135,12 @@ export function resolveShell(env: Record<string, string | undefined>, override?:
   if (override && override.length > 0) return override;
   const shell = env.SHELL;
   return typeof shell === 'string' && shell.length > 0 ? shell : DARWIN_FALLBACK_SHELL;
+}
+
+export function buildShellArgs(shell: string, launchCommand?: string): string[] {
+  if (launchCommand === undefined || launchCommand.length === 0) return ['-l', '-i'];
+  const quotedShell = `'${shell.replace(/'/g, "'\\''")}'`;
+  return ['-l', '-i', '-c', `${launchCommand}; exec ${quotedShell} -l -i`];
 }
 
 export function buildShellEnv(
@@ -177,7 +187,7 @@ export function setupPtyHost(deps: SetupPtyHostDeps): PtyHostHandle {
     const shellEnv = buildShellEnv(env);
     let pty: PtyProcessLike;
     try {
-      pty = deps.spawn(shell, ['-l', '-i'], {
+      pty = deps.spawn(shell, buildShellArgs(shell, message.launchCommand), {
         name: 'xterm-256color',
         cols: message.cols,
         rows: message.rows,
