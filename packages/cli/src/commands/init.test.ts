@@ -200,6 +200,7 @@ describe('runInit', () => {
     rmSync(testDir, { recursive: true, force: true });
   });
 
+
   it('scaffolds .ok/ and writes a fresh global Claude config', async () => {
     const result = await runInitForTest();
 
@@ -382,6 +383,7 @@ describe('runInit', () => {
 
     expect(existsSync(join(testDir, OK_DIR, 'config.yml'))).toBe(true);
   });
+
 
   describe('Cursor', () => {
     it('writes ~/.cursor/mcp.json with mcpServers key', async () => {
@@ -781,6 +783,7 @@ describe('runInit', () => {
     });
   });
 
+
   describe('launch.json scaffolding', () => {
     it('writes a fresh .claude/launch.json pointing at open-knowledge ui', async () => {
       const result = await runInitForTest();
@@ -935,6 +938,7 @@ describe('runInit', () => {
     });
   });
 
+
   describe('zero project-root file writes', () => {
     it('does not create root AGENTS.md when claude editor is selected', async () => {
       await runInitForTest({ editors: ['claude'] });
@@ -963,6 +967,7 @@ describe('runInit', () => {
       expect(existsSync(join(testDir, '.cursorrules'))).toBe(false);
     });
   });
+
 
   describe('legacy-injection non-interference', () => {
     it('leaves pre-existing open-knowledge marker blocks byte-identical in CLAUDE.md and AGENTS.md', async () => {
@@ -1002,6 +1007,7 @@ describe('runInit', () => {
       expect(readFileSync(agentsPath, 'utf-8')).toBe(beforeAgents);
     });
   });
+
 
   describe('installUserSkill wiring', () => {
     it('returns skillInstall = "installed" when the install succeeds', async () => {
@@ -1046,6 +1052,7 @@ describe('runInit', () => {
       expect(capturedHome).toBe(fakeHome);
     });
   });
+
 
   describe('content preview in init output', () => {
     it('renders Content block with file count and sample when preview succeeds', async () => {
@@ -1138,6 +1145,7 @@ describe('runInit', () => {
       expect(output).toContain(`Found ${preview.totalCount} markdown files`);
     });
   });
+
 
   describe('ensureProjectGit wiring (US-005)', () => {
     it('fresh tmpdir (no .git/) → runInit creates .git/ and reports didGitInit=true', async () => {
@@ -1242,6 +1250,7 @@ describe('runInit', () => {
       expect(existsSync(join(testDir, '.git'))).toBe(false);
     });
   });
+
 
   describe('mcp scope selection', () => {
     it('scope=user writes only user-level config (default runInitForTest behavior)', async () => {
@@ -1391,6 +1400,7 @@ describe('runInit', () => {
       expect(matches).toHaveLength(1);
     });
 
+
     const allocOutsideTestDir = (suffix: string): string =>
       resolve(
         tmpdir(),
@@ -1464,6 +1474,7 @@ describe('runInit', () => {
     });
   });
 });
+
 
 describe('runInit — projectRoot threading', () => {
   let testDir: string;
@@ -1555,6 +1566,7 @@ describe('runInit — projectRoot threading', () => {
   });
 });
 
+
 describe('resolveMcpScope', () => {
   it('returns "user" when --scope user is passed, without calling promptFn', async () => {
     const promptFn = async (): Promise<'user' | 'project' | 'both' | null> => {
@@ -1614,6 +1626,7 @@ describe('resolveMcpScope', () => {
   });
 });
 
+
 describe('initCommand', () => {
   it('rejects --scope with an invalid value (non-zero exit)', () => {
     const cmd = initCommand();
@@ -1621,6 +1634,7 @@ describe('initCommand', () => {
     expect(() => cmd.parse(['--scope', 'bogus'], { from: 'user' })).toThrow();
   });
 });
+
 
 describe('detectInstalledEditors', () => {
   let testDir: string;
@@ -2308,6 +2322,7 @@ describe('classifyExistingMcpEntry', () => {
   });
 });
 
+
 describe('runInit — sharing mode', () => {
   let testDir: string;
   let fakeHome: string;
@@ -2485,6 +2500,7 @@ describe('runInit — sharing mode', () => {
     expect(result.sharing.kind).toBe('applied');
   });
 });
+
 
 describe('resolveSharingMode', () => {
   let testDir: string;

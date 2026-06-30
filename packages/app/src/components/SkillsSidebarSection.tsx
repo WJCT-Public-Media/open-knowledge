@@ -162,13 +162,22 @@ function SkillFolderItem({
 }) {
   const { t } = useLingui();
   const [open, setOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const active = activeDocName === skillLiveDocName(skill.scope, skill.name);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="group/skill">
       <SidebarMenuItem>
         <CollapsibleTrigger asChild>
-          <SidebarMenuButton size="sm" isActive={active} className="h-6 text-[11px]">
+          <SidebarMenuButton
+            size="sm"
+            isActive={active}
+            className="h-6 text-[11px]"
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setMenuOpen(true);
+            }}
+          >
             <ChevronRight className="size-3 shrink-0 text-muted-foreground transition-transform group-data-[state=open]/skill:rotate-90" />
             <Hexagon className="size-3 shrink-0 text-muted-foreground" />
             {/* Display the prefix-stripped name (`open-knowledge-pack-X` → `X`) so
@@ -196,7 +205,7 @@ function SkillFolderItem({
         {/* The same context menu a file row gets (Reveal / Open with AI / Terminal
             / Copy Path / Duplicate / Rename / Delete), with Install/Uninstall in
             place of Hide — reuses SkillContextMenuItems. */}
-        <DropdownMenu>
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
             <SidebarMenuAction showOnHover aria-label={t`Actions for ${skill.name}`}>
               <MoreHorizontal />
