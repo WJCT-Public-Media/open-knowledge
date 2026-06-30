@@ -116,7 +116,7 @@ export function CallToAction() {
               href="/docs/get-started/quickstart#ok-install-web-app-linux-windows-intel-mac"
               className="font-mono text-base text-slide-muted underline-offset-4 transition-colors hover:text-slide-text hover:underline"
             >
-              or CLI
+              More platforms
             </Link>
           </div>
         </div>
