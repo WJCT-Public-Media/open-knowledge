@@ -12,21 +12,16 @@ import {
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { SidebarMenuButton } from '@/components/ui/sidebar';
 import { useCurrentBranch } from '@/hooks/use-current-branch';
-import { useWorktrees } from '@/hooks/use-worktrees';
 import type { OkDesktopBridge, RecentProjectEntry } from '@/lib/desktop-bridge-types';
 import { runWithToast as runWithToastBase } from '@/lib/error-state';
 import { cn } from '@/lib/utils';
 import { CreateProjectDialog } from './CreateProjectDialog';
-import { NewWorktreeDialog } from './NewWorktreeDialog';
-import { RecentProjectsMenu } from './RecentProjectsMenu';
 
 export const runWithToast = (
   fn: () => Promise<void>,
   fallback: string,
   toastApi?: { error(msg: string): void },
 ): Promise<void> => runWithToastBase(fn, fallback, toastApi, 'ProjectSwitcher');
-
-const SELECT_GUARD_MS = 350;
 
 interface ProjectSwitcherProps {
   bridge: OkDesktopBridge;
@@ -38,31 +33,14 @@ export function ProjectSwitcher({ bridge }: ProjectSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
-  const [newWorktreeOpen, setNewWorktreeOpen] = useState(false);
   const branch = useCurrentBranch();
-  const worktreeModel = useWorktrees();
 
   const isElectronHost = typeof window !== 'undefined' && window.okDesktop != null;
   const sawPointerDownRef = useRef(false);
-  const withinOpenGuardRef = useRef(false);
-  const openGuardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleOpenChange = (next: boolean): void => {
-    if (next) {
-      withinOpenGuardRef.current = true;
-      if (openGuardTimerRef.current !== null) clearTimeout(openGuardTimerRef.current);
-      openGuardTimerRef.current = setTimeout(() => {
-        withinOpenGuardRef.current = false;
-      }, SELECT_GUARD_MS);
-    }
     setOpen(next);
     if (!next) setSearch('');
-  };
-
-  const guardStaleSelect = (event: Event): boolean => {
-    if (!isElectronHost || !withinOpenGuardRef.current) return false;
-    event.preventDefault();
-    return true;
   };
 
   useEffect(() => {
@@ -77,16 +55,13 @@ export function ProjectSwitcher({ bridge }: ProjectSwitcherProps) {
     };
   }, [open, bridge, t]);
 
-  useEffect(() => {
-    return bridge.onMenuAction((action) => {
-      if (action === 'new-worktree') {
-        setOpen(false);
-        setNewWorktreeOpen(true);
-      } else if (action === 'switch-worktree') {
-        setOpen(true);
-      }
-    });
-  }, [bridge]);
+  const openProject = (path: string) => {
+    setOpen(false);
+    void runWithToast(
+      () => bridge.project.open({ path, target: 'new-window', entryPoint: 'recents' }),
+      t`Failed to open project.`,
+    );
+  };
 
   const onOpenFolder = () => {
     setOpen(false);
@@ -108,7 +83,14 @@ export function ProjectSwitcher({ bridge }: ProjectSwitcherProps) {
   };
 
   const currentPath = bridge.config.projectPath;
+  const switchable = recents.filter((r) => r.path !== currentPath);
+
   const query = search.trim().toLowerCase();
+  const filtered = query
+    ? switchable.filter(
+        (r) => r.name.toLowerCase().includes(query) || r.path.toLowerCase().includes(query),
+      )
+    : switchable;
 
   return (
     <>
@@ -172,9 +154,9 @@ export function ProjectSwitcher({ bridge }: ProjectSwitcherProps) {
           className="min-w-[260px]"
           data-testid="project-switcher-menu"
         >
-          {recents.length === 0 ? (
+          {switchable.length === 0 ? (
             <DropdownMenuLabel className="font-normal text-muted-foreground text-xs">
-              <Trans>No recent projects.</Trans>
+              <Trans>No other recent projects.</Trans>
             </DropdownMenuLabel>
           ) : (
             <>
@@ -182,8 +164,8 @@ export function ProjectSwitcher({ bridge }: ProjectSwitcherProps) {
                 swallow keystrokes meant for the filter field. */}
               <InputGroup className="mb-1 h-8 border-0 shadow-none has-[[data-slot=input-group-control]:focus-visible]:ring-0">
                 <InputGroupInput
-                  aria-label={t`Search projects and worktrees`}
-                  placeholder={t`Search projects and worktrees...`}
+                  aria-label={t`Search recent projects`}
+                  placeholder={t`Search recent projects...`}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={(e) => e.stopPropagation()}
@@ -194,69 +176,53 @@ export function ProjectSwitcher({ bridge }: ProjectSwitcherProps) {
                 </InputGroupAddon>
               </InputGroup>
               <DropdownMenuSeparator />
-              {/* Only the items list scrolls — the search field above and the
-                New / Switch / Open actions below stay pinned. Radix resolves the
-                DropdownMenuItem / DropdownMenuSub descendants for keyboard nav
-                through this plain wrapper; submenu flyouts portal out, so the
-                scroll clip doesn't cut them off. overscroll-contain stops scroll
-                chaining to the page behind the dropdown at the list edges. */}
-              <div className="max-h-64 overflow-x-hidden overflow-y-auto overscroll-contain subtle-scrollbar scroll-fade-mask">
-                <RecentProjectsMenu
-                  bridge={bridge}
-                  recents={recents}
-                  currentPath={currentPath}
-                  query={query}
-                  worktreeModel={worktreeModel}
-                  closeMenu={() => setOpen(false)}
-                  guardStaleSelect={guardStaleSelect}
-                />
-              </div>
+              {filtered.length === 0 ? (
+                <DropdownMenuLabel
+                  className="font-normal text-muted-foreground text-xs"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <Trans>No matching projects.</Trans>
+                </DropdownMenuLabel>
+              ) : (
+                <div className="max-h-64 overflow-x-hidden overflow-y-auto overscroll-contain subtle-scrollbar scroll-fade-mask">
+                  {filtered.slice(0, 10).map((row) => (
+                    <DropdownMenuItem
+                      key={row.path}
+                      disabled={row.missing}
+                      onSelect={() => openProject(row.path)}
+                      className="flex w-full min-w-0 flex-col items-start gap-0.5"
+                      data-testid={`project-switcher-recent-${row.path}`}
+                    >
+                      <span className="w-full truncate font-medium text-sm" title={row.name}>
+                        {row.name}
+                      </span>
+                      <span
+                        className="w-full truncate text-muted-foreground text-xs"
+                        title={row.path}
+                      >
+                        {row.path}
+                        {row.missing ? t`  (missing)` : ''}
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                </div>
+              )}
             </>
           )}
-          {branch !== null ? (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={(e) => {
-                  if (guardStaleSelect(e)) return;
-                  setOpen(false);
-                  setNewWorktreeOpen(true);
-                }}
-                data-testid="project-switcher-new-worktree"
-              >
-                <GitBranch aria-hidden="true" className="text-muted-foreground" />
-                <Trans>New worktree</Trans>
-              </DropdownMenuItem>
-            </>
-          ) : null}
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onSelect={(e) => {
-              if (guardStaleSelect(e)) return;
-              onCreateProject();
-            }}
-            data-testid="project-switcher-new-project"
-          >
+          <DropdownMenuItem onSelect={onCreateProject} data-testid="project-switcher-new-project">
             <Plus aria-hidden="true" className="text-muted-foreground" />
             <Trans>New project</Trans>
           </DropdownMenuItem>
           <DropdownMenuItem
-            onSelect={(e) => {
-              if (guardStaleSelect(e)) return;
-              onSwitchProject();
-            }}
+            onSelect={onSwitchProject}
             data-testid="project-switcher-switch-project"
           >
             <LayoutGrid aria-hidden="true" className="text-muted-foreground" />
             <Trans>Switch project</Trans>
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={(e) => {
-              if (guardStaleSelect(e)) return;
-              onOpenFolder();
-            }}
-            data-testid="project-switcher-open-folder"
-          >
+          <DropdownMenuItem onSelect={onOpenFolder} data-testid="project-switcher-open-folder">
             <FolderOpen aria-hidden="true" className="text-muted-foreground" />
             <Trans>Open folder</Trans>
           </DropdownMenuItem>
@@ -266,15 +232,6 @@ export function ProjectSwitcher({ bridge }: ProjectSwitcherProps) {
         open={createProjectOpen}
         onOpenChange={setCreateProjectOpen}
         bridge={bridge}
-      />
-      <NewWorktreeDialog
-        open={newWorktreeOpen}
-        onOpenChange={setNewWorktreeOpen}
-        bridge={bridge}
-        currentBranch={branch}
-        branches={worktreeModel?.entries
-          .map((entry) => entry.branch)
-          .filter((b): b is string => b !== null)}
       />
     </>
   );

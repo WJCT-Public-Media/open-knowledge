@@ -439,12 +439,10 @@ describe('M1 smoke', () => {
     expect(desktopMembers.size).toBeGreaterThan(0);
     expect(coreMembers.size).toBeGreaterThan(0);
     expect(appMembers.size).toBeGreaterThan(0);
-    expect(desktopMembers.size).toBe(28);
+    expect(desktopMembers.size).toBe(26);
     expect(desktopMembers).toEqual(coreMembers);
     expect(desktopMembers).toEqual(appMembers);
     expect(desktopMembers.has('toggle-show-hidden-files')).toBe(true);
-    expect(desktopMembers.has('new-worktree')).toBe(true);
-    expect(desktopMembers.has('switch-worktree')).toBe(true);
   });
 
   test('M1 invariant: EntryPoint / OkProjectEntryPoint literal-union drift catcher', async () => {
@@ -479,7 +477,7 @@ describe('M1 smoke', () => {
     expect(coreMembers.size).toBeGreaterThan(0);
     expect(appMembers.size).toBeGreaterThan(0);
 
-    expect(desktopMembers.size).toBe(8);
+    expect(desktopMembers.size).toBe(7);
 
     expect(desktopMembers).toEqual(coreMembers);
     expect(desktopMembers).toEqual(appMembers);

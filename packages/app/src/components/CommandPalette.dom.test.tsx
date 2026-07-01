@@ -183,13 +183,6 @@ mock.module('@/components/command-palette-tag-search', () => ({
   fetchDocsForTag: mock(() => Promise.resolve([])),
 }));
 
-let worktreeModelMock: import('@inkeep/open-knowledge-core').WorktreeSelectorModel | null = null;
-mock.module('@/hooks/use-worktrees', () => ({
-  useWorktrees: () => worktreeModelMock,
-}));
-const refreshWorktreesMock = mock(() => {});
-mock.module('@/lib/worktree-store', () => ({ refreshWorktrees: refreshWorktreesMock }));
-
 function recent(name: string, path = `/projects/${name.toLowerCase()}`) {
   return { name, path: path.replaceAll(' ', '-') };
 }
@@ -215,15 +208,6 @@ function createBridge() {
     },
     navigator: {
       open: mock(() => Promise.resolve()),
-    },
-    worktree: {
-      create: mock(() =>
-        Promise.resolve({
-          ok: true as const,
-          path: '/projects/current/.ok/worktrees/feature-x',
-          created: true,
-        }),
-      ),
     },
   };
 }
@@ -263,8 +247,6 @@ describe('CommandPalette DOM behavior', () => {
     createProjectDialogProps = [];
     commandDialogProps = [];
     refreshInstallStatesCalls = 0;
-    worktreeModelMock = null;
-    refreshWorktreesMock.mockClear();
     window.location.hash = '';
     globalThis.fetch = mock(() =>
       Promise.resolve(new Response(JSON.stringify({ results: [] }), { status: 200 })),
@@ -558,64 +540,6 @@ describe('CommandPalette DOM behavior', () => {
     await waitFor(() =>
       expect(screen.queryByTestId('command-palette-search-preparing')).toBeNull(),
     );
-  });
-
-  test('surfaces worktrees of the current project — opens an existing one and creates one on demand', async () => {
-    worktreeModelMock = {
-      mainRoot: '/projects/current',
-      currentBranch: 'main',
-      entries: [
-        {
-          branch: 'main',
-          worktreePath: '/projects/current',
-          isCurrent: true,
-          isMain: true,
-          locked: false,
-        },
-        {
-          branch: 'dev',
-          worktreePath: '/projects/current/.ok/worktrees/dev',
-          isCurrent: false,
-          isMain: false,
-          locked: false,
-        },
-        {
-          branch: 'feature-x',
-          worktreePath: null,
-          isCurrent: false,
-          isMain: false,
-          locked: false,
-        },
-      ],
-    };
-    const { bridge } = await renderPalette();
-
-    expect(screen.queryByTestId('command-palette-worktree-main')).toBeNull();
-
-    fireEvent.click(screen.getByTestId('command-palette-worktree-dev'));
-    await waitFor(() => {
-      expect(bridge?.project.open).toHaveBeenCalledWith({
-        path: '/projects/current/.ok/worktrees/dev',
-        target: 'new-window',
-        entryPoint: 'worktree',
-      });
-    });
-
-    fireEvent.click(screen.getByTestId('command-palette-worktree-feature-x'));
-    await waitFor(() => {
-      expect(bridge?.worktree.create).toHaveBeenCalledWith({
-        branch: 'feature-x',
-        createBranch: false,
-      });
-    });
-    await waitFor(() => {
-      expect(bridge?.project.open).toHaveBeenCalledWith({
-        path: '/projects/current/.ok/worktrees/feature-x',
-        target: 'new-window',
-        entryPoint: 'worktree',
-      });
-    });
-    expect(refreshWorktreesMock).toHaveBeenCalled();
   });
 });
 

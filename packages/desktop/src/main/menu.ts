@@ -26,8 +26,6 @@ export interface MenuDeps {
   onNewFolder?(): void;
   onNewFromTemplate?(): void;
   onNewProject?(): void;
-  onNewWorktree?(): void;
-  onSwitchWorktree?(): void;
   onRename?(): void;
   onDuplicate?(): void;
   onMoveToTrash?(): void;
@@ -162,17 +160,6 @@ export function buildMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] 
               await deps.openProject(picked, 'pick-existing');
             }
           },
-        },
-        { type: 'separator' },
-        {
-          label: 'New worktree…',
-          enabled: deps.onNewWorktree !== undefined,
-          click: () => deps.onNewWorktree?.(),
-        },
-        {
-          label: 'Switch worktree…',
-          enabled: deps.onSwitchWorktree !== undefined,
-          click: () => deps.onSwitchWorktree?.(),
         },
         { type: 'separator' },
         {

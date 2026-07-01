@@ -5,8 +5,7 @@ export type EntryPoint =
   | 'recents'
   | 'deep-link'
   | 'drag-drop'
-  | 'share-receive'
-  | 'worktree';
+  | 'share-receive';
 
 const ENTRY_POINT_VALUES: ReadonlySet<EntryPoint> = new Set([
   'create-new',
@@ -16,7 +15,6 @@ const ENTRY_POINT_VALUES: ReadonlySet<EntryPoint> = new Set([
   'deep-link',
   'drag-drop',
   'share-receive',
-  'worktree',
 ]);
 
 export function isEntryPoint(value: unknown): value is EntryPoint {

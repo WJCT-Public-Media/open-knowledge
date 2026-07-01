@@ -17,10 +17,6 @@ export interface RecentProjectEntry {
   lastOpenedAt: string;
   missing?: boolean;
   gitRemoteUrl?: string;
-  gitCommonDir?: string;
-  mainRoot?: string;
-  isLinkedWorktree?: boolean;
-  branch?: string | null;
 }
 
 export interface ExpectedShareRepo {

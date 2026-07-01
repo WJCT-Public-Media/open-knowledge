@@ -27,7 +27,6 @@
     "-wePNM": [
       "Search matches file names, paths, and folders. Open a file to search its body (⌘F)."
     ],
-    "-zA2E7": ["Couldn't create the worktree. Try a different name."],
     "-zy2Nq": ["Type"],
     "0-31GV": ["Removing"],
     "02P3hL": ["Upload failed: ", ["message"]],
@@ -106,6 +105,7 @@
     "2XQ8Ww": ["Open preview when agent edits"],
     "2YOwme": ["Restarted — now running v", ["appRuntime"], "."],
     "2YZwPB": ["Forward-links response did not match expected shape."],
+    "2Znqb1": ["  (missing)"],
     "2bVHbB": ["Available in every project on this computer."],
     "2fkdnR": ["Nothing to undo on this file"],
     "2hYmUH": ["my@email.com"],
@@ -199,9 +199,6 @@
     "4sKwf6": ["File already exists"],
     "4uNLmk": ["Pulling"],
     "4v2Yyz": ["Select every visible file-tree row when focus is in the Files sidebar."],
-    "4vPsaF": [
-      "New branch based on the current commit. The worktree lives inside the project, under <0>.ok/worktrees/</0>."
-    ],
     "4xtLTl": ["Hidden folder “", ["basename"], "”"],
     "4zGlN_": ["Paste image URL or click upload"],
     "5-FeN2": ["Share URL"],
@@ -267,7 +264,6 @@
     "67f-3g": ["Duplicate succeeded but the sidebar may be out of date — refresh to resync"],
     "6Aih4U": ["Offline"],
     "6EKG_c": ["What agents match on to decide when to use the skill."],
-    "6HCOwA": ["Failed to open."],
     "6I7cJR": ["Open chat"],
     "6LbUG7": ["The repository is private and your GitHub account doesn't have access to it."],
     "6MnZEC": ["Terminal failed to load"],
@@ -356,6 +352,7 @@
     "8OxKZy": ["Move succeeded but the sidebar may be out of date — refresh to resync"],
     "8PmoQF": ["Open the insert menu in an empty or active text position."],
     "8RtNI0": ["Failed to load documents"],
+    "8S1E33": ["Search recent projects..."],
     "8XQRON": ["Loading repositories"],
     "8_brI5": ["Name is required"],
     "8cS0nH": ["Config sharing unavailable: ", ["0"], "."],
@@ -478,7 +475,6 @@
     "C7XjNB": ["Global Skill"],
     "C9TBvF": ["No Outgoing"],
     "CCTop_": ["Recent"],
-    "CFnavk": ["This project isn't a git repository, so worktrees aren't available."],
     "CKyk7Q": ["Go back"],
     "COr1Y7": [
       "Pick <0>openknowledge.skill</0> from your <1>Downloads</1> folder. It enables automatically."
@@ -505,7 +501,6 @@
     "DId6MT": ["Project-level pages with no outgoing graph edges."],
     "DPfwMq": ["Done"],
     "DVh_Tb": ["Failed to clean up after trash"],
-    "DXd9LM": ["New worktree"],
     "D_WKe_": ["Click an agent's avatar in the presence bar to view their session."],
     "DbILZA": ["No matches. Some files are excluded from search (hidden or ignored files)."],
     "DeDYLr": ["Unrecognized wiki link"],
@@ -668,12 +663,13 @@
     "H-vDm3": ["Relaunching to install the update…"],
     "H0WlWQ": ["Grid of rows and columns with a header row."],
     "H86f9p": ["Collapse"],
+    "H8Ng4Z": ["Search recent projects"],
     "HCn0Ay": ["Toggle strikethrough formatting."],
     "HGNCsl": ["Connection lost — keep this tab open, your edits will sync when reconnected"],
     "HIb0vl": ["Network error — please try again"],
     "HM56Bx": ["Creating..."],
+    "HNnVG1": ["No other recent projects."],
     "HPTPGr": ["Create a new spec file for my user story"],
-    "HWAICJ": ["Open ", ["0"]],
     "HXFyWD": ["Split diff"],
     "HdkSiO": ["New file"],
     "HfI1dR": ["I already have it locally →"],
@@ -701,7 +697,6 @@
     "IRv9cH": ["Cloned ", ["repoName"], "."],
     "IWGfGF": ["Checking your GitHub connection"],
     "IX7-sq": ["Something went wrong opening \"", ["docName"], "\"."],
-    "IX_uXB": ["my-feature"],
     "IajAbS": ["Add a starter pack"],
     "If0crP": ["Open with AI ", ["targetDisplayName"], ", ", ["hint"]],
     "IgTwLt": ["Open this document in the editor and collapse the graph."],
@@ -828,7 +823,6 @@
         }
       ]
     ],
-    "LwMxXg": ["Failed to open worktree."],
     "M1OfV9": ["Next source diagnostic"],
     "M3ytY_": [
       "This looks like a drive root (e.g., C:\\). Scaffolding here will scan an entire drive."
@@ -844,7 +838,6 @@
     "MQIM_Y": ["Couldn't copy. Select the URL above to copy it manually."],
     "MTs6g3": ["Couldn't reconnect after server restart"],
     "MUBR8r": ["Rename succeeded but the tabstrip may be out of date — refresh to resync"],
-    "MUrVEo": ["No recent projects."],
     "MV-Dkb": ["Found ", ["countDisplay"], " markdown files"],
     "MVxpbf": ["Find and replace"],
     "MWrUEd": ["Undo all"],
@@ -878,7 +871,6 @@
     "N55YNr": [
       "Choose whether this project's OpenKnowledge setup, including its AI-tool connections, is saved with the project so teammates get it too, or kept only on your computer."
     ],
-    "NEzPEh": ["Create a new branch, or check out an existing one, in its own window."],
     "NIWAux": ["No docs registered under #", ["tagDocsName"], "."],
     "NJyQi_": ["Branch ", ["shareBranch"], " no longer exists on the remote."],
     "NKkZXl": ["Initialize and open"],
@@ -891,7 +883,6 @@
     "N_7kkF": [
       "Read through this codebase and draft a technical spec for the most complex module: an overview, the architecture, key files, and open questions, all linked from a specs index page."
     ],
-    "NaTLh6": ["Search projects and worktrees"],
     "NjrIak": ["File: <0>", ["fixedName"], ".md</0>"],
     "NkXEFS": ["Restore failed — document unchanged"],
     "NmPNJJ": ["Copy code"],
@@ -928,7 +919,6 @@
     "OYnx7O": ["Path cannot start with \"/\""],
     "OdmsFg": ["Failed to delete item"],
     "OeAl1e": ["e.g. assets/uploads"],
-    "Ogur1T": ["Search projects and worktrees..."],
     "OgyJSr": ["Local only"],
     "OiHJdA": [
       "Move through slash, wiki-link, tag, and path suggestions; accept or dismiss the active suggestion."
@@ -945,11 +935,6 @@
     "Oxyd5f": ["Pick a name"],
     "OyIC0Q": ["Project name"],
     "P-ye9o": ["Could not open folder picker"],
-    "P366P-": [
-      "New branch based on <0>",
-      ["currentBranch"],
-      "</0>. The worktree lives inside the project, under <1>.ok/worktrees/</1>."
-    ],
     "P3NS4G": ["Pattern syntax error (line ", ["lineNumber"], "): ", ["message"]],
     "P3hnm0": ["File too large to open"],
     "P47EWZ": ["Could not update sidebar settings"],
@@ -1464,11 +1449,6 @@
     "euc6Ns": ["Duplicate"],
     "evs0iw": ["Tags matching \"", ["tagListQuery"], "\""],
     "f1XQyZ": ["Move block"],
-    "f5R032": [
-      "Checks out <0>",
-      ["trimmed"],
-      "</0> into its own window, under <1>.ok/worktrees/</1>."
-    ],
     "f65AOQ": ["Start from"],
     "f8jU-L": [["0"], "/", ["1"], " — ", ["2"]],
     "fBHvBn": ["There's no project folder for this window, so a terminal can't start here."],
@@ -1584,7 +1564,6 @@
     "iKZkk1": ["Property value"],
     "iMkWoF": ["Turn on"],
     "iNFKkm": ["No diff."],
-    "iO8V-7": ["Create worktree"],
     "iOHg1t": ["Open embedded URL in new tab"],
     "iSQTsg": ["Ordered list"],
     "iSnkwB": ["Failed to open cloned project."],
@@ -1688,7 +1667,6 @@
     "lb_UU4": ["Sync now"],
     "lbkOif": ["Undo or redo visual-editor changes through TipTap collaboration history."],
     "lhjq3G": ["Reset ", ["labelText"], " to default"],
-    "ljHjfg": ["That branch is already open in another worktree."],
     "lkYioO": ["Show or hide document panel"],
     "ll2yNl": ["Content directory"],
     "lond3p": ["Shows above the code body. Round-trips as `title=\"...\"` in markdown."],
@@ -1714,7 +1692,6 @@
     "mWVJRX": ["Collapsible section with a clickable summary."],
     "mY8U64": ["Teach agents a repeatable task. You can edit the body after creating."],
     "mYGY3B": ["Date"],
-    "mYzDD_": ["A worktree folder for that branch already exists."],
     "mZ1r4i": ["Create a document from ", ["label"]],
     "maDWIB": ["Mirror source <0>api-spec</0>"],
     "makN88": ["No patterns yet. Type a folder or file name below to start hiding files."],
@@ -1771,7 +1748,6 @@
     "nft48x": [
       "Stored at <0>.ok/templates/</0> in this project. Available in every folder (folder-scoped templates can override by filename)."
     ],
-    "ng2Ibo": ["Branch name"],
     "nh3wwx": ["Embeddings provider key"],
     "njBeMm": ["Both"],
     "njU86j": ["Property \"", ["trimmed"], "\" already exists"],
@@ -1830,6 +1806,7 @@
     "p9sdCy": ["New ignore pattern"],
     "pAgkuZ": ["Reopening \"", ["docName"], "\" with a fresh local collaboration cache."],
     "pBROkv": ["Thanks for subscribing. Watch your inbox for product updates."],
+    "pEQFsW": ["No matching projects."],
     "pFagOn": ["Source editing"],
     "pHYP6v": ["Open <0>Customize</0> in the sidebar <1/> <2>Skills</2>."],
     "pRc-Im": ["Undone all edits on ", ["docName"]],
@@ -1884,7 +1861,6 @@
     "qpQwGC": ["Describe what you're working on and the agent sets it up for you."],
     "qvWGzP": ["Collapse all"],
     "qyLmWw": ["Source editor search panel"],
-    "r-OJYm": ["Enter a valid branch name (no spaces, no leading dot, no \"..\")."],
     "r2huLx": ["Undo, redo, or undo selection changes through CodeMirror history."],
     "r4R7AZ": ["Network error during cleanup"],
     "r51jLC": ["File saved & Claude Desktop App opened"],
@@ -1960,7 +1936,6 @@
       "On — your search queries and the text of matching pages are sent to your embeddings provider (OpenAI by default) to compute embeddings."
     ],
     "sxTdZI": ["Loading paths…"],
-    "sxjyRq": ["Worktrees"],
     "sxkWRg": ["Advanced"],
     "t-JXbf": ["Notion-style inline row for a downloadable file. Drag-drop also works."],
     "t18QYR": ["Unpin ", ["accessibleLabel"]],
@@ -1972,7 +1947,6 @@
     "tUvUfp": ["Use a folder you already have."],
     "tW_yvQ": ["Expand ", ["docName"]],
     "t_YqKh": ["Remove"],
-    "teD0H9": ["Couldn't open a worktree for that branch."],
     "tfDRzk": ["Save"],
     "tfi40B": ["Failed to create page"],
     "tgWuMB": ["Modified"],
@@ -1994,7 +1968,6 @@
     "uFOL2y": [
       "No project skills yet. Author one to teach agents a repeatable task scoped to this knowledge base."
     ],
-    "uGaIIS": ["Check out worktree"],
     "uH_S-u": [["loadErrorTitle"], ": ", ["message"]],
     "uKRYiW": ["Sync status unavailable — server error."],
     "uL_Wx8": ["The terminal stopped unexpectedly."],
@@ -2035,7 +2008,6 @@
     ],
     "v7hK0U": ["Use lowercase letters, digits, and hyphens only."],
     "v7lbnC": ["Find next match"],
-    "vAYoCZ": ["Couldn't open the worktree. Try again."],
     "vDXqVv": ["Insert a markdown hard break."],
     "vEJDlt": ["The file is in your Trash; the file-watcher will reconcile."],
     "vGeNNQ": ["Copy a prompt and paste it into your agent to set up your project."],
@@ -2082,9 +2054,6 @@
     "wndeIl": ["Project-level pages with neither incoming nor outgoing graph edges."],
     "wtcxiD": ["Share this setup with your team?"],
     "wvbc1r": ["Couldn't open document"],
-    "wzq9Rv": [
-      "A branch with that name already exists. Open its worktree from the switcher instead."
-    ],
     "x-5mJ1": ["Install on all"],
     "x2fr_j": ["Graph"],
     "x3-2ta": [

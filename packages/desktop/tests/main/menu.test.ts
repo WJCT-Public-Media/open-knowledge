@@ -157,32 +157,6 @@ describe('buildMenuTemplate', () => {
     expect(findByLabel(template, 'New Project…')).toBeUndefined();
   });
 
-  describe('Worktree items (SPEC: worktree = window)', () => {
-    test('New worktree… / Switch worktree… are disabled when their deps are unwired', () => {
-      const template = buildMenuTemplate(makeDeps());
-      expect(findByLabel(template, 'New worktree…')?.enabled).toBe(false);
-      expect(findByLabel(template, 'Switch worktree…')?.enabled).toBe(false);
-    });
-
-    test('New worktree… click dispatches deps.onNewWorktree()', () => {
-      const onNewWorktree = mock(() => {});
-      const template = buildMenuTemplate(makeDeps({ onNewWorktree }));
-      const item = findByLabel(template, 'New worktree…');
-      expect(item?.enabled).toBe(true);
-      (item?.click as () => void)?.();
-      expect(onNewWorktree).toHaveBeenCalledTimes(1);
-    });
-
-    test('Switch worktree… click dispatches deps.onSwitchWorktree()', () => {
-      const onSwitchWorktree = mock(() => {});
-      const template = buildMenuTemplate(makeDeps({ onSwitchWorktree }));
-      const item = findByLabel(template, 'Switch worktree…');
-      expect(item?.enabled).toBe(true);
-      (item?.click as () => void)?.();
-      expect(onSwitchWorktree).toHaveBeenCalledTimes(1);
-    });
-  });
-
   test('top-level menus include File / Edit / View / Terminal / Window / Help', () => {
     const template = buildMenuTemplate(makeDeps());
     const topLabels = template.map((t) => t.label);
