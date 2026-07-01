@@ -127,7 +127,7 @@ export const RELAUNCH_WATCHDOG_MS = 15_000;
 
 export const STUCK_HINT_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
 
-export const STUCK_HINT_DOWNLOAD_URL = 'https://inkeep.com/open-knowledge/download';
+export const STUCK_HINT_DOWNLOAD_URL = 'https://github.com/inkeep/open-knowledge/releases';
 
 const WHATS_NEW_LIVE_WINDOW_MS = 60_000;
 
