@@ -1,5 +1,13 @@
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { inspect } from 'node:util';
 import { atomicWriteFileSync, withFileLockSync } from '@inkeep/open-knowledge-core/server';
 import type {
   InstallUserSkillOptions,
@@ -27,7 +35,7 @@ import {
   parseTree as parseJsoncTree,
 } from 'jsonc-parser';
 import { stringify as stringifyToml } from 'smol-toml';
-import { OK_DIR } from '../constants.ts';
+import { CONFIG_FILENAME, OK_DIR } from '../constants.ts';
 import { formatPreviewBlock, type PreviewResult } from '../content/preview.ts';
 import { resolveProjectRoot } from '../integrations/resolve-project-root.ts';
 import {
@@ -370,6 +378,54 @@ interface InitCommandOptions {
   promptFn?: () => Promise<McpScope | null>;
   sharing?: 'shared' | 'local-only';
   sharingPromptFn?: (defaultMode: 'shared' | 'local-only') => Promise<'shared' | 'local-only'>;
+  contentDir?: string;
+}
+
+export class ContentDirError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ContentDirError';
+  }
+}
+
+export function resolveRequestedContentDir(
+  input: string,
+  projectRoot: string,
+  cwd: string,
+): string {
+  const abs = resolve(cwd, input);
+  let stat: ReturnType<typeof statSync>;
+  try {
+    stat = statSync(abs);
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      throw new ContentDirError(`--content-dir path does not exist: ${abs}`);
+    }
+    throw new ContentDirError(
+      `--content-dir path is not accessible (${code ?? 'unknown error'}): ${abs}`,
+    );
+  }
+  if (!stat.isDirectory()) {
+    throw new ContentDirError(`--content-dir must be a directory: ${abs}`);
+  }
+  const canonRoot = safeRealpath(projectRoot);
+  const canonAbs = safeRealpath(abs);
+  const rel = relative(canonRoot, canonAbs);
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    throw new ContentDirError(
+      `--content-dir must be inside the project root (${projectRoot}); got ${abs}`,
+    );
+  }
+  return rel === '' ? '.' : rel;
+}
+
+function safeRealpath(p: string): string {
+  try {
+    return realpathSync(p);
+  } catch {
+    return p;
+  }
 }
 
 interface InitCommandResult {
@@ -388,6 +444,11 @@ interface InitCommandResult {
    * Only set when `didGitInit` is also `true` AND no `.gitignore` was already
    * present at `projectRoot` — pre-existing files are never touched. */
   rootGitignoreCreated: boolean;
+  gitRootPromoted: boolean;
+  promotedFromDir?: string;
+  contentDir?: string;
+  contentDirRequested?: string;
+  contentScaffoldFailed: boolean;
   mcpAction: 'written' | 'overwritten' | 'skipped-missing' | 'skipped-flag' | 'failed' | 'declined';
   mcpPath: string;
   mcpError?: string;
@@ -802,11 +863,19 @@ export async function runInit(options: InitCommandOptions = {}): Promise<InitCom
   const resolution = resolveProjectRoot(cwd, { homeDir: options.home });
   const projectRoot = resolution.projectRoot;
   const willScaffold = !existsSync(join(projectRoot, OK_DIR));
+  const promotedFromDir = resolution.gitRootPromoted ? relative(projectRoot, cwd) : undefined;
+  const contentDirScope =
+    options.contentDir !== undefined
+      ? resolveRequestedContentDir(options.contentDir, projectRoot, cwd)
+      : resolution.defaultContentDir;
   if (resolution.ancestorPromoted) {
     console.log(`[ok] Opened existing project at ${projectRoot}`);
-  } else if (resolution.gitRootPromoted && willScaffold) {
-    console.log(
-      `[ok] Initialized OK at ${projectRoot} — opened parent of ${relative(projectRoot, cwd)} because it contains a .git folder`,
+  } else if (resolution.gitRootPromoted && willScaffold && contentDirScope === '.') {
+    process.stderr.write(
+      `${warning(`[ok] Content scope promoted to the git repo root: ${projectRoot}`)}\n` +
+        `      Ran in ${promotedFromDir}/, but .ok/ lives at the git root (one .ok/ per git repo),\n` +
+        `      so the whole repo is now the content scope. To narrow it, re-run with\n` +
+        `      \`ok init --content-dir .\`, or set content.dir: ${promotedFromDir} in ${OK_DIR}/config.yml.\n`,
     );
   }
 
@@ -818,7 +887,7 @@ export async function runInit(options: InitCommandOptions = {}): Promise<InitCom
 
   let contentResult: ReturnType<typeof initContent>;
   try {
-    contentResult = initContent(projectRoot, { contentDir: resolution.defaultContentDir });
+    contentResult = initContent(projectRoot, { contentDir: contentDirScope });
   } catch (err) {
     const fallbackPath = EDITOR_TARGETS.claude.configPath(projectRoot, options.home);
     return {
@@ -831,12 +900,18 @@ export async function runInit(options: InitCommandOptions = {}): Promise<InitCom
       legacyProjectConfigs: [],
       didGitInit: gitResult.didInit,
       rootGitignoreCreated: false,
+      gitRootPromoted: resolution.gitRootPromoted,
+      promotedFromDir,
+      contentDirRequested: options.contentDir,
+      contentScaffoldFailed: true,
       mcpAction: 'failed',
       mcpPath: fallbackPath,
       mcpError: `Content scaffolding failed: ${err instanceof Error ? err.message : String(err)}`,
       sharing: { kind: 'no-exclude', reason: 'no-git', localOnlyRequested: false },
     };
   }
+
+  const configCreated = contentResult.created.includes(CONFIG_FILENAME);
 
   let rootGitignoreCreated = false;
   if (gitResult.didInit) {
@@ -969,6 +1044,11 @@ export async function runInit(options: InitCommandOptions = {}): Promise<InitCom
     skillInstall,
     didGitInit: gitResult.didInit,
     rootGitignoreCreated,
+    gitRootPromoted: resolution.gitRootPromoted,
+    promotedFromDir,
+    contentDir: configCreated ? contentDirScope : undefined,
+    contentDirRequested: options.contentDir,
+    contentScaffoldFailed: false,
     mcpAction: primary.action,
     mcpPath: primary.configPath,
     mcpError: 'error' in primary ? (primary as EditorMcpResult).error : undefined,
@@ -1267,6 +1347,42 @@ export function formatInitResult(result: InitCommandResult, cwd: string): string
     }
   }
 
+  if (
+    result.contentDirRequested !== undefined &&
+    result.contentDir === undefined &&
+    !result.contentScaffoldFailed
+  ) {
+    lines.push('');
+    lines.push(
+      warning(
+        `⚠ --content-dir ${result.contentDirRequested} ignored — ${OK_DIR}/config.yml already exists`,
+      ),
+    );
+    lines.push(`  Edit ${OK_DIR}/config.yml → content.dir directly to change the content scope.`);
+  } else if (result.contentDir !== undefined && result.contentDir !== '.') {
+    lines.push('');
+    lines.push(`Content scope set to ${result.contentDir}/ (content.dir in ${OK_DIR}/config.yml).`);
+  } else if (
+    result.gitRootPromoted &&
+    result.contentDir === '.' &&
+    result.contentDirRequested === undefined
+  ) {
+    lines.push('');
+    lines.push(warning('⚠ Content scope promoted to the git repo root'));
+    lines.push(
+      `  .ok/ was initialized at ${cwd} because it contains a .git folder (one .ok/ per git repo),`,
+    );
+    lines.push(
+      `  not the sub-folder you ran \`ok init\` in${result.promotedFromDir ? ` (${result.promotedFromDir})` : ''}. The whole repo is now the content scope.`,
+    );
+    if (result.promotedFromDir) {
+      lines.push(
+        `  To scope to just that sub-folder, re-run \`ok init --content-dir .\` from there, or set`,
+      );
+      lines.push(`  content.dir: ${result.promotedFromDir} in ${OK_DIR}/config.yml.`);
+    }
+  }
+
   if (result.preview) {
     lines.push('');
     lines.push(formatPreviewBlock(result.preview, cwd));
@@ -1309,6 +1425,58 @@ export function formatInitResult(result: InitCommandResult, cwd: string): string
   return lines.join('\n');
 }
 
+export interface InitJsonSummary {
+  projectRoot: string;
+  gitRootPromoted: boolean;
+  promotedFromDir: string | null;
+  contentDir: string;
+  contentDirRequested: string | null;
+  /** True when this run wrote `content.dir` (fresh `config.yml`); false when a
+   * pre-existing config left the requested scope unapplied. */
+  contentDirApplied: boolean;
+  /** Files the watcher will index under the content scope; `null` if preview
+   * failed — pair with `previewError` to distinguish a failure from 0 files. */
+  contentFileCount: number | null;
+  /** The preview/config-read failure message when `contentFileCount` is `null`
+   * because scope resolution threw; `null` when the preview ran (so a `null`
+   * `contentFileCount` alongside a `null` `previewError` genuinely means 0). */
+  previewError: string | null;
+  didGitInit: boolean;
+  mcpAction: InitCommandResult['mcpAction'];
+  editors: Array<{
+    editorId: EditorId;
+    label: string;
+    action: EditorMcpResult['action'];
+    configPath: string;
+    scope: 'project' | 'user';
+  }>;
+}
+
+export function buildInitJsonSummary(
+  result: InitCommandResult,
+  opts: { contentDir: string; contentFileCount: number | null },
+): InitJsonSummary {
+  return {
+    projectRoot: result.projectRoot,
+    gitRootPromoted: result.gitRootPromoted,
+    promotedFromDir: result.promotedFromDir ?? null,
+    contentDir: opts.contentDir,
+    contentDirRequested: result.contentDirRequested ?? null,
+    contentDirApplied: result.contentDir !== undefined,
+    contentFileCount: opts.contentFileCount,
+    previewError: result.previewWarning ?? null,
+    didGitInit: result.didGitInit,
+    mcpAction: result.mcpAction,
+    editors: result.editors.map((e) => ({
+      editorId: e.editorId,
+      label: e.label,
+      action: e.action,
+      configPath: e.configPath,
+      scope: e.configScope === 'project' ? 'project' : 'user',
+    })),
+  };
+}
+
 export function detectInstalledEditors(cwd: string, home?: string): EditorId[] {
   const detected: EditorId[] = [];
   for (const id of ALL_EDITOR_IDS) {
@@ -1317,6 +1485,23 @@ export function detectInstalledEditors(cwd: string, home?: string): EditorId[] {
     }
   }
   return detected;
+}
+
+function redirectStdoutConsoleToStderr(): () => void {
+  const orig = { log: console.log, info: console.info, debug: console.debug };
+  const toErr = (...args: unknown[]): void => {
+    process.stderr.write(
+      `${args.map((a) => (typeof a === 'string' ? a : inspect(a))).join(' ')}\n`,
+    );
+  };
+  console.log = toErr;
+  console.info = toErr;
+  console.debug = toErr;
+  return () => {
+    console.log = orig.log;
+    console.info = orig.info;
+    console.debug = orig.debug;
+  };
 }
 
 export function initCommand(): Command {
@@ -1330,6 +1515,11 @@ export function initCommand(): Command {
       '--dev-mcp',
       'Register a local dev MCP entry using node + packages/cli/dist/cli.mjs with debug logging',
     )
+    .option(
+      '--content-dir <dir>',
+      `Limit content to <dir> instead of the whole project. <dir> is interpreted relative to your current directory (e.g. "." = the folder you run the command in), then saved to ${OK_DIR}/config.yml as content.dir.`,
+    )
+    .option('--json', 'Emit a structured JSON summary to stdout (diagnostics stay on stderr)')
     .addOption(
       new Option(
         '--scope <scope>',
@@ -1355,6 +1545,8 @@ export function initCommand(): Command {
         scope?: McpScope;
         shared?: boolean;
         localOnly?: boolean;
+        contentDir?: string;
+        json?: boolean;
       }) => {
         const cwd = process.cwd();
 
@@ -1363,50 +1555,82 @@ export function initCommand(): Command {
           : opts.localOnly
             ? 'local-only'
             : undefined;
-        let result: InitCommandResult;
+        const restoreConsole = opts.json ? redirectStdoutConsoleToStderr() : null;
         try {
-          result = await runInit({
-            cwd,
-            mcp: opts.mcp,
-            devMcp: opts.devMcp,
-            scope: opts.scope,
-            sharing,
-          });
-        } catch (err) {
-          if (err instanceof GitNotAvailableError || err instanceof GitTooOldError) {
-            process.stderr.write(`${err.message}\n`);
-            process.exitCode = 78;
-            return;
+          let result: InitCommandResult;
+          try {
+            result = await runInit({
+              cwd,
+              mcp: opts.mcp,
+              devMcp: opts.devMcp,
+              scope: opts.scope,
+              sharing,
+              contentDir: opts.contentDir,
+            });
+          } catch (err) {
+            if (err instanceof ContentDirError) {
+              process.stderr.write(`${err.message}\n`);
+              process.exitCode = 64;
+              return;
+            }
+            if (err instanceof GitNotAvailableError || err instanceof GitTooOldError) {
+              process.stderr.write(`${err.message}\n`);
+              process.exitCode = 78;
+              return;
+            }
+            if (err instanceof ProjectGitInitError) {
+              process.stderr.write(
+                "open-knowledge could not initialize a git repo for this project. Re-run, or run 'git init' yourself in the project folder.\n",
+              );
+              if (err.stderr) process.stderr.write(`${err.stderr.trim()}\n`);
+              process.exitCode = 1;
+              return;
+            }
+            throw err;
           }
-          if (err instanceof ProjectGitInitError) {
-            process.stderr.write(
-              "open-knowledge could not initialize a git repo for this project. Re-run, or run 'git init' yourself in the project folder.\n",
-            );
-            if (err.stderr) process.stderr.write(`${err.stderr.trim()}\n`);
-            process.exitCode = 1;
-            return;
-          }
-          throw err;
-        }
 
-        try {
-          const { previewContent } = await import('../content/preview.ts');
+          let effectiveContentDir = result.contentDir ?? '.';
+          let contentFileCount: number | null = null;
           const { loadConfig } = await import('../config/loader.ts');
           const { resolveContentDir } = await import('@inkeep/open-knowledge-server');
-          const { config } = loadConfig(result.projectRoot);
-          const contentDir = resolveContentDir(config, result.projectRoot);
-          result.preview = previewContent({
-            projectDir: result.projectRoot,
-            contentDir,
-          });
-        } catch (e) {
-          result.previewWarning = e instanceof Error ? e.message : String(e);
-        }
+          let config: Awaited<ReturnType<typeof loadConfig>>['config'] | undefined;
+          try {
+            config = loadConfig(result.projectRoot).config;
+            effectiveContentDir = config.content.dir;
+          } catch (e) {
+            result.previewWarning = e instanceof Error ? e.message : String(e);
+          }
+          if (config) {
+            try {
+              const { previewContent } = await import('../content/preview.ts');
+              const contentDir = resolveContentDir(config, result.projectRoot);
+              result.preview = previewContent({
+                projectDir: result.projectRoot,
+                contentDir,
+              });
+              contentFileCount = result.preview.totalCount;
+            } catch (e) {
+              result.previewWarning = e instanceof Error ? e.message : String(e);
+            }
+          }
 
-        process.stdout.write(`${formatInitResult(result, result.projectRoot)}\n`);
+          if (opts.json) {
+            process.stdout.write(
+              `${JSON.stringify(
+                buildInitJsonSummary(result, { contentDir: effectiveContentDir, contentFileCount }),
+                null,
+                2,
+              )}\n`,
+            );
+          } else {
+            process.stdout.write(`${formatInitResult(result, result.projectRoot)}\n`);
+          }
 
-        if (result.editors.some((e) => e.action === 'failed') || result.mcpAction === 'failed') {
-          process.exitCode = 1;
+          if (result.editors.some((e) => e.action === 'failed') || result.mcpAction === 'failed') {
+            process.exitCode = 1;
+          }
+        } finally {
+          restoreConsole?.();
         }
       },
     );

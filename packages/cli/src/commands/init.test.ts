@@ -35,6 +35,8 @@ import {
 } from '../native/toml-config-engine.ts';
 import {
   applySharingMode,
+  buildInitJsonSummary,
+  ContentDirError,
   classifyExistingMcpEntry,
   detectInstalledEditors,
   type EditorMcpResult,
@@ -45,6 +47,7 @@ import {
   LAUNCH_UI_CHAIN_V1,
   readExistingMcpEntry,
   resolveMcpScope,
+  resolveRequestedContentDir,
   resolveSharingMode,
   runInit,
   writeEditorMcpConfig,
@@ -1518,6 +1521,11 @@ describe('runInit — projectRoot threading', () => {
     expect(result.projectRoot).toBe(repo);
     expect(existsSync(join(repo, OK_DIR))).toBe(true);
     expect(existsSync(join(sub, OK_DIR))).toBe(false);
+    expect(result.gitRootPromoted).toBe(true);
+    expect(result.promotedFromDir).toBe('sub');
+    const output = formatInitResult(result, result.projectRoot);
+    expect(output).toContain('Content scope promoted to the git repo root');
+    expect(output).toContain('content.dir: sub');
   });
 
   it('returns projectRoot equal to cwd when cwd is the git root', async () => {
@@ -1534,6 +1542,10 @@ describe('runInit — projectRoot threading', () => {
 
     expect(result.projectRoot).toBe(repo);
     expect(existsSync(join(repo, OK_DIR))).toBe(true);
+    expect(result.gitRootPromoted).toBe(false);
+    expect(result.promotedFromDir).toBeUndefined();
+    const output = formatInitResult(result, result.projectRoot);
+    expect(output).not.toContain('Content scope promoted to the git repo root');
   });
 
   it('loadConfig succeeds when called against the resolved projectRoot', async () => {
@@ -1554,6 +1566,254 @@ describe('runInit — projectRoot threading', () => {
     const { config: rootConfig } = loadConfig(result.projectRoot);
     expect(rootConfig).toBeDefined();
     expect(rootConfig.content.dir).toBe('.');
+  });
+
+  it('--content-dir . from a sub-folder narrows scope to that folder', async () => {
+    const repo = join(fakeHome, 'repo-cd-dot');
+    const sub = join(repo, 'notes');
+    mkdirSync(sub, { recursive: true });
+    Bun.spawnSync({ cmd: ['git', 'init', '-q', repo], stdout: 'ignore', stderr: 'ignore' });
+
+    const result = await runInit({
+      cwd: sub,
+      home: fakeHome,
+      installUserSkill: defaultInstallUserSkill,
+      scope: 'user',
+      contentDir: '.',
+    });
+
+    expect(result.projectRoot).toBe(repo);
+    expect(result.gitRootPromoted).toBe(true);
+    expect(result.contentDir).toBe('notes');
+    const { config } = loadConfig(result.projectRoot);
+    expect(config.content.dir).toBe('notes');
+
+    const output = formatInitResult(result, result.projectRoot);
+    expect(output).not.toContain('Content scope promoted to the git repo root');
+    expect(output).toContain('Content scope set to notes/');
+  });
+
+  it('--content-dir <subpath> narrows scope relative to cwd', async () => {
+    const repo = join(fakeHome, 'repo-cd-sub');
+    const nested = join(repo, 'docs', 'guides');
+    mkdirSync(nested, { recursive: true });
+    Bun.spawnSync({ cmd: ['git', 'init', '-q', repo], stdout: 'ignore', stderr: 'ignore' });
+
+    const result = await runInit({
+      cwd: repo,
+      home: fakeHome,
+      installUserSkill: defaultInstallUserSkill,
+      scope: 'user',
+      contentDir: 'docs/guides',
+    });
+
+    expect(result.projectRoot).toBe(repo);
+    expect(result.contentDir).toBe('docs/guides');
+    const { config } = loadConfig(result.projectRoot);
+    expect(config.content.dir).toBe('docs/guides');
+  });
+
+  it('--content-dir outside the project root throws ContentDirError', async () => {
+    const repo = join(fakeHome, 'repo-cd-escape');
+    mkdirSync(repo, { recursive: true });
+    Bun.spawnSync({ cmd: ['git', 'init', '-q', repo], stdout: 'ignore', stderr: 'ignore' });
+
+    await expect(
+      runInit({
+        cwd: repo,
+        home: fakeHome,
+        installUserSkill: defaultInstallUserSkill,
+        scope: 'user',
+        contentDir: '..',
+      }),
+    ).rejects.toBeInstanceOf(ContentDirError);
+    expect(existsSync(join(repo, OK_DIR))).toBe(false);
+  });
+
+  it('--content-dir on re-init is ignored (config.yml already exists) and warns', async () => {
+    const repo = join(fakeHome, 'repo-cd-reinit');
+    const sub = join(repo, 'notes');
+    mkdirSync(sub, { recursive: true });
+    Bun.spawnSync({ cmd: ['git', 'init', '-q', repo], stdout: 'ignore', stderr: 'ignore' });
+
+    await runInit({
+      cwd: repo,
+      home: fakeHome,
+      installUserSkill: defaultInstallUserSkill,
+      scope: 'user',
+    });
+    expect(loadConfig(repo).config.content.dir).toBe('.');
+
+    const result = await runInit({
+      cwd: sub,
+      home: fakeHome,
+      installUserSkill: defaultInstallUserSkill,
+      scope: 'user',
+      contentDir: '.',
+    });
+    expect(result.contentDir).toBeUndefined();
+    expect(result.contentDirRequested).toBe('.');
+    expect(result.contentScaffoldFailed).toBe(false);
+    expect(loadConfig(repo).config.content.dir).toBe('.');
+    const output = formatInitResult(result, result.projectRoot);
+    expect(output).toContain('ignored');
+    expect(
+      buildInitJsonSummary(result, { contentDir: '.', contentFileCount: null }).contentDirApplied,
+    ).toBe(false);
+  });
+
+  it('does not claim "config.yml already exists" when content scaffolding failed', async () => {
+    const repo = join(fakeHome, 'repo-scaffold-fail');
+    mkdirSync(repo, { recursive: true });
+    Bun.spawnSync({ cmd: ['git', 'init', '-q', repo], stdout: 'ignore', stderr: 'ignore' });
+    const base = await runInit({
+      cwd: repo,
+      home: fakeHome,
+      installUserSkill: defaultInstallUserSkill,
+      scope: 'user',
+    });
+
+    const scaffoldFailed = {
+      ...base,
+      contentDirRequested: 'notes',
+      contentDir: undefined,
+      contentScaffoldFailed: true,
+    };
+    expect(formatInitResult(scaffoldFailed, base.projectRoot)).not.toContain('ignored');
+
+    const configExisted = {
+      ...base,
+      contentDirRequested: 'notes',
+      contentDir: undefined,
+      contentScaffoldFailed: false,
+    };
+    expect(formatInitResult(configExisted, base.projectRoot)).toContain('ignored');
+  });
+
+  it('buildInitJsonSummary projects a promoted, narrowed result into stable JSON fields', async () => {
+    const repo = join(fakeHome, 'repo-json');
+    const sub = join(repo, 'notes');
+    mkdirSync(sub, { recursive: true });
+    Bun.spawnSync({ cmd: ['git', 'init', '-q', repo], stdout: 'ignore', stderr: 'ignore' });
+
+    const result = await runInit({
+      cwd: sub,
+      home: fakeHome,
+      installUserSkill: defaultInstallUserSkill,
+      scope: 'user',
+      contentDir: '.',
+    });
+
+    const summary = buildInitJsonSummary(result, { contentDir: 'notes', contentFileCount: 3 });
+    expect(summary.projectRoot).toBe(repo);
+    expect(summary.gitRootPromoted).toBe(true);
+    expect(summary.promotedFromDir).toBe('notes');
+    expect(summary.contentDir).toBe('notes');
+    expect(summary.contentDirRequested).toBe('.');
+    expect(summary.contentDirApplied).toBe(true);
+    expect(summary.contentFileCount).toBe(3);
+    expect(summary.previewError).toBeNull();
+    expect(JSON.parse(JSON.stringify(summary))).toEqual(summary);
+  });
+
+  it('buildInitJsonSummary surfaces previewError so a null count is unambiguous', async () => {
+    const repo = join(fakeHome, 'repo-json-previewerr');
+    mkdirSync(repo, { recursive: true });
+    Bun.spawnSync({ cmd: ['git', 'init', '-q', repo], stdout: 'ignore', stderr: 'ignore' });
+    const base = await runInit({
+      cwd: repo,
+      home: fakeHome,
+      installUserSkill: defaultInstallUserSkill,
+      scope: 'user',
+    });
+    const withPreviewError = { ...base, previewWarning: 'cannot access content directory' };
+    const summary = buildInitJsonSummary(withPreviewError, {
+      contentDir: '.',
+      contentFileCount: null,
+    });
+    expect(summary.contentFileCount).toBeNull();
+    expect(summary.previewError).toBe('cannot access content directory');
+  });
+
+  it('buildInitJsonSummary uses null for absent promotion / request / count', async () => {
+    const repo = join(fakeHome, 'repo-json-flat');
+    mkdirSync(repo, { recursive: true });
+    Bun.spawnSync({ cmd: ['git', 'init', '-q', repo], stdout: 'ignore', stderr: 'ignore' });
+
+    const result = await runInit({
+      cwd: repo,
+      home: fakeHome,
+      installUserSkill: defaultInstallUserSkill,
+      scope: 'user',
+    });
+
+    const summary = buildInitJsonSummary(result, { contentDir: '.', contentFileCount: null });
+    expect(summary.gitRootPromoted).toBe(false);
+    expect(summary.promotedFromDir).toBeNull();
+    expect(summary.contentDirRequested).toBeNull();
+    expect(summary.contentDirApplied).toBe(true);
+    expect(summary.contentFileCount).toBeNull();
+  });
+});
+
+describe('resolveRequestedContentDir', () => {
+  let root: string;
+  beforeEach(() => {
+    const raw = join(tmpdir(), `rrcd-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(raw, { recursive: true });
+    root = realpathSync(raw);
+    mkdirSync(join(root, 'sub'), { recursive: true });
+  });
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('returns "." when the request resolves to the project root itself', () => {
+    expect(resolveRequestedContentDir('.', root, root)).toBe('.');
+  });
+
+  it('returns the git-root-relative path for a descendant (cwd-relative input)', () => {
+    expect(resolveRequestedContentDir('sub', root, root)).toBe('sub');
+    expect(resolveRequestedContentDir('.', root, join(root, 'sub'))).toBe('sub');
+  });
+
+  it('throws when the resolved path escapes the project root', () => {
+    expect(() => resolveRequestedContentDir('..', root, root)).toThrow(ContentDirError);
+  });
+
+  it('throws when the path does not exist', () => {
+    expect(() => resolveRequestedContentDir('nope', root, root)).toThrow(ContentDirError);
+  });
+
+  it('throws when the path is a file, not a directory', () => {
+    writeFileSync(join(root, 'file.md'), '# x');
+    expect(() => resolveRequestedContentDir('file.md', root, root)).toThrow(ContentDirError);
+  });
+
+  it('reports a non-ENOENT stat error as "not accessible", not "does not exist"', () => {
+    writeFileSync(join(root, 'file.md'), '# x');
+    let msg = '';
+    try {
+      resolveRequestedContentDir('file.md/nested', root, root);
+    } catch (e) {
+      msg = e instanceof Error ? e.message : String(e);
+    }
+    expect(msg).toContain('not accessible');
+    expect(msg).not.toContain('does not exist');
+  });
+
+  it('resolves . when cwd reaches the project via a symlinked prefix', () => {
+    const linkParent = join(
+      tmpdir(),
+      `rrcd-link-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    symlinkSync(root, linkParent);
+    try {
+      expect(resolveRequestedContentDir('.', root, linkParent)).toBe('.');
+      expect(resolveRequestedContentDir('sub', root, linkParent)).toBe('sub');
+    } finally {
+      rmSync(linkParent, { force: true });
+    }
   });
 });
 
