@@ -9,14 +9,20 @@ import { useGitSyncStatus } from '@/hooks/use-git-sync-status';
 import { useNoPushPermissionToast } from '@/hooks/use-no-push-permission-toast';
 import { useConfigContext } from '@/lib/config-provider';
 import { matchesKeyboardShortcut } from '@/lib/keyboard-shortcuts';
+import {
+  getInitialTerminalDock,
+  type TerminalDockPosition,
+  writeTerminalDock,
+} from '@/lib/terminal-dock-store';
 import { recordTerminalOpened } from '@/lib/terminal-telemetry';
 import { AuthModal } from './AuthModal';
 import { AutoSyncOnboardingDialog } from './AutoSyncOnboardingDialog';
 import { shouldShowAutoSyncOnboarding } from './auto-sync-onboarding-gate';
 import { type PanelTab, TABS } from './DocPanel';
-import { EditorArea } from './EditorArea';
+import { EditorArea, type TerminalPlacement } from './EditorArea';
 import { EditorHeader } from './EditorHeader';
 import { subscribeToTerminalLaunchRequests } from './handoff/terminal-launch-events';
+import { TerminalSessionsHost } from './TerminalSessionsHost';
 
 export interface TerminalLaunchIntent {
   readonly prompt: string;
@@ -42,6 +48,22 @@ export function EditorPane({ onOpenSearch }: EditorPaneProps = {}) {
   const [dockRestoreSettled, setDockRestoreSettled] = useState(false);
   const restoreRevealRef = useRef(false);
   const [terminalLaunch, setTerminalLaunch] = useState<TerminalLaunchIntent | null>(null);
+  const [terminalDock, setTerminalDockState] =
+    useState<TerminalDockPosition>(getInitialTerminalDock);
+  function setTerminalDock(next: TerminalDockPosition) {
+    setTerminalDockState(next);
+    writeTerminalDock(next);
+    setTerminalVisible(true);
+  }
+  function toggleTerminalDock() {
+    setTerminalDock(terminalDock === 'right' ? 'bottom' : 'right');
+  }
+  const [terminalPlacement, setTerminalPlacement] = useState<TerminalPlacement>({
+    container: null,
+    isShowing: false,
+    dockPosition: 'bottom',
+    editorRegion: null,
+  });
   const launchNonceRef = useRef(0);
 
   const syncStatus = useGitSyncStatus();
@@ -169,10 +191,11 @@ export function EditorPane({ onOpenSearch }: EditorPaneProps = {}) {
         }}
         onOpenSearch={onOpenSearch}
       />
-      {/* The terminal docks under the editor/file column only — EditorArea
-          nests the vertical split inside its horizontal editor↔doc-panel
-          split so the doc panel stays full-height beside the terminal. The
-          ⌘J/menu/telemetry state stays owned here and is threaded down. */}
+      {/* The terminal docks to the right of the doc panel (its own column) or
+          under the editor/file column. EditorArea owns the layout; the dock
+          position, visibility, and the dock-toggle/collapse controls' state stay
+          owned here and are threaded down — to EditorArea (placement) and to the
+          session host (which renders the tab strip's controls via its portal). */}
       <EditorArea
         editorMode={editorMode}
         onModeChange={handleModeChange}
@@ -181,8 +204,22 @@ export function EditorPane({ onOpenSearch }: EditorPaneProps = {}) {
         terminalBridge={desktopBridge}
         terminalVisible={terminalVisible}
         onTerminalVisibleChange={setTerminalVisible}
-        terminalLaunch={terminalLaunch}
+        terminalDock={terminalDock}
+        onTerminalPlacement={setTerminalPlacement}
       />
+      {desktopBridge != null ? (
+        <TerminalSessionsHost
+          bridge={desktopBridge}
+          visible={terminalVisible}
+          onVisibleChange={setTerminalVisible}
+          launch={terminalLaunch}
+          container={terminalPlacement.container}
+          isShowing={terminalPlacement.isShowing}
+          onRequestEditorFocus={() => terminalPlacement.editorRegion?.focus()}
+          dockPosition={terminalDock}
+          onToggleDock={toggleTerminalDock}
+        />
+      ) : null}
       <AuthModal
         open={authModalOpen}
         onOpenChange={setAuthModalOpen}

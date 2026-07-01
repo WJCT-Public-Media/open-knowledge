@@ -1244,6 +1244,10 @@ msgstr ""
 msgid "Collapse graph"
 msgstr ""
 
+#: src/components/TerminalTabStrip.tsx
+msgid "Collapse terminal"
+msgstr ""
+
 #: src/editor/slash-command/component-items.tsx
 msgid "Collapsible section with a clickable summary."
 msgstr ""
@@ -2127,6 +2131,14 @@ msgstr ""
 
 #: src/editor/composer-mention/ComposerMentionMenu.tsx
 msgid "Doc mention suggestions"
+msgstr ""
+
+#: src/components/TerminalTabStrip.tsx
+msgid "Dock terminal to the bottom"
+msgstr ""
+
+#: src/components/TerminalTabStrip.tsx
+msgid "Dock terminal to the right"
 msgstr ""
 
 #: src/components/HelpPopover.tsx
@@ -6134,7 +6146,7 @@ msgid "Terminal"
 msgstr ""
 
 #. placeholder {0}: index + 1
-#: src/components/TerminalDock.tsx
+#: src/components/TerminalSessionsHost.tsx
 msgid "Terminal {0}"
 msgstr ""
 

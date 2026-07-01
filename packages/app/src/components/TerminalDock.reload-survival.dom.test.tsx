@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { OkDesktopBridge } from '@/lib/desktop-bridge-types';
 
@@ -39,6 +40,35 @@ mock.module('@/lib/terminal-height-store', () => ({
 }));
 
 const { TerminalDock } = await import('./TerminalDock');
+const { TerminalSessionsHost } = await import('./TerminalSessionsHost');
+
+function ReloadHarness({ bridge, visible }: { bridge: OkDesktopBridge; visible: boolean }) {
+  const [bottomContainer, setBottomContainer] = useState<HTMLDivElement | null>(null);
+  return (
+    <TooltipProvider>
+      <TerminalDock
+        visible={visible}
+        onVisibleChange={() => {}}
+        dockPosition="bottom"
+        onBottomContainer={setBottomContainer}
+        onEditorRegion={() => {}}
+      >
+        <div data-testid="editor-child" />
+      </TerminalDock>
+      <TerminalSessionsHost
+        bridge={bridge}
+        visible={visible}
+        onVisibleChange={() => {}}
+        launch={null}
+        container={bottomContainer}
+        isShowing={visible && bottomContainer != null}
+        onRequestEditorFocus={() => {}}
+        dockPosition="bottom"
+        onToggleDock={() => {}}
+      />
+    </TooltipProvider>
+  );
+}
 
 function makeSurvivingMainBridge(preExisting: ReadonlyArray<{ ptyId: string }>) {
   let freshCounter = 0;
@@ -65,13 +95,7 @@ function makeSurvivingMainBridge(preExisting: ReadonlyArray<{ ptyId: string }>) 
 }
 
 function renderDock(bridge: OkDesktopBridge, visible: boolean) {
-  return render(
-    <TooltipProvider>
-      <TerminalDock bridge={bridge} visible={visible} onVisibleChange={() => {}} launch={null}>
-        <div data-testid="editor-child" />
-      </TerminalDock>
-    </TooltipProvider>,
-  );
+  return render(<ReloadHarness bridge={bridge} visible={visible} />);
 }
 
 describe('issue #351 — the terminal dock rehydrates surviving sessions after a renderer reload', () => {
@@ -95,13 +119,7 @@ describe('issue #351 — the terminal dock rehydrates surviving sessions after a
   });
 
   function dockUi(bridge: OkDesktopBridge, visible: boolean) {
-    return (
-      <TooltipProvider>
-        <TerminalDock bridge={bridge} visible={visible} onVisibleChange={() => {}} launch={null}>
-          <div data-testid="editor-child" />
-        </TerminalDock>
-      </TooltipProvider>
-    );
+    return <ReloadHarness bridge={bridge} visible={visible} />;
   }
 
   test('zero survivors settles so a later open still cold-starts exactly one tab', async () => {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { OkDesktopBridge } from '@/lib/desktop-bridge-types';
 
@@ -104,6 +104,7 @@ mock.module('@/lib/terminal-height-store', () => ({
 }));
 
 const { TerminalDock } = await import('./TerminalDock');
+const { TerminalSessionsHost } = await import('./TerminalSessionsHost');
 
 function makeBridge() {
   const menuHandlers: Array<(action: string) => void> = [];
@@ -140,20 +141,41 @@ function makeBridge() {
   };
 }
 
-function renderDock(visible: boolean, launch?: { prompt: string; nonce: number } | null) {
-  const onVisibleChange = mock((_v: boolean) => {});
-  const { bridge, create, kill, viewMenuPushes, dispatchMenuAction } = makeBridge();
-  const ui = (v: boolean, l?: { prompt: string; nonce: number } | null) => (
+// biome-ignore lint/suspicious/noExplicitAny: test harness props
+function DockHarness({ v, l, onVisibleChange, bridge }: any) {
+  const [bottomContainer, setBottomContainer] = useState<HTMLDivElement | null>(null);
+  const [editorRegionEl, setEditorRegionEl] = useState<HTMLDivElement | null>(null);
+  return (
     <TooltipProvider>
       <TerminalDock
+        visible={v}
+        onVisibleChange={onVisibleChange}
+        dockPosition="bottom"
+        onBottomContainer={setBottomContainer}
+        onEditorRegion={setEditorRegionEl}
+      >
+        <div data-testid="editor-child" />
+      </TerminalDock>
+      <TerminalSessionsHost
         bridge={bridge}
         visible={v}
         onVisibleChange={onVisibleChange}
         launch={l ?? null}
-      >
-        <div data-testid="editor-child" />
-      </TerminalDock>
+        container={bottomContainer}
+        isShowing={v && bottomContainer != null}
+        onRequestEditorFocus={() => editorRegionEl?.focus()}
+        dockPosition="bottom"
+        onToggleDock={() => {}}
+      />
     </TooltipProvider>
+  );
+}
+
+function renderDock(visible: boolean, launch?: { prompt: string; nonce: number } | null) {
+  const onVisibleChange = mock((_v: boolean) => {});
+  const { bridge, create, kill, viewMenuPushes, dispatchMenuAction } = makeBridge();
+  const ui = (v: boolean, l?: { prompt: string; nonce: number } | null) => (
+    <DockHarness v={v} l={l ?? null} onVisibleChange={onVisibleChange} bridge={bridge} />
   );
   const utils = render(ui(visible, launch));
   return {
@@ -205,6 +227,13 @@ describe('TerminalDock multi-session', () => {
   });
   afterEach(() => {
     cleanup();
+  });
+
+  test('tab strip exposes the dock-toggle + collapse buttons and no drag grip', () => {
+    renderDock(true);
+    expect(screen.getByRole('button', { name: 'Dock terminal to the right' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Collapse terminal' })).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'Drag to dock the terminal' })).toBeNull();
   });
 
   test('mounts no session until first opened, then keeps the session mounted on hide', () => {
@@ -670,5 +699,66 @@ describe('TerminalDock multi-session', () => {
 
     act(() => view.rerender(true));
     expect(document.activeElement).toBe(session);
+  });
+});
+
+describe('TerminalSessionsHost focus-return gating across a dock move', () => {
+  afterEach(() => cleanup());
+
+  function FocusHarness({
+    bridge,
+    isShowing,
+    visible,
+    onEditorFocus,
+  }: {
+    // biome-ignore lint/suspicious/noExplicitAny: test harness bridge stub
+    bridge: any;
+    isShowing: boolean;
+    visible: boolean;
+    onEditorFocus: () => void;
+  }) {
+    const [container, setContainer] = useState<HTMLDivElement | null>(null);
+    return (
+      <TooltipProvider>
+        <div ref={setContainer} data-testid="term-host-container" />
+        <TerminalSessionsHost
+          bridge={bridge}
+          visible={visible}
+          onVisibleChange={() => {}}
+          launch={null}
+          container={container}
+          isShowing={isShowing}
+          onRequestEditorFocus={onEditorFocus}
+          dockPosition="right"
+          onToggleDock={() => {}}
+        />
+      </TooltipProvider>
+    );
+  }
+
+  test('a dock move keeps focus (visible stays true); a genuine hide returns focus to the editor', () => {
+    const onEditorFocus = mock(() => {});
+    const { bridge } = makeBridge();
+    const ui = (isShowing: boolean, visible: boolean) => (
+      <FocusHarness
+        bridge={bridge}
+        isShowing={isShowing}
+        visible={visible}
+        onEditorFocus={onEditorFocus}
+      />
+    );
+    const { rerender } = render(ui(true, true));
+
+    const sink = document.querySelector<HTMLElement>(
+      '[data-terminal-session] .xterm-helper-textarea',
+    );
+    act(() => sink?.focus());
+    expect(onEditorFocus).not.toHaveBeenCalled();
+
+    act(() => rerender(ui(false, true)));
+    expect(onEditorFocus).not.toHaveBeenCalled();
+
+    act(() => rerender(ui(false, false)));
+    expect(onEditorFocus).toHaveBeenCalled();
   });
 });

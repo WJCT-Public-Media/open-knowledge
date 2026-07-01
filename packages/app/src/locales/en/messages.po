@@ -1249,6 +1249,10 @@ msgstr "Collapse burst {burstNumber} diff"
 msgid "Collapse graph"
 msgstr "Collapse graph"
 
+#: src/components/TerminalTabStrip.tsx
+msgid "Collapse terminal"
+msgstr "Collapse terminal"
+
 #: src/editor/slash-command/component-items.tsx
 msgid "Collapsible section with a clickable summary."
 msgstr "Collapsible section with a clickable summary."
@@ -2133,6 +2137,14 @@ msgstr "Do you want to permanently delete instead?"
 #: src/editor/composer-mention/ComposerMentionMenu.tsx
 msgid "Doc mention suggestions"
 msgstr "Doc mention suggestions"
+
+#: src/components/TerminalTabStrip.tsx
+msgid "Dock terminal to the bottom"
+msgstr "Dock terminal to the bottom"
+
+#: src/components/TerminalTabStrip.tsx
+msgid "Dock terminal to the right"
+msgstr "Dock terminal to the right"
 
 #: src/components/HelpPopover.tsx
 msgid "Docs"
@@ -6139,7 +6151,7 @@ msgid "Terminal"
 msgstr "Terminal"
 
 #. placeholder {0}: index + 1
-#: src/components/TerminalDock.tsx
+#: src/components/TerminalSessionsHost.tsx
 msgid "Terminal {0}"
 msgstr "Terminal {0}"
 

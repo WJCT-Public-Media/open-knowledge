@@ -1,9 +1,17 @@
 import { Trans, useLingui } from '@lingui/react/macro';
-import { PlusIcon, XIcon } from 'lucide-react';
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  PanelBottomIcon,
+  PanelRightIcon,
+  PlusIcon,
+  XIcon,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import type { TerminalDockPosition } from '@/lib/terminal-dock-store';
 import { cn } from '@/lib/utils';
 
 export interface TerminalTabDescriptor {
@@ -18,6 +26,11 @@ interface TerminalTabStripProps {
   readonly onTabActivate?: (id: string) => void;
   readonly onNew: () => void;
   readonly onClose: (id: string) => void;
+  /** Where the terminal is currently docked — drives the dock-toggle + collapse
+   *  button icons/labels. */
+  readonly dockPosition: TerminalDockPosition;
+  readonly onToggleDock: () => void;
+  readonly onCollapse: () => void;
   readonly children?: ReactNode;
   readonly className?: string;
 }
@@ -29,10 +42,14 @@ export function TerminalTabStrip({
   onTabActivate,
   onNew,
   onClose,
+  dockPosition,
+  onToggleDock,
+  onCollapse,
   children,
   className,
 }: TerminalTabStripProps) {
   const { t } = useLingui();
+  const rightDocked = dockPosition === 'right';
   return (
     <Tabs
       value={activeSessionId}
@@ -51,7 +68,7 @@ export function TerminalTabStrip({
               <div
                 key={session.id}
                 className={cn(
-                  'group flex shrink-0 items-center rounded-md pr-0.5 transition-colors',
+                  'group flex shrink-0 cursor-default items-center rounded-md pr-0.5 transition-colors',
                   isActive ? 'bg-muted' : 'hover:bg-muted/50',
                 )}
               >
@@ -90,7 +107,7 @@ export function TerminalTabStrip({
               variant="ghost"
               size="icon-xs"
               aria-label={t`New terminal`}
-              className="shrink-0 text-muted-foreground hover:text-foreground"
+              className="shrink-0 cursor-pointer text-muted-foreground hover:text-foreground"
               onClick={onNew}
             >
               <PlusIcon aria-hidden="true" />
@@ -98,6 +115,56 @@ export function TerminalTabStrip({
           </TooltipTrigger>
           <TooltipContent side="bottom" sideOffset={8}>
             <Trans>New terminal</Trans>
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={
+                rightDocked ? t`Dock terminal to the bottom` : t`Dock terminal to the right`
+              }
+              className="shrink-0 cursor-pointer text-muted-foreground hover:text-foreground"
+              onClick={onToggleDock}
+            >
+              {rightDocked ? (
+                <PanelBottomIcon aria-hidden="true" />
+              ) : (
+                <PanelRightIcon aria-hidden="true" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={8}>
+            {rightDocked ? (
+              <Trans>Dock terminal to the bottom</Trans>
+            ) : (
+              <Trans>Dock terminal to the right</Trans>
+            )}
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={t`Collapse terminal`}
+              className="shrink-0 cursor-pointer text-muted-foreground hover:text-foreground"
+              onClick={onCollapse}
+            >
+              {/* Chevron points the way the panel slides shut: down for the bottom
+                  dock, right for the right column. */}
+              {rightDocked ? (
+                <ChevronRightIcon aria-hidden="true" />
+              ) : (
+                <ChevronDownIcon aria-hidden="true" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={8}>
+            <Trans>Collapse terminal</Trans>
           </TooltipContent>
         </Tooltip>
       </div>

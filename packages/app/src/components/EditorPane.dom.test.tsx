@@ -51,24 +51,21 @@ mock.module('./EditorHeader', () => ({
 }));
 
 mock.module('./EditorArea', () => ({
-  EditorArea: ({
-    terminalBridge,
-    terminalVisible,
-    terminalLaunch,
+  EditorArea: () => <div data-testid="editor-area" />,
+}));
+mock.module('./TerminalSessionsHost', () => ({
+  TerminalSessionsHost: ({
+    visible,
+    launch,
   }: {
-    terminalBridge?: unknown;
-    terminalVisible?: boolean;
-    terminalLaunch?: { nonce: number } | null;
+    visible?: boolean;
+    launch?: { nonce: number } | null;
   }) => (
-    <div data-testid="editor-area">
-      {terminalBridge != null ? (
-        <div
-          data-testid="terminal-dock"
-          data-visible={String(terminalVisible)}
-          data-launch-nonce={terminalLaunch ? String(terminalLaunch.nonce) : 'none'}
-        />
-      ) : null}
-    </div>
+    <div
+      data-testid="terminal-dock"
+      data-visible={String(visible)}
+      data-launch-nonce={launch ? String(launch.nonce) : 'none'}
+    />
   ),
 }));
 
@@ -277,8 +274,8 @@ describe('EditorPane terminal dock wiring', () => {
     await renderEditorPane();
 
     expect(screen.getByTestId('editor-header')).toBeTruthy();
-    const area = screen.getByTestId('editor-area');
-    expect(area.querySelector('[data-testid="terminal-dock"]')).not.toBeNull();
+    expect(screen.getByTestId('editor-area')).toBeTruthy();
+    expect(screen.queryByTestId('terminal-dock')).not.toBeNull();
   });
 
   test('desktop: toggle-terminal menu action flips dock visibility and pushes the view-menu state', async () => {

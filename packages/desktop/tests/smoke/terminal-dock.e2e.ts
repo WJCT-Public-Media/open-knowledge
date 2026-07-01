@@ -170,6 +170,16 @@ async function waitForStatus(page: Page, status: string, timeoutMs = 20_000): Pr
   });
 }
 
+/** Ensure the terminal is bottom-docked. The default dock is the right column, so
+ *  the bottom-panel assertions (`#terminal-dock-panel`) first flip it down via the
+ *  tab strip's dock-toggle button (which reads "Dock terminal to the bottom" while
+ *  right-docked). A no-op if it is already bottom-docked. */
+async function ensureBottomDock(page: Page): Promise<void> {
+  const toBottom = page.getByRole('button', { name: 'Dock terminal to the bottom' });
+  if (await toBottom.count()) await toBottom.click();
+  await expect(page.locator('#terminal-dock-panel')).toBeVisible({ timeout: 10_000 });
+}
+
 async function typeInTerminal(page: Page, text: string): Promise<void> {
   await page.locator('section[aria-label="Terminal"] .xterm').click();
   await page.keyboard.type(text);
@@ -311,6 +321,79 @@ test.describe('Docked terminal — live Electron', () => {
       .toContain('OK_E2E_MARKER_123');
   });
 
+  test('terminal tab strip exposes dock-toggle + collapse buttons and no drag grip', async ({
+    captureStderrFor,
+  }) => {
+    const s = seed('dock-controls', { consent: true });
+    track(s.tmpHome, s.projectDir);
+    const app = await launchApp(s, { restrictPath: true });
+    captureStderrFor(app, { cleanupDirs: [s.tmpHome, s.projectDir] });
+    const page = await findEditorWindow(app);
+    await openTerminal(app, page);
+    await waitForStatus(page, 'running', 25_000);
+    await expect(page.getByRole('button', { name: /Dock terminal to the/ })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByRole('button', { name: 'Collapse terminal' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Drag to dock the terminal' })).toHaveCount(0);
+  });
+
+  test('movable dock — the dock-toggle button moves the terminal between bottom and right', async ({
+    captureStderrFor,
+  }) => {
+    const s = seed('dock-move', { consent: true });
+    track(s.tmpHome, s.projectDir);
+    const app = await launchApp(s, { restrictPath: true });
+    captureStderrFor(app, { cleanupDirs: [s.tmpHome, s.projectDir] });
+    const page = await findEditorWindow(app);
+    await openTerminal(app, page);
+    await waitForStatus(page, 'running', 25_000);
+
+    await expect(page.locator('#terminal-column section[aria-label="Terminal"]')).toBeVisible({
+      timeout: 10_000,
+    });
+
+    await page.getByRole('button', { name: 'Dock terminal to the bottom' }).click();
+    await expect(page.locator('#terminal-dock-panel section[aria-label="Terminal"]')).toBeVisible({
+      timeout: 10_000,
+    });
+
+    await page.getByRole('button', { name: 'Dock terminal to the right' }).click();
+    await expect(page.locator('#terminal-column section[aria-label="Terminal"]')).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+
+  test('movable dock — preserves the same live terminal session across moves', async ({
+    captureStderrFor,
+  }) => {
+    const s = seed('dock-parity', { consent: true });
+    track(s.tmpHome, s.projectDir);
+    const app = await launchApp(s, { restrictPath: true });
+    captureStderrFor(app, { cleanupDirs: [s.tmpHome, s.projectDir] });
+    const page = await findEditorWindow(app);
+    await openTerminal(app, page);
+    await waitForStatus(page, 'running', 25_000);
+
+    const xterm = page.locator('section[aria-label="Terminal"] .xterm');
+    await xterm.evaluate((el) => {
+      (el as HTMLElement).dataset.parityTag = 'OK_PARITY_TAG';
+    });
+    await page.getByRole('button', { name: 'Dock terminal to the bottom' }).click();
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () =>
+              document
+                .querySelector<HTMLElement>('.xterm[data-parity-tag="OK_PARITY_TAG"]')
+                ?.closest('#terminal-dock-panel') != null,
+          ),
+        { timeout: 10_000 },
+      )
+      .toBe(true);
+  });
+
   test('QA-020 panel exposes region + screen-reader mode + AA contrast', async ({
     captureStderrFor,
   }) => {
@@ -365,6 +448,7 @@ test.describe('Docked terminal — live Electron', () => {
     const page = await findEditorWindow(app);
     await openTerminal(app, page);
     await waitForStatus(page, 'running', 25_000);
+    await ensureBottomDock(page);
     await page.locator('section[aria-label="Terminal"] .xterm').click();
 
     await clickViewTerminalItem(app);
@@ -389,6 +473,7 @@ test.describe('Docked terminal — live Electron', () => {
     const page = await findEditorWindow(app);
     await openTerminal(app, page);
     await waitForStatus(page, 'running', 25_000);
+    await ensureBottomDock(page);
 
     const heightBefore = await page
       .locator('#terminal-dock-panel')

@@ -1,5 +1,6 @@
 import { detectEmbeddedHostFromBrowser } from '@inkeep/open-knowledge-core';
 import { Trans, useLingui } from '@lingui/react/macro';
+import { useTheme } from 'next-themes';
 import {
   lazy,
   type ReactNode,
@@ -40,6 +41,13 @@ import { matchesKeyboardShortcut } from '@/lib/keyboard-shortcuts';
 import { ProfilerBoundary } from '@/lib/perf';
 import { RIGHT_COLLAPSE_THRESHOLD, resolvePartition } from '@/lib/sidebar-partition';
 import { applyToggle, readPins, resolveEffectiveState } from '@/lib/sidebar-pin-store';
+import type { TerminalDockPosition } from '@/lib/terminal-dock-store';
+import {
+  getInitialTerminalWidth,
+  MAX_TERMINAL_WIDTH,
+  MIN_TERMINAL_WIDTH,
+  writeTerminalWidth,
+} from '@/lib/terminal-width-store';
 import { useSettingsRoute } from '@/lib/use-settings-route';
 import { cn } from '@/lib/utils';
 import { useSyncStatus } from '@/presence/use-sync-status';
@@ -47,10 +55,11 @@ import { BottomComposer } from './BottomComposer';
 import { shouldShowBottomComposer, shouldShowFolderComposer } from './bottom-composer-gate';
 import { EditorActivityPool } from './EditorActivityPool';
 import { EditorFooter } from './EditorFooter';
-import type { EditorMode, TerminalLaunchIntent } from './EditorPane';
+import type { EditorMode } from './EditorPane';
 import { EditorToolbar } from './EditorToolbar';
 import { shouldPaintOverlay } from './editor-area-overlay';
 import { TerminalDock } from './TerminalDock';
+import { xtermThemeForMode } from './terminal-theme';
 
 const LazyActivityModeContent = lazy(async () => {
   const mod = await import('@/components/ActivityModeContent');
@@ -60,6 +69,13 @@ const LazyActivityModeContent = lazy(async () => {
 const DOC_PANEL_MIN_SIZE = '300px';
 const DOC_PANEL_MAX_SIZE = '600px';
 
+export interface TerminalPlacement {
+  readonly container: HTMLElement | null;
+  readonly isShowing: boolean;
+  readonly dockPosition: TerminalDockPosition;
+  readonly editorRegion: HTMLElement | null;
+}
+
 interface EditorAreaProps {
   editorMode: EditorMode;
   onModeChange: (mode: EditorMode) => void;
@@ -68,9 +84,13 @@ interface EditorAreaProps {
   terminalBridge?: OkDesktopBridge | null;
   terminalVisible?: boolean;
   onTerminalVisibleChange?: (visible: boolean) => void;
-  /** "Open in terminal" launch intent — carried to the terminal session, which
-   *  writes the `claude` launch once per nonce. Null until a UI click. */
-  terminalLaunch?: TerminalLaunchIntent | null;
+  /** Terminal dock position (right default | bottom). When `'right'` the terminal
+   *  is its own column to the right of the doc/agent panel (MD | PANE | TERMINAL)
+   *  instead of docking under the editor. */
+  terminalDock?: TerminalDockPosition;
+  /** Report the terminal's attach point up to EditorPane (which owns the session
+   *  host). See {@link TerminalPlacement}. */
+  onTerminalPlacement?: (placement: TerminalPlacement) => void;
 }
 
 export function EditorArea(props: EditorAreaProps) {
@@ -110,9 +130,12 @@ function EditorAreaInner({
   terminalBridge,
   terminalVisible = false,
   onTerminalVisibleChange,
-  terminalLaunch = null,
+  terminalDock = 'right',
+  onTerminalPlacement,
 }: EditorAreaProps) {
   const { t } = useLingui();
+  const { resolvedTheme } = useTheme();
+  const xtermBackground = xtermThemeForMode(resolvedTheme).background;
   const {
     activeDocName,
     activeProvider,
@@ -153,12 +176,43 @@ function EditorAreaInner({
     rightPartitionRef.current = rightPartition;
   }, [rightPartition]);
   const panelRef = usePanelRef();
+  const terminalColumnPanelRef = usePanelRef();
   const [initialRightCollapsed] = useState(() => {
     const pins = readPins();
     return resolveEffectiveState('right', rightPartition, pins) === 'collapsed';
   });
   const [isCollapsed, setIsCollapsed] = useState(initialRightCollapsed);
   const isCollapsedRef = useRef(isCollapsed);
+
+  const [rightTerminalContainer, setRightTerminalContainer] = useState<HTMLDivElement | null>(null);
+  const [bottomTerminalContainer, setBottomTerminalContainer] = useState<HTMLDivElement | null>(
+    null,
+  );
+  const [terminalEditorRegion, setTerminalEditorRegion] = useState<HTMLDivElement | null>(null);
+
+  const rightDocked = terminalDock === 'right';
+  const terminalDockPosition: TerminalDockPosition = rightDocked ? 'right' : 'bottom';
+  const rightTerminalShowing = rightDocked && terminalVisible && rightTerminalContainer != null;
+  const activeTerminalContainer = rightTerminalShowing
+    ? rightTerminalContainer
+    : bottomTerminalContainer;
+  const terminalShowing =
+    (rightDocked ? rightTerminalShowing : terminalVisible) && activeTerminalContainer != null;
+  useEffect(() => {
+    onTerminalPlacement?.({
+      container: activeTerminalContainer,
+      isShowing: terminalShowing,
+      dockPosition: terminalDockPosition,
+      editorRegion: terminalEditorRegion,
+    });
+  }, [
+    onTerminalPlacement,
+    activeTerminalContainer,
+    terminalShowing,
+    terminalDockPosition,
+    terminalEditorRegion,
+  ]);
+
   useEffect(() => {
     isCollapsedRef.current = isCollapsed;
   }, [isCollapsed]);
@@ -175,9 +229,24 @@ function EditorAreaInner({
       writeTimerRef.current = null;
     }, 100);
   }
+
+  const [initialTerminalWidthPx] = useState(() => getInitialTerminalWidth());
+  const terminalWidthPxRef = useRef(initialTerminalWidthPx);
+  const [isDraggingTerminalHandle, setIsDraggingTerminalHandle] = useState(false);
+  const isDraggingTerminalHandleRef = useRef(false);
+  const terminalWriteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function debouncedWriteTerminalWidth(px: number) {
+    if (terminalWriteTimerRef.current != null) clearTimeout(terminalWriteTimerRef.current);
+    terminalWriteTimerRef.current = setTimeout(() => {
+      writeTerminalWidth(px);
+      terminalWriteTimerRef.current = null;
+    }, 100);
+  }
+
   useEffect(
     () => () => {
       if (writeTimerRef.current != null) clearTimeout(writeTimerRef.current);
+      if (terminalWriteTimerRef.current != null) clearTimeout(terminalWriteTimerRef.current);
     },
     [],
   );
@@ -219,13 +288,16 @@ function EditorAreaInner({
     if (groupContainerEl == null) return;
     if (isEmbedded) return;
     const ro = new ResizeObserver(() => {
-      if (isCollapsedRef.current) return;
-      if (isDraggingDocHandleRef.current) return;
-      panelRef.current?.resize(`${docPanelWidthPxRef.current}px`);
+      if (!isDraggingDocHandleRef.current && !isCollapsedRef.current) {
+        panelRef.current?.resize(`${docPanelWidthPxRef.current}px`);
+      }
+      if (!isDraggingTerminalHandleRef.current) {
+        terminalColumnPanelRef.current?.resize(`${terminalWidthPxRef.current}px`);
+      }
     });
     ro.observe(groupContainerEl);
     return () => ro.disconnect();
-  }, [groupContainerEl, isEmbedded, panelRef]);
+  }, [groupContainerEl, isEmbedded, panelRef, terminalColumnPanelRef]);
 
   useEffect(() => {
     const openRequestedTab = (tab: PanelTab) => {
@@ -419,7 +491,9 @@ function EditorAreaInner({
         return <EditorSkeleton />;
       }
     } else {
-      viewContent = <EmptyEditorState terminalVisible={terminalVisible} />;
+      viewContent = (
+        <EmptyEditorState terminalVisible={terminalVisible && terminalDockPosition === 'bottom'} />
+      );
     }
   } else {
     const isSourceMode = editorMode === 'source';
@@ -606,10 +680,11 @@ function EditorAreaInner({
   const leftColumn =
     terminalBridge != null ? (
       <TerminalDock
-        bridge={terminalBridge}
         visible={terminalVisible}
         onVisibleChange={onTerminalVisibleChange ?? (() => {})}
-        launch={terminalLaunch}
+        dockPosition={terminalDockPosition}
+        onBottomContainer={setBottomTerminalContainer}
+        onEditorRegion={setTerminalEditorRegion}
       >
         {viewContent}
       </TerminalDock>
@@ -617,24 +692,71 @@ function EditorAreaInner({
       viewContent
     );
 
+  const terminalColumnPresent = terminalBridge != null && rightDocked && terminalVisible;
+  const terminalColumn = terminalColumnPresent ? (
+    <>
+      <ResizableHandle
+        withHandle
+        onPointerDown={() => {
+          setIsDraggingTerminalHandle(true);
+          isDraggingTerminalHandleRef.current = true;
+          const handleUp = () => {
+            setIsDraggingTerminalHandle(false);
+            isDraggingTerminalHandleRef.current = false;
+            window.removeEventListener('pointerup', handleUp);
+          };
+          window.addEventListener('pointerup', handleUp);
+        }}
+      />
+      <ResizablePanel
+        id="terminal-column"
+        panelRef={terminalColumnPanelRef}
+        style={{ backgroundColor: xtermBackground }}
+        defaultSize={`${initialTerminalWidthPx}px`}
+        minSize={`${MIN_TERMINAL_WIDTH}px`}
+        maxSize={`${MAX_TERMINAL_WIDTH}px`}
+        onResize={(size) => {
+          if (size.inPixels > 0 && isDraggingTerminalHandleRef.current) {
+            terminalWidthPxRef.current = size.inPixels;
+            debouncedWriteTerminalWidth(size.inPixels);
+          }
+        }}
+        className={cn(
+          'flex flex-col',
+          !isDraggingTerminalHandle &&
+            'transition-[flex-grow] duration-200 ease-out motion-reduce:transition-none motion-reduce:duration-0',
+        )}
+      >
+        {/* Mount point for the session host's stable host div when right-docked. */}
+        <div
+          ref={setRightTerminalContainer}
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        />
+      </ResizablePanel>
+    </>
+  ) : null;
+
+  const editorAbsorbsResidual =
+    (rightPanel != null && !initialRightCollapsed) || terminalColumnPresent;
+
   return (
     <div className="flex min-h-0 flex-1" ref={setGroupContainerEl}>
       <ResizablePanelGroup
         orientation="horizontal"
-        data-dragging={isDraggingDocHandle || undefined}
+        data-dragging={isDraggingDocHandle || isDraggingTerminalHandle || undefined}
       >
         <ResizablePanel
           minSize="30%"
-          {...(rightPanel != null && !initialRightCollapsed ? {} : { defaultSize: '100%' })}
-          className={
-            isDraggingDocHandle
-              ? undefined
-              : 'transition-[flex-grow] duration-200 ease-out motion-reduce:transition-none motion-reduce:duration-0'
-          }
+          {...(editorAbsorbsResidual ? {} : { defaultSize: '100%' })}
+          className={cn(
+            !(isDraggingDocHandle || isDraggingTerminalHandle) &&
+              'transition-[flex-grow] duration-200 ease-out motion-reduce:transition-none motion-reduce:duration-0',
+          )}
         >
           {leftColumn}
         </ResizablePanel>
         {rightPanel}
+        {terminalColumn}
       </ResizablePanelGroup>
     </div>
   );

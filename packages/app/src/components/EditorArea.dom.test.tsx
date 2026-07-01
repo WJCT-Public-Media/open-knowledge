@@ -225,7 +225,7 @@ describe('EditorArea empty-state terminal host', () => {
         terminalBridge={{} as never}
         terminalVisible
         onTerminalVisibleChange={() => {}}
-        terminalLaunch={null}
+        terminalDock="bottom"
       />,
     );
 
@@ -234,6 +234,27 @@ describe('EditorArea empty-state terminal host', () => {
     const emptyState = dock.querySelector('[data-testid="empty-editor-state"]');
     expect(emptyState).not.toBeNull();
     expect(emptyState?.getAttribute('data-terminal-visible')).toBe('true');
+  });
+
+  test('keeps the empty-state mascot full-size when the terminal is right-docked', () => {
+    render(
+      <EditorArea
+        editorMode="wysiwyg"
+        onModeChange={() => {}}
+        activeTab="timeline"
+        onActiveTabChange={() => {}}
+        terminalBridge={{} as never}
+        terminalVisible
+        onTerminalVisibleChange={() => {}}
+        terminalDock="right"
+      />,
+    );
+
+    const dock = screen.getByTestId('terminal-dock');
+    expect(dock.getAttribute('data-visible')).toBe('true');
+    const emptyState = dock.querySelector('[data-testid="empty-editor-state"]');
+    expect(emptyState).not.toBeNull();
+    expect(emptyState?.getAttribute('data-terminal-visible')).toBe('false');
   });
 
   test('renders the empty state with no terminal dock on the web host (no bridge)', () => {
@@ -267,7 +288,6 @@ describe('EditorArea folder-view terminal host', () => {
         terminalBridge={{} as never}
         terminalVisible
         onTerminalVisibleChange={() => {}}
-        terminalLaunch={null}
       />,
     );
 
@@ -300,7 +320,6 @@ describe('EditorArea large-file-view terminal host', () => {
         terminalBridge={{} as never}
         terminalVisible
         onTerminalVisibleChange={() => {}}
-        terminalLaunch={null}
       />,
     );
 
@@ -333,7 +352,6 @@ describe('EditorArea asset-view terminal host', () => {
         terminalBridge={{} as never}
         terminalVisible
         onTerminalVisibleChange={() => {}}
-        terminalLaunch={null}
       />,
     );
 
@@ -366,7 +384,6 @@ describe('EditorArea terminal persists across view-kind switches', () => {
       terminalBridge: {} as never,
       terminalVisible: true,
       onTerminalVisibleChange: () => {},
-      terminalLaunch: null,
     };
     const { rerender } = render(<EditorArea {...props} />);
     const mountsAfterInitial = terminalDockMounts;
@@ -411,7 +428,6 @@ describe('EditorArea hash-load skeleton renders outside the panel group (cold st
         terminalBridge={{} as never}
         terminalVisible
         onTerminalVisibleChange={() => {}}
-        terminalLaunch={null}
       />,
     );
 
@@ -441,7 +457,6 @@ describe('EditorArea terminal persists across a mid-session cold navigation', ()
       terminalBridge: {} as never,
       terminalVisible: true,
       onTerminalVisibleChange: () => {},
-      terminalLaunch: null,
     };
     const { rerender } = render(<EditorArea {...props} />);
     const mountsAfterInitial = terminalDockMounts;

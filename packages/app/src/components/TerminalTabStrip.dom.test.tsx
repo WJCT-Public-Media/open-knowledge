@@ -13,11 +13,14 @@ const SESSIONS: readonly TerminalTabDescriptor[] = [
 function renderStrip(props?: {
   sessions?: readonly TerminalTabDescriptor[];
   activeSessionId?: string;
+  dockPosition?: 'bottom' | 'right';
 }) {
   const onSelect = mock((_id: string) => {});
   const onTabActivate = mock((_id: string) => {});
   const onNew = mock(() => {});
   const onClose = mock((_id: string) => {});
+  const onToggleDock = mock(() => {});
+  const onCollapse = mock(() => {});
   render(
     <TooltipProvider>
       <TerminalTabStrip
@@ -27,10 +30,13 @@ function renderStrip(props?: {
         onTabActivate={onTabActivate}
         onNew={onNew}
         onClose={onClose}
+        dockPosition={props?.dockPosition ?? 'bottom'}
+        onToggleDock={onToggleDock}
+        onCollapse={onCollapse}
       />
     </TooltipProvider>,
   );
-  return { onSelect, onTabActivate, onNew, onClose };
+  return { onSelect, onTabActivate, onNew, onClose, onToggleDock, onCollapse };
 }
 
 describe('TerminalTabStrip', () => {
@@ -120,9 +126,43 @@ describe('TerminalTabStrip', () => {
     expect(onNew).not.toHaveBeenCalled();
   });
 
+  test('the dock-toggle reports onToggleDock and labels the resulting position', async () => {
+    const user = userEvent.setup();
+    const bottom = renderStrip({ dockPosition: 'bottom' });
+    const toRight = screen.getByRole('button', { name: 'Dock terminal to the right' });
+    await user.click(toRight);
+    expect(bottom.onToggleDock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Dock terminal to the bottom' })).toBeNull();
+    cleanup();
+
+    const right = renderStrip({ dockPosition: 'right' });
+    const toBottom = screen.getByRole('button', { name: 'Dock terminal to the bottom' });
+    await user.click(toBottom);
+    expect(right.onToggleDock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Dock terminal to the right' })).toBeNull();
+  });
+
+  test('the collapse control reports onCollapse and never onClose/onNew', async () => {
+    const user = userEvent.setup();
+    const { onCollapse, onClose, onNew } = renderStrip();
+
+    await user.click(screen.getByRole('button', { name: 'Collapse terminal' }));
+
+    expect(onCollapse).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onNew).not.toHaveBeenCalled();
+  });
+
+  test('no drag-to-dock grip is rendered (dragging was removed)', () => {
+    renderStrip();
+    expect(screen.queryByRole('button', { name: 'Drag to dock the terminal' })).toBeNull();
+  });
+
   test('every icon-only control exposes an accessible name', () => {
     renderStrip();
     expect(screen.getByRole('button', { name: 'New terminal' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Dock terminal to the right' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Collapse terminal' })).toBeDefined();
     for (const label of ['Terminal 1', 'Terminal 2', 'Terminal 3']) {
       expect(screen.getByRole('button', { name: `Close ${label}` })).toBeDefined();
     }
