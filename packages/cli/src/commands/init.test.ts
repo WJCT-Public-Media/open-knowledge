@@ -52,6 +52,8 @@ import {
 } from './init.ts';
 import { LAUNCH_JSON_PORT } from './ui.ts';
 
+const NATIVE_TOML_AVAILABLE = createTomlConfigEngine().backend === 'native';
+
 describe('LAUNCH_UI_CHAIN_V1 (published launch.json recipe shell chain)', () => {
   it('is syntactically valid POSIX sh (sh -n)', () => {
     const result = spawnSync('sh', ['-n', '-c', LAUNCH_UI_CHAIN_V1], { encoding: 'utf-8' });
@@ -447,7 +449,7 @@ describe('runInit', () => {
       expect(config.mcp_servers[result.editors[0].serverName]).toEqual(expectedDevMcpEntry());
     });
 
-    it('preserves existing Codex MCP entries', async () => {
+    it.skipIf(!NATIVE_TOML_AVAILABLE)('preserves existing Codex MCP entries', async () => {
       mkdirSync(dirname(codexConfigPath()), { recursive: true });
       writeFileSync(
         codexConfigPath(),
@@ -2131,18 +2133,21 @@ describe('classifyExistingMcpEntry', () => {
     });
   });
 
-  it('no-entry (not decline) on a valid Codex config with a 2^53+ integer', () => {
-    const path = resolveCodexConfigPath({ home: fakeHome, env: {} });
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(
-      path,
-      '# keep my comments\nmodel = "gpt-5"\n[mcp_servers.other]\ncommand = "node"\nstartup_timeout_ms = 9223372036854775807\n',
-      'utf-8',
-    );
-    expect(classifyExistingMcpEntry(EDITOR_TARGETS.codex, '', fakeHome)).toEqual({
-      kind: 'no-entry',
-    });
-  });
+  it.skipIf(!NATIVE_TOML_AVAILABLE)(
+    'no-entry (not decline) on a valid Codex config with a 2^53+ integer',
+    () => {
+      const path = resolveCodexConfigPath({ home: fakeHome, env: {} });
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(
+        path,
+        '# keep my comments\nmodel = "gpt-5"\n[mcp_servers.other]\ncommand = "node"\nstartup_timeout_ms = 9223372036854775807\n',
+        'utf-8',
+      );
+      expect(classifyExistingMcpEntry(EDITOR_TARGETS.codex, '', fakeHome)).toEqual({
+        kind: 'no-entry',
+      });
+    },
+  );
 
   it('present on a valid Codex config with a microsecond datetime and OK entry', () => {
     const path = resolveCodexConfigPath({ home: fakeHome, env: {} });

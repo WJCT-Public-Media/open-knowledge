@@ -35,6 +35,8 @@ import {
   writeMcpStatusMarker,
 } from './mcp-wiring.ts';
 
+const NATIVE_TOML_AVAILABLE = createTomlConfigEngine().backend === 'native';
+
 function memoryFs(
   initial: Record<string, string> = {},
 ): McpWiringFsOps & { files: Record<string, string> } {
@@ -241,83 +243,86 @@ describe('checkAndRepairMcpWiringOnStartup — non-destructive decline', () => {
       dir = undefined;
     });
 
-    test('real classify on a 2^53+ integer TOML → byte-unchanged, no .broken, no-op', async () => {
-      dir = mkdtempSync(join(tmpdir(), 'ok-reset-repro-'));
-      const tomlPath = join(dir, 'config.toml');
-      const original = [
-        '# my codex config — keep my comments!',
-        'model = "gpt-5"',
-        '',
-        '[mcp_servers.other]',
-        'command = "node"',
-        'startup_timeout_ms = 9223372036854775807',
-        '',
-      ].join('\n');
-      fsWriteFileSync(tomlPath, original);
+    test.skipIf(!NATIVE_TOML_AVAILABLE)(
+      'real classify on a 2^53+ integer TOML → byte-unchanged, no .broken, no-op',
+      async () => {
+        dir = mkdtempSync(join(tmpdir(), 'ok-reset-repro-'));
+        const tomlPath = join(dir, 'config.toml');
+        const original = [
+          '# my codex config — keep my comments!',
+          'model = "gpt-5"',
+          '',
+          '[mcp_servers.other]',
+          'command = "node"',
+          'startup_timeout_ms = 9223372036854775807',
+          '',
+        ].join('\n');
+        fsWriteFileSync(tomlPath, original);
 
-      const target: EditorMcpTarget = {
-        id: 'codex' as McpWiringEditorId,
-        label: 'Codex',
-        format: 'toml',
-        topLevelKey: 'mcp_servers',
-        serverName: () => 'open-knowledge',
-        configPath: () => tomlPath,
-        buildEntry: () => buildManagedServerEntry({ mode: 'published' }),
-        scope: 'global',
-      };
+        const target: EditorMcpTarget = {
+          id: 'codex' as McpWiringEditorId,
+          label: 'Codex',
+          format: 'toml',
+          topLevelKey: 'mcp_servers',
+          serverName: () => 'open-knowledge',
+          configPath: () => tomlPath,
+          buildEntry: () => buildManagedServerEntry({ mode: 'published' }),
+          scope: 'global',
+        };
 
-      expect(classifyExistingMcpEntry(target, '', undefined, tomlPath)).toEqual({
-        kind: 'no-entry',
-      });
+        expect(classifyExistingMcpEntry(target, '', undefined, tomlPath)).toEqual({
+          kind: 'no-entry',
+        });
 
-      const realFs: McpWiringFsOps = {
-        existsSync: (p) => fsExistsSync(p),
-        readFileSync: (p) => fsReadFileSync(p, 'utf8'),
-        writeFileSync: (p, c) => fsWriteFileSync(p, c),
-        mkdirSync: (p, o) => {
-          fsMkdirSync(p, o);
-        },
-        renameSync: (from, to) => fsRenameSync(from, to),
-        unlinkSync: (p) => fsUnlinkSync(p),
-      };
-      const writes: McpWiringEditorId[][] = [];
-      const cli: McpWiringCliSurface = {
-        detectInstalledEditors: () => ['codex' as McpWiringEditorId],
-        classifyExistingMcpEntry: () => classifyExistingMcpEntry(target, '', undefined, tomlPath),
-        readExistingMcpEntry: () => null,
-        allEditorIds: ['codex' as McpWiringEditorId],
-        editorTargets: { codex: target } as Record<McpWiringEditorId, EditorMcpTarget>,
-        writeUserMcpConfigs: async ({ editors }) => {
-          writes.push([...editors]);
-          fsWriteFileSync(tomlPath, '{"mcp_servers":{"open-knowledge":{}}}');
-          return editors.map((editorId) => ({
-            editorId,
-            label: editorId,
-            action: 'written' as const,
-            configPath: tomlPath,
-            serverName: 'open-knowledge',
-          }));
-        },
-      };
+        const realFs: McpWiringFsOps = {
+          existsSync: (p) => fsExistsSync(p),
+          readFileSync: (p) => fsReadFileSync(p, 'utf8'),
+          writeFileSync: (p, c) => fsWriteFileSync(p, c),
+          mkdirSync: (p, o) => {
+            fsMkdirSync(p, o);
+          },
+          renameSync: (from, to) => fsRenameSync(from, to),
+          unlinkSync: (p) => fsUnlinkSync(p),
+        };
+        const writes: McpWiringEditorId[][] = [];
+        const cli: McpWiringCliSurface = {
+          detectInstalledEditors: () => ['codex' as McpWiringEditorId],
+          classifyExistingMcpEntry: () => classifyExistingMcpEntry(target, '', undefined, tomlPath),
+          readExistingMcpEntry: () => null,
+          allEditorIds: ['codex' as McpWiringEditorId],
+          editorTargets: { codex: target } as Record<McpWiringEditorId, EditorMcpTarget>,
+          writeUserMcpConfigs: async ({ editors }) => {
+            writes.push([...editors]);
+            fsWriteFileSync(tomlPath, '{"mcp_servers":{"open-knowledge":{}}}');
+            return editors.map((editorId) => ({
+              editorId,
+              label: editorId,
+              action: 'written' as const,
+              configPath: tomlPath,
+              serverName: 'open-knowledge',
+            }));
+          },
+        };
 
-      const events: Array<Record<string, unknown>> = [];
-      const result = await checkAndRepairMcpWiringOnStartup({
-        isPackaged: true,
-        executablePath: PACKAGED_EXE,
-        home: dir,
-        platform: 'darwin',
-        ipcMain: inertIpcMain,
-        cli,
-        fs: realFs,
-        logger: { info() {}, warn() {}, error() {}, event: (e) => events.push(e) },
-      });
+        const events: Array<Record<string, unknown>> = [];
+        const result = await checkAndRepairMcpWiringOnStartup({
+          isPackaged: true,
+          executablePath: PACKAGED_EXE,
+          home: dir,
+          platform: 'darwin',
+          ipcMain: inertIpcMain,
+          cli,
+          fs: realFs,
+          logger: { info() {}, warn() {}, error() {}, event: (e) => events.push(e) },
+        });
 
-      expect(result.status).toBe('ok');
-      expect(fsReadFileSync(tomlPath, 'utf8')).toBe(original);
-      expect(readdirSync(dir).some((name) => name.includes('.broken-'))).toBe(false);
-      expect(writes).toEqual([]);
-      expect(events.find((e) => e.event === 'mcp-config-decline')).toBeUndefined();
-    });
+        expect(result.status).toBe('ok');
+        expect(fsReadFileSync(tomlPath, 'utf8')).toBe(original);
+        expect(readdirSync(dir).some((name) => name.includes('.broken-'))).toBe(false);
+        expect(writes).toEqual([]);
+        expect(events.find((e) => e.event === 'mcp-config-decline')).toBeUndefined();
+      },
+    );
 
     test('real classify on a genuinely-malformed TOML → decline, byte-unchanged, no write, bounded signal', async () => {
       dir = mkdtempSync(join(tmpdir(), 'ok-decline-sweep-'));

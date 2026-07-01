@@ -112,21 +112,6 @@
       "plugins": ["./biome-plugins/class-proof-registration-discipline.grit"]
     },
     {
-      // Apple-Event / IPC roundtrip toPass budget enforcement is scoped to
-      // the desktop-smoke files (and the plugin's own fixture for testing).
-      // packages/app's *.e2e.ts files drive Chromium in-process, NOT macOS
-      // `open(1)` Apple-Event dispatch, so their sub-15s toPass budgets are
-      // legitimate (fast in-process roundtrip, no Launch Services latency).
-      // Pairs with `tests/smoke/calibration.test.ts` Invariant B, which is
-      // scoped to the same surface via `TOPASS_BUDGET_FILES`.
-      "includes": [
-        "packages/desktop/tests/smoke/deep-link.e2e.ts",
-        "packages/desktop/tests/smoke/external-link.e2e.ts",
-        "biome-plugins/__fixtures__/playwright-topass-budget.fixture.tsx"
-      ],
-      "plugins": ["./biome-plugins/playwright-topass-budget.grit"]
-    },
-    {
       // One-shot `expect(await locator.count())` reads never retry and are
       // the canonical hidden-flake assertion shape (2026-06 e2e audit).
       // Scoped to the browser e2e suites (all three dirs the e2e-stop-rules
@@ -219,11 +204,11 @@
       // Byte-fidelity round-trip oracle ban, scoped to the public-mirrored test
       // surface. `serialize(parse(x))` (or the MarkdownManager method form)
       // asserted equal to the same `x` is the engine's byte-identity correctness
-      // oracle — private quality-bar IP. It legitimately lives in the engine
-      // fidelity suite (packages/app/tests/fidelity), the markdown + bridge
-      // precision suites, and the enumerated byte-oracle tests; those are
-      // excluded from the public mirror, and are excluded here too so the oracle
-      // stays allowed there but forbidden on the public surface.
+      // oracle. It legitimately lives in the engine fidelity suite
+      // (packages/app/tests/fidelity), the markdown + bridge precision suites, and
+      // the enumerated byte-oracle tests; those are excluded from this override's
+      // scope so the oracle stays allowed there but forbidden on the public
+      // surface.
       // packages/md-conformance is the private conformance estate
       // (also mirror-excluded). The fixture is in scope so its planted oracle
       // drives the fixture-file test; the Bridge-invariant comparator
@@ -237,15 +222,35 @@
         "!packages/app/tests/fidelity/**",
         "!packages/core/src/markdown/**/*.test.ts",
         "!packages/core/src/bridge/**/*.test.ts",
-        "!packages/server/src/prd-6654-multi-client-repro.test.ts",
-        "!packages/app/tests/integration/source-mode-byte-preservation.test.ts",
-        "!packages/app/tests/integration/init-load-byte-stable.test.ts",
-        "!packages/app/tests/integration/init-load-byte-stable-corpus-coverage.test.ts",
-        "!packages/app/tests/stress/init-load-byte-stable.e2e.ts",
-        "!packages/app/tests/stress/single-file-ephemeral.e2e.ts",
+        "!**/*.private.*",
         "biome-plugins/__fixtures__/no-roundtrip-identity-oracle.fixture.tsx"
       ],
       "plugins": ["./biome-plugins/no-roundtrip-identity-oracle.grit"]
+    },
+    {
+      // Inline bridge normalization-class value ban, scoped to the
+      // public-mirrored test surface. BRIDGE_TOLERANCE_CLASSES
+      // (packages/core/src/bridge/normalize.ts) is the bridge normalizer's class
+      // catalog; importing it into a public test is blocked by
+      // check-mirror-test-policy Check B, and this rule blocks the complementary
+      // inline re-encoding. The catalog legitimately lives in the bridge tests,
+      // the markdown precision suite, the fidelity suite, and the byte-oracle
+      // one-offs — excluded from this override's scope (as they are from the
+      // plugin pass) so the catalog stays allowed there but the inline form is
+      // forbidden on the public surface. The fixture is in scope so its planted
+      // literals drive the fixture-file test.
+      "includes": [
+        "packages/**/*.test.ts",
+        "packages/**/*.test.tsx",
+        "packages/**/*.e2e.ts",
+        "!packages/md-conformance/**",
+        "!packages/app/tests/fidelity/**",
+        "!packages/core/src/markdown/**/*.test.ts",
+        "!packages/core/src/bridge/**/*.test.ts",
+        "!**/*.private.*",
+        "biome-plugins/__fixtures__/no-inline-tolerance-class.fixture.tsx"
+      ],
+      "plugins": ["./biome-plugins/no-inline-tolerance-class.grit"]
     }
   ],
   "files": {

@@ -3,10 +3,10 @@
 // Asserting that re-serializing a freshly-parsed document yields back the
 // SAME input bytes — `serialize(parse(x))` (or the MarkdownManager method
 // equivalent `m.serialize(m.parse(x))`) compared equal to that same `x` — is
-// the engine's byte-identity correctness oracle. That oracle is the private
-// quality-bar IP and lives in the private engine fidelity suite; it must not
-// ship on the public mirror. This rule flags the inline assertion shape so a
-// new public test can't reintroduce it.
+// the engine's byte-identity correctness oracle. This general round-trip-identity
+// check is exercised by the engine's own fidelity suite; a public test should pin
+// a specific expected output instead. This rule flags the inline assertion shape
+// so a new public test can't reintroduce the general oracle.
 //
 // IDENTITY, not contract: the rule only fires when the parse input and the
 // expected value are the SAME expression (metavariable reuse `$x` ... `$x`
@@ -22,8 +22,8 @@
 //   - Round-trip identity through a helper (`mdRoundTrip(x)`, `normalize(...)`)
 //     or via an intermediate variable (`const out = serialize(parse(x)); ...`)
 //     — GritQL matches the inline call shape, not helper bodies or cross-
-//     statement data flow. Those forms live in the private fidelity suite,
-//     which is path-excluded from the mirror, so they are covered there.
+//     statement data flow. Those forms live in the engine's fidelity suite and
+//     are covered there.
 //   - Matchers other than `toBe` / `toEqual` / `toStrictEqual` and operators
 //     other than `===` (e.g. a custom `assertByteIdentical` helper).
 //
@@ -46,7 +46,7 @@ or {
         },
         register_diagnostic(
             span = $assertion,
-            message = "Byte-fidelity round-trip oracle in a public test: `serialize(parse(x))` asserted equal to the same input `x` exposes the engine's byte-identity correctness oracle on the public mirror. Keep round-trip-identity assertions in the private engine fidelity suite (packages/app/tests/fidelity or packages/core/src/markdown), or assert against a fixed expected literal for a public contract test. See https://github.com/inkeep/open-knowledge/blob/main/biome-plugins/README.md#no-roundtrip-identity-oraclegrit"
+            message = "Byte-fidelity round-trip oracle in a public test: `serialize(parse(x))` asserted equal to the same input `x`. This general round-trip-identity check belongs to the engine's fidelity suite (packages/app/tests/fidelity or packages/core/src/markdown); a public test should assert a fixed expected literal for a specific contract instead. See https://github.com/inkeep/open-knowledge/blob/main/biome-plugins/README.md#no-roundtrip-identity-oraclegrit"
         )
     },
     // serialize(parse($x)) === $x in either operand order (covers `assert(...)`,
@@ -71,7 +71,7 @@ or {
         },
         register_diagnostic(
             span = $cmp,
-            message = "Byte-fidelity round-trip oracle in a public test: `serialize(parse(x))` asserted equal to the same input `x` exposes the engine's byte-identity correctness oracle on the public mirror. Keep round-trip-identity assertions in the private engine fidelity suite (packages/app/tests/fidelity or packages/core/src/markdown), or assert against a fixed expected literal for a public contract test. See https://github.com/inkeep/open-knowledge/blob/main/biome-plugins/README.md#no-roundtrip-identity-oraclegrit"
+            message = "Byte-fidelity round-trip oracle in a public test: `serialize(parse(x))` asserted equal to the same input `x`. This general round-trip-identity check belongs to the engine's fidelity suite (packages/app/tests/fidelity or packages/core/src/markdown); a public test should assert a fixed expected literal for a specific contract instead. See https://github.com/inkeep/open-knowledge/blob/main/biome-plugins/README.md#no-roundtrip-identity-oraclegrit"
         )
     }
 }

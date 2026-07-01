@@ -17,9 +17,7 @@ describe('no-roundtrip-identity-oracle GritQL plugin', () => {
     const output = `${result.stdout}\n${result.stderr}`;
     const fires = (output.match(/Byte-fidelity round-trip oracle in a public test/g) ?? []).length;
     expect(fires).toBe(10);
-    expect(output).toContain(
-      'Keep round-trip-identity assertions in the private engine fidelity suite',
-    );
+    expect(output).toContain('assert a fixed expected literal for a specific contract');
     expect(output).toMatch(/https?:\/\/[^\s]+/);
     expect(output).toContain('biome-plugins/README.md#no-roundtrip-identity-oraclegrit');
   });
@@ -39,12 +37,7 @@ describe('no-roundtrip-identity-oracle GritQL plugin', () => {
       '!packages/app/tests/fidelity/**',
       '!packages/core/src/markdown/**/*.test.ts',
       '!packages/core/src/bridge/**/*.test.ts',
-      '!packages/server/src/prd-6654-multi-client-repro.test.ts',
-      '!packages/app/tests/integration/source-mode-byte-preservation.test.ts',
-      '!packages/app/tests/integration/init-load-byte-stable.test.ts',
-      '!packages/app/tests/integration/init-load-byte-stable-corpus-coverage.test.ts',
-      '!packages/app/tests/stress/init-load-byte-stable.e2e.ts',
-      '!packages/app/tests/stress/single-file-ephemeral.e2e.ts',
+      '!**/*.private.*',
     ]) {
       expect(includes).toContain(excluded);
     }

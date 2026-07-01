@@ -52,6 +52,8 @@ export default {
     'scripts/assert-smoke-not-vacuous.mjs': ['files'],
     'scripts/assert-smoke-not-vacuous.test.mjs': ['files'],
     'scripts/check-no-ci-skip-in-e2e.test.mjs': ['files'],
+    'scripts/assert-app-built.mjs': ['files'],
+    'scripts/assert-app-built.test.mjs': ['files'],
     '.github/scripts/cla-gate.test.mjs': ['files'],
     '.github/scripts/cla-gate.mjs': ['exports'],
     '.github/scripts/bridge-public-pr-to-monorepo.test.mjs': ['files'],
