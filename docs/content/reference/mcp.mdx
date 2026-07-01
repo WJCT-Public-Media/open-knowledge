@@ -6,7 +6,7 @@ description: Tools the OpenKnowledge MCP server exposes to AI agents.
 
 The MCP server gives AI agents structured access to your knowledge base. Two reads are server-free: `exec` (shell-style reads, fs-direct against the disk) and `preview_url` (reads `ui.lock` directly) both work even when the editor is down. Every other read tool (`search`, `links`, `history`, etc.) and all write tools route through the Hocuspocus server, which OpenKnowledge starts for you on the first write.
 
-The surface is **17 tools**. Three of the four write verbs — `write`, `edit`, `delete` — are native CRUD operations polymorphic over a target (`document`, `folder`, `template`, `asset`): per-target fields nest inside the address key (`write({ document: { path, content } })`), and you pass exactly one target per call. `move` is the fourth write verb but takes flat `from`/`to` paths and auto-detects whether the path is a document, folder, or asset (no `template` target).
+The surface is **19 tools**. Three of the four write verbs — `write`, `edit`, `delete` — are native CRUD operations polymorphic over a target (`document`, `folder`, `template`, `asset`): per-target fields nest inside the address key (`write({ document: { path, content } })`), and you pass exactly one target per call. `move` is the fourth write verb but takes flat `from`/`to` paths and auto-detects whether the path is a document, folder, or asset (no `template` target).
 
 ## Tools
 
@@ -16,6 +16,7 @@ The surface is **17 tools**. Three of the four write verbs — `write`, `edit`, 
 | `search` | Ranked workspace search (title boost + body BM25 + recency; same engine the cmd-K palette uses). When [semantic search](/docs/reference/configuration#semantic-search) is enabled, an embeddings signal is additionally fused into `full_text` ranking (opt-in, content egress) — pass `semantic: false` to force pure-lexical. |
 | `links` | Wiki-link graph. `kind` selects: `backlinks`, `forward`, `dead`, `orphans`, `hubs`, or `suggest`. Accepts an array (e.g. `["dead", "orphans", "hubs"]`) to fetch several views in one call; each view nests under its own key in the response |
 | `history` | Version timeline for a doc. Each entry carries a `version` (commit SHA) you pass to `restore_version` |
+| `skills` | Find and read agent skills. Omit `name` to list every skill across Project + Global; pass `name` to read one (addressed by `name`+`scope`, never by path) |
 | `config` | Read the effective merged config (`config({ key: "appearance.theme" })` for a sub-tree; omit `key` for the whole config) |
 | `palette` | Markdown-native authoring forms, themed `html preview` embed starters, and theme tokens. Pass `components` for the canonical components' full JSX prop schemas |
 | `preview_url` | Resolve the browser-reachable preview URL. Per-response `previewUrl` fields elsewhere are route-only (`/#/<doc>`); call this when you need the full openable URL |
@@ -24,6 +25,7 @@ The surface is **17 tools**. Three of the four write verbs — `write`, `edit`, 
 | `edit` | Modify a `document` (body find/replace **or** a frontmatter merge-patch), a `folder` (frontmatter merge-patch), or a `template` |
 | `delete` | Delete a `document` (one path or an array), `folder`, `template`, or `asset` |
 | `move` | Move or rename a `document`, `folder`, or `asset` and rewrite every affected link |
+| `install` | Project an authored skill (the Draft produced by `write({ skill })`) into your editors — the Draft → Installed step |
 | `checkpoint` | Save a project-wide version snapshot — a single restore point. Returns its `version` |
 | `restore_version` | Restore one document to a historical `version` (the SHA from `history` or `checkpoint`) |
 | `conflicts` | Read GitHub-sync merge conflicts. `kind: "list"` enumerates tracked conflicts; `kind: "content"` returns one file's base / ours / theirs stages |
