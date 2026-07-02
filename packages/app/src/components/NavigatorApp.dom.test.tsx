@@ -224,7 +224,7 @@ describe('NavigatorApp launcher runtime behavior', () => {
     expect(list.textContent).toContain('/Users/x/plain-notes');
   });
 
-  test('gives worktree and plain-project recents distinct icon tiles', async () => {
+  test('flags worktrees with a badge + branch chip; projects show their path', async () => {
     const bridge = createBridge();
     bridge.project.listRecent = mock(() =>
       Promise.resolve([
@@ -247,14 +247,19 @@ describe('NavigatorApp launcher runtime behavior', () => {
     const [worktreeRow, plainRow] = rows;
     if (!worktreeRow || !plainRow) throw new Error('expected two recent rows');
 
-    expect(worktreeRow.querySelector('svg.lucide-git-branch')).not.toBeNull();
-    expect(worktreeRow.querySelector('svg.lucide-folder')).toBeNull();
+    expect(worktreeRow.querySelector('svg.lucide-folder')).not.toBeNull();
     expect(worktreeRow.textContent).toContain('dev');
-    expect(worktreeRow.textContent).toContain('worktree of pnw-fishing');
+    expect(worktreeRow.textContent).toContain('worktree');
+    expect(worktreeRow.textContent).toContain('of pnw-fishing');
+    expect(
+      worktreeRow.querySelector(
+        '[data-testid="nav-recent-branch-/Users/x/pnw-fishing/.ok/worktrees/dev"]',
+      ),
+    ).not.toBeNull();
 
     expect(plainRow.querySelector('svg.lucide-folder')).not.toBeNull();
-    expect(plainRow.querySelector('svg.lucide-git-branch')).toBeNull();
     expect(plainRow.textContent).toContain('Plain Notes');
     expect(plainRow.textContent).toContain('/Users/x/plain-notes');
+    expect(plainRow.textContent).not.toContain('worktree');
   });
 });

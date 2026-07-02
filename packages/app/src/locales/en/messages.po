@@ -4398,6 +4398,11 @@ msgstr "Numbered list of items."
 msgid "Object"
 msgstr "Object"
 
+#. placeholder {0}: basenameOf(project.mainRoot ?? '')
+#: src/components/NavigatorApp.tsx
+msgid "of {0}"
+msgstr "of {0}"
+
 #: src/editor/components/Pdf.tsx
 msgid "of {totalPages}"
 msgstr "of {totalPages}"
@@ -7212,10 +7217,9 @@ msgstr "Workspace"
 msgid "Workspace Command Palette"
 msgstr "Workspace Command Palette"
 
-#. placeholder {0}: basenameOf(project.mainRoot ?? '')
 #: src/components/NavigatorApp.tsx
-msgid "worktree of {0}"
-msgstr "worktree of {0}"
+msgid "worktree"
+msgstr "worktree"
 
 #: src/components/CommandPalette.tsx
 msgid "worktree of {worktreeOf}"

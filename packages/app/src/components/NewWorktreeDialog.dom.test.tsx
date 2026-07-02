@@ -304,6 +304,7 @@ describe('NewWorktreeDialog', () => {
       target: { value: 'my-feature' },
     });
 
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     fireEvent.click(screen.getByTestId('new-worktree-base-trigger'));
     fireEvent.click(await screen.findByTestId('new-worktree-base-option-dev'));
 
@@ -591,6 +592,7 @@ describe('NewWorktreeDialog', () => {
     fireEvent.change(await screen.findByTestId('new-worktree-branch'), {
       target: { value: 'my-feature' },
     });
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     fireEvent.click(screen.getByTestId('new-worktree-base-trigger'));
     fireEvent.click(await screen.findByTestId('new-worktree-base-option-origin/main'));
     await waitFor(() =>
@@ -628,6 +630,7 @@ describe('NewWorktreeDialog', () => {
     fireEvent.change(await screen.findByTestId('new-worktree-branch'), {
       target: { value: 'my-feature' },
     });
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     fireEvent.click(screen.getByTestId('new-worktree-base-trigger'));
     const behindHint = await screen.findByTestId('new-worktree-base-behind-main');
     expect(behindHint.textContent).toContain('3 behind origin');
