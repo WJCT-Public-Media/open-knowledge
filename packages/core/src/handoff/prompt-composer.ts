@@ -98,7 +98,11 @@ export function composeCreatePrompt(
   scenario: CreateScenario,
   mentions: readonly string[],
 ): string {
-  const openTrailer = autoOpen ? ' Open the OK editor in web view.' : '';
+  const trailer = autoOpen ? 'Open the OK editor in web view.' : '';
+  const withTrailer = (base: string): string => {
+    if (trailer === '') return base;
+    return base.includes('\n') ? [base, '', trailer].join('\n') : `${base} ${trailer}`;
+  };
   const blockquote = (text: string): string =>
     text
       .split('\n')
@@ -118,7 +122,7 @@ export function composeCreatePrompt(
               blockquote(trimmed),
             ].join('\n');
       const base = mentionBlock === '' ? briefPart : [briefPart, '', mentionBlock].join('\n');
-      return `${base}${openTrailer}`;
+      return withTrailer(base);
     }
 
     const scaffold =
@@ -136,7 +140,7 @@ export function composeCreatePrompt(
             '',
             scaffold,
           ].join('\n');
-    return `${base}${openTrailer}`;
+    return withTrailer(base);
   };
 
   const fittedBrief = fitInstruction(

@@ -262,8 +262,9 @@ test('composeCreatePrompt new-project blockquotes the brief + appends the scaffo
       '\n' +
       '> a wiki for my D&D campaign\n' +
       '\n' +
-      'Scaffold the folders, templates, and AI-readable rules to match, using OpenKnowledge.' +
-      ' Open the OK editor in web view.',
+      'Scaffold the folders, templates, and AI-readable rules to match, using OpenKnowledge.\n' +
+      '\n' +
+      'Open the OK editor in web view.',
   );
 });
 
@@ -287,11 +288,32 @@ test('composeCreatePrompt existing-repo does NOT say "new project" or scaffold f
   expect(out).toBe(
     "Here's what I'd like to do in this OpenKnowledge project:\n" +
       '\n' +
-      '> Read through this codebase and draft a technical spec.' +
-      ' Open the OK editor in web view.',
+      '> Read through this codebase and draft a technical spec.\n' +
+      '\n' +
+      'Open the OK editor in web view.',
   );
   expect(out).not.toContain('new OpenKnowledge project');
   expect(out).not.toContain('Scaffold the folders');
+});
+
+test('the autoOpen trailer is never glued into the blockquoted brief or the @-mention block', () => {
+  const cases = [
+    composeCreatePrompt('draft a spec', true, 'existing-repo', []),
+    composeCreatePrompt('draft a spec', true, 'existing-repo', ['src/index.ts']),
+    composeCreatePrompt('a wiki', true, 'new-project', []),
+    composeCreatePrompt('', true, 'new-project', ['notes/structure.md']),
+  ];
+  for (const out of cases) {
+    expect(out.endsWith('\n\nOpen the OK editor in web view.')).toBe(true);
+    for (const line of out.split('\n')) {
+      if (line.startsWith('> ') || line.startsWith('@')) {
+        expect(line).not.toContain('Open the OK editor');
+      }
+    }
+  }
+  expect(composeCreatePrompt('', true, 'existing-repo', [])).toBe(
+    "Let's work on this project using OpenKnowledge. Open the OK editor in web view.",
+  );
 });
 
 test('composeCreatePrompt blockquotes every line of a multi-line brief', () => {
