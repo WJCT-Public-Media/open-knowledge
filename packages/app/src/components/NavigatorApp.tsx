@@ -376,6 +376,7 @@ function RecentRow({
   const { t } = useLingui();
   const { name: projectName } = project;
   const isWorktree = project.isLinkedWorktree === true;
+  const rowBranch = isWorktree ? (project.branch ?? branch) : branch;
   return (
     <li className="group flex items-center justify-between rounded-lg hover:bg-accent">
       <Button
@@ -389,53 +390,43 @@ function RecentRow({
         )}
       >
         <div className="flex min-w-0 items-center gap-3">
-          <span
-            aria-hidden="true"
-            className={cn(
-              'flex size-8 shrink-0 items-center justify-center rounded-lg',
-              isWorktree
-                ? 'bg-green-600/10 text-green-600 dark:bg-green-400/10 dark:text-green-400'
-                : 'bg-muted text-muted-foreground',
-            )}
-          >
-            {isWorktree ? <GitBranch className="size-4" /> : <Folder className="size-4" />}
-          </span>
+          {/* Uniform folder icon for every row — worktree vs project is conveyed
+            by the worktree pill + the branch chip, not by the icon. */}
+          <Folder aria-hidden="true" className="size-[18px] shrink-0 text-muted-foreground" />
           <div className="flex min-w-0 flex-col gap-1 truncate">
-            {isWorktree ? (
-              <>
-                <span className="truncate font-medium text-sm text-gray-700 dark:text-foreground">
-                  {project.branch ?? branch ?? project.name}
-                </span>
-                <span
-                  className="truncate w-full text-muted-foreground text-xs"
-                  title={project.mainRoot ?? ''}
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-medium text-sm text-gray-700 dark:text-foreground">
+                {project.name}
+              </span>
+              {isWorktree ? (
+                <Badge
+                  variant="secondary"
+                  className="shrink-0 gap-1 rounded-full border-transparent bg-green-600/10 px-2 py-0 font-medium text-2xs text-green-800 dark:bg-green-400/10 dark:text-green-400"
                 >
-                  <Trans>worktree of {basenameOf(project.mainRoot ?? '')}</Trans>
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="font-medium text-sm text-gray-700 dark:text-foreground">
-                  {project.name}
-                </span>
-                <span className="truncate w-full text-muted-foreground text-xs">
-                  {project.path}
-                </span>
-              </>
-            )}
+                  <GitBranch aria-hidden="true" className="size-2.5" />
+                  <Trans>worktree</Trans>
+                </Badge>
+              ) : null}
+            </div>
+            <span
+              className="truncate w-full text-muted-foreground text-xs"
+              title={isWorktree ? (project.mainRoot ?? '') : project.path}
+            >
+              {isWorktree ? <Trans>of {basenameOf(project.mainRoot ?? '')}</Trans> : project.path}
+            </span>
           </div>
         </div>
         {project.missing ? (
           <Badge className="text-2xs rounded-sm" variant="warning">
             <Trans>Missing</Trans>
           </Badge>
-        ) : branch !== null && !isWorktree ? (
+        ) : rowBranch != null ? (
           <span
             className="flex max-w-[40%] items-center gap-1 text-muted-foreground text-xs"
             data-testid={`nav-recent-branch-${project.path}`}
           >
             <GitBranch aria-hidden="true" className="size-3 shrink-0" />
-            <span className="truncate">{branch}</span>
+            <span className="truncate font-mono">{rowBranch}</span>
           </span>
         ) : null}
       </Button>

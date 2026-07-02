@@ -1,6 +1,6 @@
 import type { WorktreeSelectorEntry, WorktreeSelectorModel } from '@inkeep/open-knowledge-core';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
-import { Check, ChevronRight, GitBranch, Plus } from 'lucide-react';
+import { Check, ChevronRight, GitBranch, Plus, Search } from 'lucide-react';
 import type * as React from 'react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -382,7 +382,13 @@ function WorktreeFlyout({
       }}
       data-testid={`project-switcher-flyout-${group.project.path}`}
     >
-      <InputGroup className="mb-0.5 h-8 shrink-0 border-0 shadow-none has-[[data-slot=input-group-control]:focus-visible]:ring-0">
+      <InputGroup className="mb-1 h-8 shrink-0">
+        {/* Search magnifier leads so the row reads as a typeable field; the
+          default InputGroup border + focus ring (restored by dropping the
+          border-0 / ring-0 overrides) is what signals "you can type here". */}
+        <InputGroupAddon align="inline-start">
+          <Search aria-hidden="true" />
+        </InputGroupAddon>
         <InputGroupInput
           ref={searchRef}
           aria-label={t`Search worktrees and branches`}
@@ -398,10 +404,9 @@ function WorktreeFlyout({
           }}
           data-testid={`project-switcher-flyout-search-${group.project.path}`}
         />
-        {/* GitBranch here (not the search magnifier) — the placeholder text
-          already says "Search worktrees"; this is the one worktree-context
-          icon for the whole flyout, replacing the per-row icon below. */}
-        <InputGroupAddon>
+        {/* Branch icon trails as the worktree-context cue (kept per design),
+          alongside the leading search magnifier. */}
+        <InputGroupAddon align="inline-end">
           <GitBranch aria-hidden="true" />
         </InputGroupAddon>
       </InputGroup>

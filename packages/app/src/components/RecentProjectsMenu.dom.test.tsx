@@ -336,7 +336,7 @@ describe('RecentProjectsMenu — grouped browse (no query)', () => {
     expect(mainEntry.querySelector('svg')).toBeNull();
     expect(devEntry.querySelector('svg')).toBeNull();
     const flyoutSearch = screen.getByTestId('project-switcher-flyout-search-/repo');
-    expect(flyoutSearch.parentElement?.querySelectorAll('svg').length).toBe(1);
+    expect(flyoutSearch.parentElement?.querySelectorAll('svg').length).toBe(2);
 
     fireEvent.click(devEntry);
     await waitFor(() => {

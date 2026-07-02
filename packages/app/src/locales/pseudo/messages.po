@@ -4393,6 +4393,11 @@ msgstr ""
 msgid "Object"
 msgstr ""
 
+#. placeholder {0}: basenameOf(project.mainRoot ?? '')
+#: src/components/NavigatorApp.tsx
+msgid "of {0}"
+msgstr ""
+
 #: src/editor/components/Pdf.tsx
 msgid "of {totalPages}"
 msgstr ""
@@ -7207,9 +7212,8 @@ msgstr ""
 msgid "Workspace Command Palette"
 msgstr ""
 
-#. placeholder {0}: basenameOf(project.mainRoot ?? '')
 #: src/components/NavigatorApp.tsx
-msgid "worktree of {0}"
+msgid "worktree"
 msgstr ""
 
 #: src/components/CommandPalette.tsx
