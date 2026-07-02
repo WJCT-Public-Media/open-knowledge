@@ -5116,3 +5116,18 @@ html.electron-mode [data-slot="sidebar-inner"] {
 [data-sonner-toast] {
   pointer-events: auto;
 }
+
+/* While a modal Radix layer is open (a Dialog/Sheet overlay is mounted), the
+   toaster must sit BELOW the overlay (z-50): sonner's inline z-index
+   999999999 would otherwise paint the toast over the modal, and — with the
+   pointer-events restore above — the toast box would also intercept clicks
+   aimed at the modal's own controls (e.g. the first-launch "Added ok to your
+   PATH" toast covering the MCP consent dialog's Add/Skip buttons). Under the
+   overlay the toast renders dimmed — no
+   false affordance while the modal owns the screen — and regains
+   interactivity the moment the modal closes. `!important` because sonner
+   sets the z-index inline on the toaster element. */
+body:has([data-slot="dialog-overlay"], [data-slot="sheet-overlay"]) [data-sonner-toaster] {
+  /* biome-ignore lint/complexity/noImportantStyles: sonner sets z-index inline on the toaster; only !important can beat an inline style. */
+  z-index: 40 !important;
+}
