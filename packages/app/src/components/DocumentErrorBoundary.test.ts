@@ -7,7 +7,7 @@ import {
   ServerCapabilityMismatchError,
   SyncTimeoutError,
 } from '@/editor/sync-promise';
-import { errorCopy, errorDocName } from './DocumentErrorBoundary';
+import { errorCopy, errorDocName, isServerReachError } from './DocumentErrorBoundary';
 
 describe('errorCopy', () => {
   test('SyncTimeoutError → "Couldn\'t load document" + doc name in summary', () => {
@@ -72,6 +72,22 @@ describe('errorCopy', () => {
     expect(copy.title).toBe('Cancelled');
     expect(copy.summary).toContain('docs/abc');
     expect(copy.summary).toMatch(/cancelled/i);
+  });
+});
+
+describe('isServerReachError (gates the "Restart server" affordance)', () => {
+  test('reach failures → true (a fresh server can recover them)', () => {
+    expect(isServerReachError(new SyncTimeoutError('docs/timeout', 30_000))).toBe(true);
+    expect(isServerReachError(new PreSyncDisconnectError('docs/dropped'))).toBe(true);
+  });
+
+  test('non-reach errors → false (restart would not help)', () => {
+    expect(isServerReachError(new DocumentNotFoundError('missing.md'))).toBe(false);
+    expect(isServerReachError(new BridgeSetupError('docs/troubled', new Error('x')))).toBe(false);
+    expect(isServerReachError(new ServerCapabilityMismatchError('docs/lost', 'ws'))).toBe(false);
+    expect(isServerReachError(new MountAbortError('docs/abc'))).toBe(false);
+    expect(isServerReachError(new Error('wss handshake rejected'))).toBe(false);
+    expect(isServerReachError(null)).toBe(false);
   });
 });
 

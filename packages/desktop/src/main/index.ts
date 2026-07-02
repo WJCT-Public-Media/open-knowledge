@@ -166,7 +166,7 @@ import {
   trashItem as trashItemImpl,
 } from './ipc-handlers.ts';
 import { logIpcError } from './ipc-log.ts';
-import { createDesktopKeepaliveFactory } from './keepalive.ts';
+import { createDesktopKeepaliveFactory, toKeepaliveLogger } from './keepalive.ts';
 import { checkAndRepairLaunchJsonOnProjectOpen } from './launch-json-wiring.ts';
 import {
   checkAndRepairMcpWiringOnStartup,
@@ -786,6 +786,7 @@ function ensureWindowManager() {
     },
     createKeepalive: createDesktopKeepaliveFactory({
       readServerLock: (lockDir) => readServerLock(lockDir),
+      logger: toKeepaliveLogger(getLogger('keepalive')),
     }),
     showGate,
     startup: {

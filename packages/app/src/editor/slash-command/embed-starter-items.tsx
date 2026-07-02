@@ -34,7 +34,7 @@ const STARTER_UI: Record<PreviewEmbedStarter['id'], StarterUi> = {
     icon: BarChart3,
     aliases: ['chart', 'bar', 'graph', 'plot', 'viz', 'data', 'embed', 'preview'],
     render: () => (
-      <div className="flex h-20 items-end gap-1.5">
+      <div className="flex h-20 w-full items-end gap-1.5">
         <div className="h-[45%] flex-1 rounded-t-sm bg-chart-1" />
         <div className="h-[70%] flex-1 rounded-t-sm bg-chart-2" />
         <div className="h-[90%] flex-1 rounded-t-sm bg-chart-3" />

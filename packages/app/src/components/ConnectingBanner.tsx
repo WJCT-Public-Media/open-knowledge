@@ -3,6 +3,7 @@ import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import { useEffect, useState } from 'react';
 import { useDocumentContext } from '@/editor/DocumentContext';
+import { restartCollabServer } from '@/lib/restart-collab-server';
 
 const GRACE_PERIOD_MS = 500;
 
@@ -39,6 +40,9 @@ export function describeError(err: CollabError): string {
 export function ConnectingBanner() {
   const { collabUrl, collabTerminal, collabLastError, retryCollab } = useDocumentContext();
   const [graceElapsed, setGraceElapsed] = useState(false);
+  const [restarting, setRestarting] = useState(false);
+  const [restartError, setRestartError] = useState<string | null>(null);
+  const bridge = typeof window !== 'undefined' ? window.okDesktop : undefined;
 
   useEffect(() => {
     if (collabUrl !== null || collabTerminal) {
@@ -56,6 +60,20 @@ export function ConnectingBanner() {
   if (mode === 'terminal') {
     const isNoCollabServer = isNoCollabServerError(collabLastError);
     const errorDetail = describeError(collabLastError);
+    const handleRestart = async () => {
+      if (!bridge) return;
+      setRestartError(null);
+      setRestarting(true);
+      try {
+        const result = await restartCollabServer(bridge);
+        if (!result.ok) {
+          setRestartError(result.message);
+          setRestarting(false);
+        }
+      } catch {
+        setRestarting(false);
+      }
+    };
     return (
       <div
         role="alert"
@@ -79,11 +97,28 @@ export function ConnectingBanner() {
         </span>
         <button
           type="button"
-          onClick={retryCollab}
-          className="bg-red-950 text-red-50 px-2 py-0.5 rounded text-xs font-medium hover:bg-red-900"
+          onClick={() => {
+            setRestartError(null);
+            retryCollab();
+          }}
+          disabled={restarting}
+          className="bg-red-950 text-red-50 px-2 py-0.5 rounded text-xs font-medium hover:bg-red-900 disabled:opacity-60"
         >
           <Trans>Retry</Trans>
         </button>
+        {bridge ? (
+          <button
+            type="button"
+            onClick={handleRestart}
+            disabled={restarting}
+            className="bg-red-950 text-red-50 px-2 py-0.5 rounded text-xs font-medium hover:bg-red-900 disabled:opacity-60"
+          >
+            {restarting ? <Trans>Restarting</Trans> : <Trans>Restart server</Trans>}
+          </button>
+        ) : null}
+        {restartError !== null ? (
+          <span className="w-full text-red-950 text-xs">{restartError}</span>
+        ) : null}
       </div>
     );
   }

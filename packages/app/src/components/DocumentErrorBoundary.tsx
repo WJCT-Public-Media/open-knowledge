@@ -38,6 +38,7 @@ import { t } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import { useEffect, useRef } from 'react';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
+import { toast } from 'sonner';
 import { OkBlob } from '@/components/OkBlob';
 import { Button } from '@/components/ui/button';
 import { MountAbortError } from '@/editor/mount-promise';
@@ -49,6 +50,7 @@ import {
   ServerCapabilityMismatchError,
   SyncTimeoutError,
 } from '@/editor/sync-promise';
+import { restartCollabServer } from '@/lib/restart-collab-server';
 
 interface ErrorCopy {
   title: string;
@@ -69,6 +71,10 @@ export function errorDocName(error: unknown): string | null {
     return error.docName;
   }
   return null;
+}
+
+export function isServerReachError(error: unknown): boolean {
+  return error instanceof SyncTimeoutError || error instanceof PreSyncDisconnectError;
 }
 
 export function errorCopy(error: unknown): ErrorCopy {
@@ -137,6 +143,8 @@ function DocumentErrorFallback({
   const { title, summary } = errorCopy(error);
   const canGoBack = !!previousDocName && !!onNavigateBack;
   const retryRef = useRef<HTMLButtonElement>(null);
+  const bridge = typeof window !== 'undefined' ? window.okDesktop : undefined;
+  const restartBridge = bridge && isServerReachError(error) ? bridge : null;
 
   useEffect(() => {
     retryRef.current?.focus();
@@ -160,6 +168,25 @@ function DocumentErrorFallback({
         <Button ref={retryRef} variant="default" onClick={resetErrorBoundary}>
           <Trans>Try again</Trans>
         </Button>
+        {restartBridge ? (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              restartCollabServer(restartBridge)
+                .then((result) => {
+                  if (!result.ok) {
+                    toast.error(result.message, {
+                      id: 'server-restart-error',
+                      duration: Infinity,
+                    });
+                  }
+                })
+                .catch(() => {});
+            }}
+          >
+            <Trans>Restart server</Trans>
+          </Button>
+        ) : null}
         {canGoBack ? (
           <Button
             variant="ghost"

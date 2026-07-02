@@ -1852,6 +1852,10 @@ msgstr "Couldn't rename template: {0}"
 msgid "Couldn't resolve the conflict for {filePath}."
 msgstr "Couldn't resolve the conflict for {filePath}."
 
+#: src/lib/restart-collab-server.ts
+msgid "Couldn't restart the server — another process owns it. Quit other OpenKnowledge windows for this project, then try again."
+msgstr "Couldn't restart the server — another process owns it. Quit other OpenKnowledge windows for this project, then try again."
+
 #: src/lib/install-server-drift-listener.ts
 msgid "Couldn't restart the server — it's running under a different account. Restart your computer to clear it, then reopen this project."
 msgstr "Couldn't restart the server — it's running under a different account. Restart your computer to clear it, then reopen this project."
@@ -1859,6 +1863,10 @@ msgstr "Couldn't restart the server — it's running under a different account. 
 #: src/lib/install-server-drift-listener.ts
 msgid "Couldn't restart the server automatically. Try running `ok stop all` in a terminal, then reopen this project — or restart your computer if it persists."
 msgstr "Couldn't restart the server automatically. Try running `ok stop all` in a terminal, then reopen this project — or restart your computer if it persists."
+
+#: src/lib/restart-collab-server.ts
+msgid "Couldn't restart the server. Try `ok start` in this folder."
+msgstr "Couldn't restart the server. Try `ok start` in this folder."
 
 #: src/components/TemplateForm.tsx
 msgid "Couldn't save template: {error}"
@@ -5396,6 +5404,12 @@ msgstr "Resolving deltas"
 msgid "Resources"
 msgstr "Resources"
 
+#: src/components/ConnectingBanner.tsx
+#: src/components/DocumentErrorBoundary.tsx
+#: src/presence/use-sync-toasts.ts
+msgid "Restart server"
+msgstr "Restart server"
+
 #: src/components/TerminalExitNotice.tsx
 msgid "Restart terminal"
 msgstr "Restart terminal"
@@ -5407,6 +5421,10 @@ msgstr "Restart with this app's version"
 #: src/lib/install-server-drift-listener.ts
 msgid "Restarted — now running v{appRuntime}."
 msgstr "Restarted — now running v{appRuntime}."
+
+#: src/components/ConnectingBanner.tsx
+msgid "Restarting"
+msgstr "Restarting"
 
 #: src/lib/install-server-drift-listener.ts
 msgid "Restarting closes this project's server. Connected agents (Claude Code, Codex, Cursor) will see their OpenKnowledge MCP connection close unexpectedly — you may need to restart the agent, or toggle its OpenKnowledge MCP server off and on, to reconnect."

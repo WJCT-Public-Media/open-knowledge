@@ -41,6 +41,7 @@
     "09Tv5j": ["Reconnecting…"],
     "0BB9ID": ["No headings yet."],
     "0E9DR6": ["Type to find a doc"],
+    "0Er6-M": ["Restarting"],
     "0Gd0NU": ["Shared"],
     "0LBDjY": ["\"", ["0"], "\" uninstalled — back to a draft"],
     "0NA4b3": ["Keep my version"],
@@ -478,6 +479,7 @@
     "BH56dn": ["Custom display text"],
     "BQKHuL": ["Restart terminal"],
     "BQu9Pg": ["Symlink"],
+    "BUyQnq": ["Couldn't restart the server. Try `ok start` in this folder."],
     "BY-g4_": ["Add pattern"],
     "Bdha5y": ["Publishing..."],
     "BeWTQy": ["Loading starter packs"],
@@ -1236,6 +1238,9 @@
     "XpIZmv": ["Fenced code block with monospace text."],
     "XqNHcm": ["Couldn't update skill targets: ", ["0"]],
     "XtRoxT": ["Page ", ["pageNumber"]],
+    "XuQzrk": [
+      "Couldn't restart the server — another process owns it. Quit other OpenKnowledge windows for this project, then try again."
+    ],
     "XvPJaT": ["Diff layout"],
     "Xv_ijG": ["https://github.com/owner/repo or owner/repo"],
     "Xw_maT": ["Type a query, then press ↵ to search your pages by meaning."],
@@ -2060,6 +2065,7 @@
     ],
     "uWx2ZP": ["Last sync"],
     "u_lS4C": ["Clone complete — opening project"],
+    "uaUc6t": ["Restart server"],
     "ubMwcO": ["The terminal session ended (signal ", ["0"], ")."],
     "ugoTXs": ["folder"],
     "uhJEA2": [

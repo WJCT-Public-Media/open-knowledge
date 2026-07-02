@@ -4,11 +4,21 @@ import {
   type KeepaliveLogger,
   startKeepalive,
 } from '@inkeep/open-knowledge-core/keepalive';
+import type { DesktopLogger } from './desktop-logger.ts';
 import type { ServerLockMetadataLike } from './window-manager.ts';
+
+export function toKeepaliveLogger(logger: DesktopLogger): KeepaliveLogger {
+  return {
+    info: (msg, ctx) => logger.info(ctx ?? {}, msg),
+    warn: (msg, ctx) => logger.warn(ctx ?? {}, msg),
+    error: (msg, ctx) => logger.error(ctx ?? {}, msg),
+    debug: (msg, ctx) => logger.debug(ctx ?? {}, msg),
+  };
+}
 
 export interface CreateDesktopKeepaliveDeps {
   readServerLock(lockDir: string): ServerLockMetadataLike | null;
-  logger?: KeepaliveLogger;
+  logger: KeepaliveLogger;
 }
 
 export interface CreateDesktopKeepaliveOpts {
@@ -29,7 +39,7 @@ export function createDesktopKeepaliveFactory(
       },
       connectionId,
       pid: process.pid,
-      ...(deps.logger ? { logger: deps.logger } : {}),
+      logger: deps.logger,
     });
   };
 }

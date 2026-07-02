@@ -1,10 +1,23 @@
 import { useLingui } from '@lingui/react/macro';
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
+import type { OkDesktopBridge } from '@/lib/desktop-bridge-types';
 import { useRelaunchInFlight } from '@/lib/relaunch-store';
+import { restartCollabServer } from '@/lib/restart-collab-server';
 import type { SyncStatus } from './use-sync-status';
 
 const TOAST_ID = 'sync-status';
+
+export async function runDisconnectRestart(
+  bridge: Pick<OkDesktopBridge, 'restartServer' | 'config'>,
+): Promise<void> {
+  try {
+    const result = await restartCollabServer(bridge);
+    if (!result.ok) {
+      toast.error(result.message, { id: TOAST_ID, duration: Infinity });
+    }
+  } catch {}
+}
 
 export function useSyncToasts(status: SyncStatus, activeDocName: string | null) {
   const { t } = useLingui();
@@ -33,9 +46,23 @@ export function useSyncToasts(status: SyncStatus, activeDocName: string | null) 
         return;
       }
       wasDisconnectedRef.current = true;
+      const bridge = window.okDesktop;
       toast.warning(
         t`Connection lost \u2014 keep this tab open, your edits will sync when reconnected`,
-        { id: TOAST_ID, duration: Infinity },
+        {
+          id: TOAST_ID,
+          duration: Infinity,
+          ...(bridge
+            ? {
+                action: {
+                  label: t`Restart server`,
+                  onClick: () => {
+                    void runDisconnectRestart(bridge);
+                  },
+                },
+              }
+            : {}),
+        },
       );
     } else if (wasDisconnectedRef.current && status === 'synced') {
       wasDisconnectedRef.current = false;

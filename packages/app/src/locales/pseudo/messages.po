@@ -1847,12 +1847,20 @@ msgstr ""
 msgid "Couldn't resolve the conflict for {filePath}."
 msgstr ""
 
+#: src/lib/restart-collab-server.ts
+msgid "Couldn't restart the server — another process owns it. Quit other OpenKnowledge windows for this project, then try again."
+msgstr ""
+
 #: src/lib/install-server-drift-listener.ts
 msgid "Couldn't restart the server — it's running under a different account. Restart your computer to clear it, then reopen this project."
 msgstr ""
 
 #: src/lib/install-server-drift-listener.ts
 msgid "Couldn't restart the server automatically. Try running `ok stop all` in a terminal, then reopen this project — or restart your computer if it persists."
+msgstr ""
+
+#: src/lib/restart-collab-server.ts
+msgid "Couldn't restart the server. Try `ok start` in this folder."
 msgstr ""
 
 #: src/components/TemplateForm.tsx
@@ -5391,6 +5399,12 @@ msgstr ""
 msgid "Resources"
 msgstr ""
 
+#: src/components/ConnectingBanner.tsx
+#: src/components/DocumentErrorBoundary.tsx
+#: src/presence/use-sync-toasts.ts
+msgid "Restart server"
+msgstr ""
+
 #: src/components/TerminalExitNotice.tsx
 msgid "Restart terminal"
 msgstr ""
@@ -5401,6 +5415,10 @@ msgstr ""
 
 #: src/lib/install-server-drift-listener.ts
 msgid "Restarted — now running v{appRuntime}."
+msgstr ""
+
+#: src/components/ConnectingBanner.tsx
+msgid "Restarting"
 msgstr ""
 
 #: src/lib/install-server-drift-listener.ts
