@@ -10,7 +10,7 @@ if (process.argv.includes('--no-color')) {
 
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
-import type { Config } from '@inkeep/open-knowledge-server';
+import { type Config, ConfigSchema } from '@inkeep/open-knowledge-server';
 import { Command } from 'commander';
 import { authCommand } from './commands/auth/index.ts';
 import { bugReportCommand } from './commands/bug-report.ts';
@@ -18,6 +18,7 @@ import { cleanCommand } from './commands/clean.ts';
 import { cloneCommand } from './commands/clone.ts';
 import { configCommand } from './commands/config.ts';
 import { coworkCommand } from './commands/cowork.ts';
+import { deinitCommand } from './commands/deinit.ts';
 import { createRealDetectDeps, detectDesktop, launchDesktop } from './commands/desktop-dispatch.ts';
 import { diagnoseCommand } from './commands/diagnose.ts';
 import { embeddingsCommand } from './commands/embeddings/index.ts';
@@ -45,6 +46,7 @@ import { statusCommand } from './commands/status.ts';
 import { stopCommand } from './commands/stop.ts';
 import { syncCommand } from './commands/sync.ts';
 import { uiCommand } from './commands/ui.ts';
+import { uninstallCommand } from './commands/uninstall.ts';
 import { PACKAGE_VERSION } from './constants.ts';
 import { loadConfig } from './index.ts';
 import { recordInvocationCwd, resolveProjectAnchor } from './project-anchor.ts';
@@ -97,7 +99,19 @@ program
       console.error(`[ok] Using OpenKnowledge project at ${anchorRoot}`);
     }
 
-    const { config } = loadConfig(anchorRoot ?? cwd);
+    let config: Config;
+    try {
+      config = loadConfig(anchorRoot ?? cwd).config;
+    } catch (err) {
+      if (subcommandName === 'uninstall' || subcommandName === 'deinit') {
+        console.error(
+          `[ok] project config could not be loaded; ${subcommandName} will use defaults: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        config = ConfigSchema.parse({});
+      } else {
+        throw err;
+      }
+    }
     resolvedConfig = config;
 
     const commandName = thisCommand.args?.[0] ?? thisCommand.name() ?? 'cli';
@@ -148,6 +162,9 @@ program.addCommand(openCommand());
 program.addCommand(stopCommand(() => resolvedConfig));
 program.addCommand(cleanCommand(() => resolvedConfig));
 program.addCommand(statusCommand(() => resolvedConfig));
+
+program.addCommand(deinitCommand());
+program.addCommand(uninstallCommand());
 
 program.addCommand(psCommand());
 

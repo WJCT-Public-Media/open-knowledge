@@ -70,6 +70,7 @@ import {
   resolveDevCliDistPath,
   resolveEditorTargets,
 } from './editors.ts';
+import { existingFileMode, isCrlfDominant } from './jsonc-surgical.ts';
 import { LAUNCH_JSON_PORT } from './ui.ts';
 
 const JSONC_PARSE_OPTIONS = { allowTrailingComma: true, disallowComments: false };
@@ -108,13 +109,6 @@ function writeTomlConfig(path: string, config: Record<string, unknown>): void {
   atomicWriteFileSync(path, serialized.endsWith('\n') ? serialized : `${serialized}\n`);
 }
 
-function isCrlfDominant(text: string): boolean {
-  const crlf = (text.match(/\r\n/g) ?? []).length;
-  if (crlf === 0) return false;
-  const bareLf = (text.match(/\n/g) ?? []).length - crlf;
-  return crlf >= bareLf;
-}
-
 const JSON_CONFIG_MAX_BYTES = 10 * 1024 * 1024;
 
 function jsonValueEqual(a: unknown, b: unknown): boolean {
@@ -141,19 +135,11 @@ function detectJsonIndent(body: string): { insertSpaces: boolean; tabSize: numbe
   return { insertSpaces: true, tabSize: 2 };
 }
 
-function existingFileMode(path: string): number | undefined {
-  try {
-    return statSync(path).mode & 0o777;
-  } catch {
-    return undefined;
-  }
-}
-
 type JsonUpsertOutcome =
   | { kind: 'written' | 'overwritten' }
   | { kind: 'declined'; reason: McpDeclineReason };
 
-function serverMapPath(
+export function serverMapPath(
   topLevelKey: string,
   subKey: string | undefined,
   serverName: string,

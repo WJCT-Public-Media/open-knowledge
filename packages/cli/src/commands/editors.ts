@@ -213,7 +213,7 @@ function matchesCanonicalExactly(
   return e.args.every((v, i) => v === canonicalArgs[i]);
 }
 
-interface AppSupportOptions {
+export interface AppSupportOptions {
   home?: string;
   platformName?: NodeJS.Platform;
   env?: NodeJS.ProcessEnv;

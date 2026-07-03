@@ -275,7 +275,7 @@ export function makeLazyTokenStore(authFile?: string): TokenStore {
 export async function clearTokenFromAllBackends(
   host: string,
   authFile?: string,
-): Promise<{ touched: Array<'keychain' | 'file'> }> {
+): Promise<{ touched: Array<'keychain' | 'file'>; keychainError?: string }> {
   const touched: Array<'keychain' | 'file'> = [];
 
   const file = new FileBackend(authFile);
@@ -284,15 +284,26 @@ export async function clearTokenFromAllBackends(
     touched.push('file');
   }
 
+  let keychainError: string | undefined;
   try {
     const { Entry } = await import('@napi-rs/keyring');
     new Entry(KEYRING_SERVICE, '__probe__');
-    const keyring = new KeyringBackend();
-    if ((await keyring.get(host)) != null) {
-      await keyring.clear(host);
-      touched.push('keychain');
+    let readError: string | undefined;
+    const keyring = new KeyringBackend((info) => {
+      if (info.kind === 'read-error') readError = info.error ?? 'read-error';
+    });
+    const existing = await keyring.get(host);
+    if (readError !== undefined) {
+      keychainError = readError;
+    } else if (existing != null) {
+      try {
+        new Entry(KEYRING_SERVICE, host).deletePassword();
+        touched.push('keychain');
+      } catch (e) {
+        keychainError = e instanceof Error ? e.name : 'delete-error';
+      }
     }
   } catch {}
 
-  return { touched };
+  return { touched, keychainError };
 }

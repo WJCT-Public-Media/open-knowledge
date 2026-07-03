@@ -11,12 +11,19 @@ import {
   writeFileSync as fsWriteFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
+import {
+  PATH_SHIM_BEGIN as BEGIN,
+  PATH_SHIM_BLOCK_RE as BLOCK_RE,
+  PATH_SHIM_END as END,
+  type PathDiscovery,
+  type PathInstallMarker,
+  pathInstallMarkerPath,
+} from '@inkeep/open-knowledge';
 import { wrapperPathInBundle } from './bundle-paths.ts';
 
+export { pathInstallMarkerPath };
+
 const NAMES = ['ok', 'open-knowledge'] as const;
-const BEGIN = '# >>> open-knowledge cli >>>';
-const END = '# <<< open-knowledge cli <<<';
-const BLOCK_RE = /^# >>> open-knowledge cli >>>\n[\s\S]*?^# <<< open-knowledge cli <<<\n?/m;
 
 interface PathInstallFsOps {
   existsSync(path: string): boolean;
@@ -49,34 +56,6 @@ interface PathInstallLogger {
 const DEFAULT_LOGGER: PathInstallLogger = {
   event: (payload) => console.warn(JSON.stringify(payload)),
 };
-
-interface PathDiscovery {
-  capturedAt: string;
-  pathEntries: string[];
-  shellUsed: string;
-  okBinAlreadyOnPath: boolean;
-}
-
-interface PathInstallMarker {
-  version: 1;
-  installedAt: string;
-  bundleVersion: string;
-  bundleWrapperPath: string;
-  binDir: string;
-  envShimPath: string;
-  rcFiles: string[];
-  /** Rc files the user stripped the managed block from — never write to these
-   *  again. `~/.ok/*` self-heals forever; the user's own rc files get one shot
-   *  plus refreshes only while the block is still present. */
-  rcOptOuts: string[];
-  pathDiscovery: PathDiscovery | null;
-  extraSymlinks: Array<{
-    path: string;
-    target: string;
-    createdAt: string;
-    kind: 'created' | 'refreshed-our-own';
-  }>;
-}
 
 export type EnsureCliOnPathResult =
   | { status: 'skipped'; reason: string }
@@ -128,10 +107,6 @@ interface EnsureCliOnPathOpts {
   ) => Promise<{ code: number | null; stdout: string; stderr: string; timedOut?: boolean }>;
   logger?: PathInstallLogger;
   now?: () => Date;
-}
-
-export function pathInstallMarkerPath(home: string): string {
-  return join(home, 'Library', 'Application Support', 'OpenKnowledge', 'path-install.json');
 }
 
 function readMarker(

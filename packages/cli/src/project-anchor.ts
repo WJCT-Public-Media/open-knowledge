@@ -8,6 +8,7 @@ const PROJECT_ANCHORED_COMMANDS: ReadonlySet<string> = new Set([
   'ui',
   'mcp',
   'preview',
+  'deinit',
 ]);
 
 export function resolveProjectAnchor(

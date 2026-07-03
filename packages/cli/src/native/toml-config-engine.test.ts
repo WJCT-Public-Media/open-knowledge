@@ -8,6 +8,11 @@ const NOOP_UPSERT: NativeTomlBinding['upsertMcpServer'] = () => ({
   changed: false,
   existed: false,
 });
+const NOOP_REMOVE: NativeTomlBinding['removeMcpServer'] = () => ({
+  text: '',
+  changed: false,
+  existed: false,
+});
 
 describe('createTomlConfigEngine', () => {
   test('resolves the native backend and parses values smol-toml rejects', () => {
@@ -36,6 +41,7 @@ describe('createTomlConfigEngine', () => {
         throw new Error('symbol not found');
       },
       upsertMcpServer: NOOP_UPSERT,
+      removeMcpServer: NOOP_REMOVE,
     };
     const engine = createTomlConfigEngine(() => abiMismatch);
     expect(engine.backend).toBe('fallback');
@@ -45,6 +51,7 @@ describe('createTomlConfigEngine', () => {
     const wrongOutput: NativeTomlBinding = {
       parseTomlToJson: () => 'not json at all',
       upsertMcpServer: NOOP_UPSERT,
+      removeMcpServer: NOOP_REMOVE,
     };
     expect(createTomlConfigEngine(() => wrongOutput).backend).toBe('fallback');
   });
@@ -53,6 +60,7 @@ describe('createTomlConfigEngine', () => {
     const fake: NativeTomlBinding = {
       parseTomlToJson: (raw) => (raw.includes('probe') ? '{"probe":1}' : '{"injected":true}'),
       upsertMcpServer: NOOP_UPSERT,
+      removeMcpServer: NOOP_REMOVE,
     };
     const engine = createTomlConfigEngine(() => fake);
     expect(engine.backend).toBe('native');
@@ -67,6 +75,7 @@ describe('createTomlConfigEngine', () => {
         captured = { toml, name, json };
         return { text: 'edited', changed: true, existed: true };
       },
+      removeMcpServer: NOOP_REMOVE,
     };
     const engine = createTomlConfigEngine(() => fake);
     if (engine.backend !== 'native') throw new Error('expected the native engine');
@@ -77,6 +86,39 @@ describe('createTomlConfigEngine', () => {
       name: 'open-knowledge',
       json: '{"command":"c"}',
     });
+  });
+
+  test('removeEntry forwards to the binding and maps text + existed', () => {
+    let captured: { toml: string; name: string } | undefined;
+    const fake: NativeTomlBinding = {
+      parseTomlToJson: (raw) => (raw.includes('probe') ? '{"probe":1}' : '{}'),
+      upsertMcpServer: NOOP_UPSERT,
+      removeMcpServer: (toml, name) => {
+        captured = { toml, name };
+        return { text: 'trimmed', changed: true, existed: true };
+      },
+    };
+    const engine = createTomlConfigEngine(() => fake);
+    if (engine.backend !== 'native') throw new Error('expected the native engine');
+    const result = engine.removeEntry('x = 1\n', 'open-knowledge');
+    expect(result).toEqual({ text: 'trimmed', existed: true });
+    expect(captured).toEqual({ toml: 'x = 1\n', name: 'open-knowledge' });
+  });
+
+  test('the real native engine removes OK’s entry, preserving a sibling', () => {
+    const engine = createTomlConfigEngine();
+    if (engine.backend !== 'native') throw new Error('native addon must be built for this gate');
+    const input =
+      '# keep\n[mcp_servers.other]\ncommand = "node"  # sibling\n\n[mcp_servers.open-knowledge]\ncommand = "/bin/sh"\n';
+    const removed = engine.removeEntry(input, 'open-knowledge');
+    expect(removed.existed).toBe(true);
+    expect(removed.text).toContain('# keep');
+    expect(removed.text).toContain('[mcp_servers.other]');
+    expect(removed.text).toContain('command = "node"  # sibling');
+    expect(removed.text).not.toContain('[mcp_servers.open-knowledge]');
+    const again = engine.removeEntry(removed.text, 'open-knowledge');
+    expect(again.existed).toBe(false);
+    expect(again.text).toBe(removed.text);
   });
 
   test('the real native engine upserts OK’s entry, preserving a sibling', () => {
@@ -108,6 +150,7 @@ describe('createTomlConfigEngine', () => {
     const arrayRoot: NativeTomlBinding = {
       parseTomlToJson: (raw) => (raw.includes('probe') ? '{"probe":1}' : '[1,2,3]'),
       upsertMcpServer: NOOP_UPSERT,
+      removeMcpServer: NOOP_REMOVE,
     };
     expect(() => createTomlConfigEngine(() => arrayRoot).parseToObject('x')).toThrow();
   });
