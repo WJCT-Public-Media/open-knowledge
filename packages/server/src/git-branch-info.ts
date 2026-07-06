@@ -8,6 +8,7 @@
  */
 
 import { isValidBranchName } from '@inkeep/open-knowledge-core';
+import { truncateError } from './error-format.ts';
 import { type DirtyOverlapResult, dirtyFilesOverlapWith } from './git-dirty.ts';
 import { createGitInstance } from './git-handle.ts';
 
@@ -31,6 +32,7 @@ export type BranchInfo =
       shareTargetExists: boolean;
       dirtyConflicts: DirtyOverlapResult;
       branchIsLocal: boolean;
+      shareTargetOnOriginBranch?: boolean;
     }
   | {
       detached: true;
@@ -39,6 +41,7 @@ export type BranchInfo =
       shareTargetExists: boolean;
       dirtyConflicts: DirtyOverlapResult;
       branchIsLocal: boolean;
+      shareTargetOnOriginBranch?: boolean;
     };
 
 /**
@@ -142,6 +145,27 @@ export async function computeBranchInfo(
     .then(() => true)
     .catch(() => false);
 
+  // Additive HINT for the branch-switch dialog: does the share target exist at
+  // `origin/<targetBranch>` per the local remote-tracking ref? Network-free —
+  // the fetch that would refresh a stale ref belongs to target-status, not this
+  // fast-path endpoint. `undefined` when the remote-tracking ref isn't present
+  // locally (the answer is genuinely unknown until a fetch), which the dialog
+  // treats the same as `false`: a hint to ask target-status, never a denial.
+  const shareTargetOnOriginBranchPromise = (async (): Promise<boolean | undefined> => {
+    const originRef = `origin/${targetBranch}`;
+    const refPresent = await git
+      .raw(['rev-parse', '--verify', originRef])
+      .then(() => true)
+      .catch(() => false);
+    if (!refPresent) return undefined;
+    // A folder-root share targets the content-root tree, which exists on every ref.
+    if (kind === 'folder' && path === '') return true;
+    return git
+      .raw(['cat-file', '-e', `${originRef}:${path}`])
+      .then(() => true)
+      .catch(() => false);
+  })();
+
   // dirtyFilesOverlapWith throws when targetBranch isn't resolvable (e.g.
   // the share branch is not local yet). The dialog still needs the other
   // fields, so surface a no-conflict result in that case; the
@@ -162,8 +186,7 @@ export async function computeBranchInfo(
       // conflict signal is preferable to crashing the whole branch-info
       // endpoint when only one of its four probes fails for an unrelated
       // reason (the other three may still be intact).
-      const message = err instanceof Error ? err.message : String(err);
-      const truncated = message.length > 500 ? `${message.slice(0, 500)}…` : message;
+      const truncated = truncateError(err);
       console.warn(
         `[git-branch-info] action=dirty-overlap-failed branch=${targetBranch} error=${truncated}`,
       );
@@ -171,12 +194,14 @@ export async function computeBranchInfo(
     },
   );
 
-  const [headState, shareTargetExists, branchIsLocal, dirtyConflicts] = await Promise.all([
-    headStatePromise,
-    shareTargetPromise,
-    branchIsLocalPromise,
-    dirtyPromise,
-  ]);
+  const [headState, shareTargetExists, branchIsLocal, dirtyConflicts, shareTargetOnOriginBranch] =
+    await Promise.all([
+      headStatePromise,
+      shareTargetPromise,
+      branchIsLocalPromise,
+      dirtyPromise,
+      shareTargetOnOriginBranchPromise,
+    ]);
 
   if (headState.detached) {
     return {
@@ -186,6 +211,7 @@ export async function computeBranchInfo(
       shareTargetExists,
       dirtyConflicts,
       branchIsLocal,
+      shareTargetOnOriginBranch,
     };
   }
   return {
@@ -195,6 +221,7 @@ export async function computeBranchInfo(
     shareTargetExists,
     dirtyConflicts,
     branchIsLocal,
+    shareTargetOnOriginBranch,
   };
 }
 
@@ -213,8 +240,9 @@ export const BRANCH_INFO_HANDLER_TAG = 'git-branch-info';
  * mid-write) flows through to the caller's log + degrade path so it
  * doesn't get silently classified as "no conflict".
  *
- * Exported for unit testing — the narrow check is the load-bearing part of
- * the fix, and a regression test pins the message-shape match.
+ * Exported for unit testing — the narrow check is load-bearing (a mis-scoped
+ * match would silently classify a real error as "no conflict"), and a
+ * regression test pins the message-shape match.
  */
 export function isBranchResolutionError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);

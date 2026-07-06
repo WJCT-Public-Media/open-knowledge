@@ -10,6 +10,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import { useGroupRef, usePanelRef } from 'react-resizable-panels';
 import { AssetPreview } from '@/components/AssetPreview';
@@ -24,6 +25,7 @@ import { FolderOverview } from '@/components/FolderOverview';
 import { LargeFileEditorState } from '@/components/LargeFileEditorState';
 import { MountStalledAffordance } from '@/components/MountStalledAffordance';
 import { PropertyProvider, useProperties } from '@/components/PropertyContext';
+import { ShareReceiveMissPanel } from '@/components/ShareReceiveMissPanel';
 import { SkillFileViewer } from '@/components/SkillFileViewer';
 import { SettingsDialogShell } from '@/components/settings/SettingsDialogShell';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
@@ -39,6 +41,10 @@ import { docNameFromHash, hashFromDocName } from '@/lib/doc-hash';
 import { getInitialDocPanelWidth, writeDocPanelWidth } from '@/lib/doc-panel-width-store';
 import { matchesKeyboardShortcut } from '@/lib/keyboard-shortcuts';
 import { ProfilerBoundary } from '@/lib/perf';
+import {
+  matchesShareReceiveMiss,
+  pendingReceiveNavStore,
+} from '@/lib/share/pending-receive-nav-store';
 import { RIGHT_COLLAPSE_THRESHOLD, resolvePartition } from '@/lib/sidebar-partition';
 import { applyToggle, readPins, resolveEffectiveState } from '@/lib/sidebar-pin-store';
 import type { TerminalDockPosition } from '@/lib/terminal-dock-store';
@@ -240,6 +246,17 @@ function EditorAreaInner({
   const isNewDoc = activeTarget?.kind === 'missing';
   const showStats = !!activeDocName && activeTarget?.kind !== 'folder';
   const editorPlaceholder = isNewDoc ? t`Start writing to create this page` : undefined;
+  // A share-receive navigation that resolved to a missing target renders an
+  // honest verdict panel instead of the create-mode editor, so a receiver can't
+  // silently fork the doc at the shared path. A plain missing target — an
+  // ordinary wiki-link create-on-navigate — leaves this null and keeps
+  // create-mode reachable.
+  const pendingReceiveNav = useSyncExternalStore(
+    pendingReceiveNavStore.subscribe,
+    pendingReceiveNavStore.getSnapshot,
+    pendingReceiveNavStore.getSnapshot,
+  );
+  const shareReceiveMiss = matchesShareReceiveMiss(activeTarget, pendingReceiveNav);
 
   const [embeddedHost] = useState(() => detectEmbeddedHostFromBrowser());
   // Derive from the cached `embeddedHost` instead of calling
@@ -803,6 +820,12 @@ function EditorAreaInner({
         path={activeTarget.path}
       />
     );
+  } else if (shareReceiveMiss) {
+    // Terminal state for a share-receive miss — replaces the create-mode editor
+    // the missing target would otherwise open, before the phantom provider's
+    // editor can paint. Keyed by path so a redirect to another miss remounts +
+    // re-fetches its verdict.
+    viewContent = <ShareReceiveMissPanel key={shareReceiveMiss.path} nav={shareReceiveMiss} />;
   } else if (!activeProvider || !activeDocName) {
     // On initial page load the URL hash tells us a doc is about to open — render
     // the skeleton instead of the "Select a document" empty state so the user

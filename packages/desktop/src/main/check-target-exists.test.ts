@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync }
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { checkTargetExists } from './check-target-exists.ts';
+import { checkTargetExists, computeShareTargetMissing } from './check-target-exists.ts';
 
 describe('checkTargetExists', () => {
   function makeProject(): string {
@@ -275,5 +275,113 @@ describe('checkTargetExists', () => {
         cleanup(project);
       }
     });
+  });
+});
+
+describe('computeShareTargetMissing', () => {
+  function makeProject(): string {
+    return mkdtempSync(join(tmpdir(), 'ok-compute-target-missing-'));
+  }
+
+  function cleanup(path: string): void {
+    rmSync(path, { recursive: true, force: true });
+  }
+
+  // Real probe + real filesystem: the decision is exercised through the actual
+  // `checkTargetExists` (no stub), so the mapping from probe result to the
+  // caller's boolean is pinned end-to-end.
+  test('flags a doc target that is absent on the working tree', () => {
+    const project = makeProject();
+    try {
+      // Project exists, the shared doc does not — the receiver's branch is
+      // behind, or the doc was deleted/renamed upstream after the share.
+      expect(
+        computeShareTargetMissing(checkTargetExists, project, {
+          kind: 'doc',
+          path: 'notes/plan.md',
+        }),
+      ).toBe(true);
+    } finally {
+      cleanup(project);
+    }
+  });
+
+  test('does not flag a doc target present on the working tree', () => {
+    const project = makeProject();
+    try {
+      mkdirSync(join(project, 'notes'), { recursive: true });
+      writeFileSync(join(project, 'notes', 'plan.md'), '# plan\n');
+      expect(
+        computeShareTargetMissing(checkTargetExists, project, {
+          kind: 'doc',
+          path: 'notes/plan.md',
+        }),
+      ).toBe(false);
+    } finally {
+      cleanup(project);
+    }
+  });
+
+  test('flags a folder target that is absent on the working tree', () => {
+    const project = makeProject();
+    try {
+      expect(
+        computeShareTargetMissing(checkTargetExists, project, { kind: 'folder', path: 'guides' }),
+      ).toBe(true);
+    } finally {
+      cleanup(project);
+    }
+  });
+
+  test('does not flag a folder target present on the working tree', () => {
+    const project = makeProject();
+    try {
+      mkdirSync(join(project, 'guides'), { recursive: true });
+      expect(
+        computeShareTargetMissing(checkTargetExists, project, { kind: 'folder', path: 'guides' }),
+      ).toBe(false);
+    } finally {
+      cleanup(project);
+    }
+  });
+
+  test('never flags a content-root folder share (empty path)', () => {
+    // The working-tree root is always present, and the probe rejects an empty
+    // path as unreadable — either way the content root must dispatch normally.
+    const project = makeProject();
+    try {
+      expect(
+        computeShareTargetMissing(checkTargetExists, project, { kind: 'folder', path: '' }),
+      ).toBe(false);
+    } finally {
+      cleanup(project);
+    }
+  });
+
+  test('fails open (no flag) when the target path is unsafe', () => {
+    // A traversal path resolves to `unreadable`, not `missing` — a probe that
+    // refuses the input must never route the receiver to the miss panel.
+    const project = makeProject();
+    try {
+      expect(
+        computeShareTargetMissing(checkTargetExists, project, {
+          kind: 'doc',
+          path: '../escape.md',
+        }),
+      ).toBe(false);
+    } finally {
+      cleanup(project);
+    }
+  });
+
+  test('fails open (no flag) when the project path is unsafe', () => {
+    // A non-absolute project path is rejected as `unreadable`; the open proceeds
+    // rather than surfacing a false miss.
+    expect(
+      computeShareTargetMissing(checkTargetExists, 'relative/project', {
+        kind: 'doc',
+        path: 'README.md',
+      }),
+    ).toBe(false);
   });
 });

@@ -8,6 +8,11 @@
  * The dialog state lives here so both surfaces share the same gate; the
  * caller renders <EnableSyncConfirmDialog> with the returned props.
  *
+ * `opts.onEnabled` (optional) fires once, on a SUCCESSFUL enable, so a host
+ * surface can dismiss itself on the same confirm click (e.g. the share-receive
+ * miss dialog closing after the user chooses Enable auto-sync). It never fires
+ * on a failed write or on the on → off direction.
+ *
  * The hook accepts a `writer` so the toggle is decoupled from any specific
  * persistence backend. Today the writer is always a `ConfigBinding.patch`
  * adapter targeting `__local__/project`; tests inject fakes; future
@@ -85,6 +90,7 @@ interface UseEnableSyncWithConfirmResult {
 
 export function useEnableSyncWithConfirm(
   writer: SyncEnabledWriter | null,
+  opts?: { onEnabled?: () => void },
 ): UseEnableSyncWithConfirmResult {
   const { t } = useLingui();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -120,7 +126,12 @@ export function useEnableSyncWithConfirm(
     // Close only on success — closing on failure would contradict the
     // error toast and force the user to re-trigger the toggle to retry.
     const ok = applyEnabled(true);
-    if (ok) setConfirmOpen(false);
+    if (ok) {
+      setConfirmOpen(false);
+      // Success-only notify so a host surface can dismiss itself on the same
+      // click. A failed write leaves both dialogs up so the user can retry.
+      opts?.onEnabled?.();
+    }
   }
 
   return { confirmOpen, setConfirmOpen, onToggleRequest, onConfirm };

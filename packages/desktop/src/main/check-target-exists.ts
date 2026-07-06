@@ -1,6 +1,6 @@
 /**
  * Lightweight `<projectPath>/<path>` existence probe for the share-receive
- * Q1 pre-server target check. Runs after the `.git/HEAD` branch comparison
+ * pre-server target check. Runs after the `.git/HEAD` branch comparison
  * passes — answers "does the target the share links to actually exist on the
  * current working tree?" Without this gate, a share-link whose target does
  * not exist on the receiver's locally checked-out branch (typical
@@ -15,7 +15,7 @@
  * skip this probe entirely at the call site — the root always exists — so
  * this function never receives an empty `path`.
  *
- * Q1 runs before any project is opened — no server, no `simple-git`. The
+ * This runs before any project is opened — no server, no `simple-git`. The
  * receiver is choosing between silent dispatch (target present) and
  * surfacing a "missing on branch" toast (target absent); a graceful fail
  * must collapse to silent dispatch so a single broken project never blocks
@@ -174,4 +174,31 @@ export function checkTargetExists(
   const matches = kind === 'folder' ? stat.isDirectory() : stat.isFile();
   if (!matches) return 'missing';
   return 'exists';
+}
+
+/**
+ * Decide whether a share-receive deep-link target is absent on the receiver's
+ * checked-out working tree, so the caller can flag the window it is about to
+ * open. Renderer-initiated opens — a fresh clone, or a pivot into another
+ * worktree — reach window-open through the `ok:project:open` IPC handler rather
+ * than the deep-link dispatcher, so they never run the target probe that
+ * `dispatchResolvedShare` runs on the `branch-match-ok` leg. Without it a moved
+ * or deleted target lands the receiver in the create-mode editor and lets them
+ * silently fork the doc at the shared path. (This mirrors the `isContentRoot`
+ * short-circuit + `=== 'missing'` check in `url-scheme.ts`'s dispatcher; kept
+ * separate because that path takes the probe as an injected dep.)
+ *
+ * Content-root folder shares (empty `path`) always exist — the working-tree
+ * root is the target — so they short-circuit before the probe, which classifies
+ * an empty path as `unreadable`. Only a definitive `'missing'` flags the target:
+ * `'unreadable'` (unsafe input, or an I/O error other than ENOENT) collapses to
+ * `false`, so a probe failure never blocks the open.
+ */
+export function computeShareTargetMissing(
+  probe: (projectPath: string, kind: 'doc' | 'folder', path: string) => CheckTargetExistsResult,
+  projectPath: string,
+  target: { kind: 'doc' | 'folder'; path: string },
+): boolean {
+  if (target.kind === 'folder' && target.path === '') return false;
+  return probe(projectPath, target.kind, target.path) === 'missing';
 }

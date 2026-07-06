@@ -8,7 +8,7 @@
  * focused unit tests in the integration suite at `./construct-url.test.ts`.
  */
 
-import type { ShareConstructUrlErrorCode } from '@inkeep/open-knowledge-core';
+import type { ShareConstructUrlErrorCode, ShareFreshness } from '@inkeep/open-knowledge-core';
 import { getLogger } from '../logger.ts';
 
 /**
@@ -101,22 +101,25 @@ export function buildGitHubTreeUrl(
 
 /**
  * Emit one structured ops log line per request. All fields are non-PII (no
- * project path, no doc filename, no URL bytes). `kind` is a bounded enum
- * (`'doc' | 'folder'`) so it's safe as a span/log attribute per the
- * cardinality STOP rule.
+ * project path, no doc filename, no URL bytes). `kind` (`'doc' | 'folder'`)
+ * and `freshness` (`'current' | 'stale' | 'absent'`) are bounded enums, so
+ * they're safe as span/log attributes per the cardinality STOP rule.
+ * `freshness` is omitted when the probe couldn't run (fail-open).
  */
 export function emitShareConstructUrlLog(
   result: 'ok' | ShareConstructUrlErrorCode,
-  opts?: { branchExists?: boolean; kind?: 'doc' | 'folder' },
+  opts?: { branchExists?: boolean; kind?: 'doc' | 'folder'; freshness?: ShareFreshness },
 ): void {
   const branchExists = opts?.branchExists;
   const kind = opts?.kind;
+  const freshness = opts?.freshness;
   getLogger('share').info(
     {
       action: 'construct-url',
       result,
       ...(branchExists === undefined ? {} : { branchExists }),
       ...(kind === undefined ? {} : { kind }),
+      ...(freshness === undefined ? {} : { freshness }),
     },
     'share action',
   );

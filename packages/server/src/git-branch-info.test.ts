@@ -1,10 +1,12 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 
 import {
+  computeBranchInfo,
   isBranchResolutionError,
   isValidBranchInfoPath,
   isValidBranchName,
 } from './git-branch-info.ts';
+import { createGitTriangle, type GitTriangle } from './share/git-fixture.test-helper.ts';
 
 describe('isValidBranchName', () => {
   test('accepts a plain branch name', () => {
@@ -165,5 +167,52 @@ describe('isBranchResolutionError', () => {
     expect(isBranchResolutionError('random string')).toBe(false);
     expect(isBranchResolutionError(null)).toBe(false);
     expect(isBranchResolutionError(undefined)).toBe(false);
+  });
+});
+
+describe('computeBranchInfo — shareTargetOnOriginBranch (network-free hint)', () => {
+  const triangles: GitTriangle[] = [];
+  function newTriangle(): GitTriangle {
+    const t = createGitTriangle();
+    triangles.push(t);
+    return t;
+  }
+  afterEach(() => {
+    for (const t of triangles.splice(0)) t.cleanup();
+  });
+
+  test('true when the target exists at origin/<branch>', async () => {
+    const t = newTriangle();
+    t.seedAndPush('doc.md', '# hi\n');
+    const info = await computeBranchInfo(t.senderDir, t.branch, 'doc.md', 'doc');
+    expect(info.shareTargetOnOriginBranch).toBe(true);
+  });
+
+  test('false when the target is missing on an existing origin ref', async () => {
+    const t = newTriangle();
+    t.seedAndPush('doc.md', '# hi\n');
+    const info = await computeBranchInfo(t.senderDir, t.branch, 'gone.md', 'doc');
+    expect(info.shareTargetOnOriginBranch).toBe(false);
+  });
+
+  test('reads the origin ref, not HEAD: a committed-but-unpushed doc is false', async () => {
+    const t = newTriangle();
+    // Committed locally but never pushed — HEAD has it, origin/<branch> does not.
+    t.commitWithoutPush('local-only.md', '# local\n');
+    const info = await computeBranchInfo(t.senderDir, t.branch, 'local-only.md', 'doc');
+    expect(info.shareTargetOnOriginBranch).toBe(false);
+  });
+
+  test('undefined when the origin ref is not present locally (unknown until a fetch)', async () => {
+    const t = newTriangle();
+    t.seedAndPush('doc.md', '# hi\n');
+    const info = await computeBranchInfo(t.senderDir, 'never-fetched-branch', 'doc.md', 'doc');
+    expect(info.shareTargetOnOriginBranch).toBeUndefined();
+  });
+
+  test('folder content root is always present on the ref (true)', async () => {
+    const t = newTriangle();
+    const info = await computeBranchInfo(t.senderDir, t.branch, '', 'folder');
+    expect(info.shareTargetOnOriginBranch).toBe(true);
   });
 });

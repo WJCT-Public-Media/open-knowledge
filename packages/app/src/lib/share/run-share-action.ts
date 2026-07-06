@@ -2,6 +2,7 @@ import type {
   ShareConstructUrlErrorCode,
   ShareConstructUrlRequest,
   ShareConstructUrlResponse,
+  ShareFreshness,
 } from '@inkeep/open-knowledge-core';
 import { ShareConstructUrlResponseSchema } from '@inkeep/open-knowledge-core';
 import { docNameToMarkdownPath } from '@/lib/doc-paths';
@@ -56,8 +57,8 @@ export type RunShareActionInput = {
 
 export type RunShareActionResult =
   | { kind: 'opened-wizard' }
-  | { kind: 'copied'; shareUrl: string; branch: string }
-  | { kind: 'clipboard-failed'; shareUrl: string }
+  | { kind: 'copied'; shareUrl: string; branch: string; freshness?: ShareFreshness }
+  | { kind: 'clipboard-failed'; shareUrl: string; freshness?: ShareFreshness }
   | { kind: 'business-error'; error: ShareConstructUrlErrorCode; branch?: string }
   | { kind: 'transport-error' };
 
@@ -141,11 +142,20 @@ export async function runShareAction(
       // assuming the share flow itself failed.
       deps.toastError(CLIPBOARD_ERROR_TOAST);
       deps.logEvent('[share] action=link-construct result=clipboard-failed');
-      return { kind: 'clipboard-failed', shareUrl: response.shareUrl };
+      return {
+        kind: 'clipboard-failed',
+        shareUrl: response.shareUrl,
+        freshness: response.freshness,
+      };
     }
     deps.toastSuccess(input.kind === 'folder' ? 'Folder share link copied.' : 'Link copied.');
     deps.logEvent('[share] action=link-construct');
-    return { kind: 'copied', shareUrl: response.shareUrl, branch: response.branch };
+    return {
+      kind: 'copied',
+      shareUrl: response.shareUrl,
+      branch: response.branch,
+      freshness: response.freshness,
+    };
   }
 
   // Server-side `no-remote` is the wizard's domain too — the client-side

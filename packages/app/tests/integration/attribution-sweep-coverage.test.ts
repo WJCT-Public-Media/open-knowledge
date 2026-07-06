@@ -261,6 +261,11 @@ const EXEMPT_HANDLERS = new Set([
   // Identity is still extracted at entry for observability, but the
   // operation never touches Y.Docs so identity threading is exempt.
   'handleCheckout',
+  // `/api/share/target-status` — receive-side git verdict (targeted fetch +
+  // `cat-file -e` / removal-commit lookup / rename detection). Updates only
+  // remote-tracking refs, no CRDT mutation, no agent-authored content; same
+  // rationale as `handleBranchInfo` / `handleCheckout`.
+  'handleShareTargetStatus',
 ]);
 
 function extractHandlerBody(handlerName: string): string | null {

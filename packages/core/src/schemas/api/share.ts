@@ -1,5 +1,6 @@
 /**
- * share/virality flow.
+ * Share-link API schemas: send-side construct-url plus the receive-side
+ * branch-info, checkout, and target-status contracts.
  *
  * `handleShareConstructUrl` reads the project's local git state — HEAD branch,
  * `[remote "origin"] url`, and `refs/remotes/origin/<branch>` — and emits a
@@ -83,6 +84,27 @@ export const ShareConstructUrlErrorCodeSchema = z.enum([
 export type ShareConstructUrlErrorCode = z.infer<typeof ShareConstructUrlErrorCodeSchema>;
 
 /**
+ * Freshness of a share target relative to origin, computed from local git
+ * state at share time (never a fetch):
+ *
+ * - `current` — the shared doc/folder matches origin's copy.
+ * - `stale` — committed-but-unpushed or uncommitted edits exist; the recipient
+ *   reads the last pushed version until a push lands.
+ * - `absent` — the target isn't on origin at all, so the minted link 404s for
+ *   the recipient until it's pushed.
+ *
+ * Closed enum for v1. Producers only ever emit these three; consumers parse
+ * tolerantly (see the `freshness` field below), so a value a newer server
+ * adds degrades to "no signal" on an older client rather than a parse failure.
+ */
+export const ShareFreshnessSchema = z.enum([
+  'current',
+  'stale',
+  'absent',
+]) satisfies StandardSchemaV1;
+export type ShareFreshness = z.infer<typeof ShareFreshnessSchema>;
+
+/**
  * Success body for `POST /api/share/construct-url`, discriminated on `ok`.
  *
  * Happy path carries the encoded marketing URL (`shareUrl`), the unencoded
@@ -90,6 +112,10 @@ export type ShareConstructUrlErrorCode = z.infer<typeof ShareConstructUrlErrorCo
  * so callers can fall back to the splash custom-scheme handoff form without
  * re-encoding, and the resolved branch name (so
  * the toast can name it on `branch-not-on-origin` retries).
+ *
+ * The success variant also carries an optional `freshness` signal
+ * (`ShareFreshnessSchema`) describing whether the shared target is current /
+ * stale / absent vs. origin; it is omitted whenever the signal is unavailable.
  *
  * Schemas are `.loose()` per the file-wide convention for forward-compat;
  * adding fields (e.g., `defaultBranch` for splash branch-indicator hints)
@@ -102,6 +128,11 @@ export const ShareConstructUrlResponseSchema = z.discriminatedUnion('ok', [
       shareUrl: z.string().min(1),
       sharedUrl: z.string().min(1),
       branch: z.string().min(1),
+      // Additive, and value-tolerant on purpose: an unrecognized value (a
+      // newer server emitting a freshness state this client's enum predates)
+      // parses to `undefined` rather than failing the whole response. A
+      // missing warning degrades safely; a broken share does not.
+      freshness: ShareFreshnessSchema.optional().catch(undefined),
     })
     .loose(),
   z
@@ -514,6 +545,11 @@ export function isLoginFixableGitAuthError(classified: ClassifiedGitAuthError): 
  *   would change when switching to `targetBranch`. Empty when no overlap.
  * - `branchIsLocal` — true iff `refs/heads/<targetBranch>` resolves locally
  *   (no fetch attempted). Drives whether the checkout endpoint must fetch.
+ * - `shareTargetOnOriginBranch` — additive optional HINT: true iff the target
+ *   exists at `origin/<targetBranch>` per the local remote-tracking ref (still
+ *   network-free). Omitted when the probe couldn't run. The dialog treats it as
+ *   a hint, never a terminal denial — a `false`/omitted value routes through
+ *   the fetch-backed target-status verdict, not an immediate refusal.
  */
 const BranchInfoSharedFields = {
   shareTargetExists: z.boolean(),
@@ -524,6 +560,7 @@ const BranchInfoSharedFields = {
     })
     .loose(),
   branchIsLocal: z.boolean(),
+  shareTargetOnOriginBranch: z.boolean().optional(),
 };
 
 export const BranchInfoResponseSchema = z.discriminatedUnion('detached', [
@@ -564,6 +601,13 @@ export const CheckoutRequestSchema = z
   .object({
     branch: refineBranchName(z.string().min(1)),
     principalId: z.string().optional(),
+    // When set, the handler fast-forwards the target branch's local ref to
+    // origin's tip BEFORE checking out, so a receiver whose local ref is stale
+    // lands the switch WITH a recently-pushed doc. Fast-forward-only: on
+    // divergence the update is refused (`ff-diverged`) and the checkout is not
+    // attempted — the receive flow never merges. Absent/false = today's plain
+    // checkout.
+    fastForward: z.boolean().optional(),
   })
   .loose() satisfies StandardSchemaV1;
 export type CheckoutRequest = z.infer<typeof CheckoutRequestSchema>;
@@ -594,6 +638,11 @@ export type CheckoutRequest = z.infer<typeof CheckoutRequestSchema>;
  *   instead" instead of the generic "try switching manually" copy. The
  *   accompanying `otherWorktreePath` carries the realpath-collapsed path
  *   git reported.
+ * - `ff-diverged` — only reachable with `fastForward: true`. The local branch
+ *   and origin diverged, so the fast-forward-only pre-checkout update was
+ *   refused and the checkout was NOT attempted (nothing mutated). The dialog
+ *   offers a plain switch with an honest note; reconciliation is the sync
+ *   engine's job — the receive flow never merges.
  */
 export const CheckoutFailureReasonSchema = z.enum([
   'dirty-conflict',
@@ -601,6 +650,7 @@ export const CheckoutFailureReasonSchema = z.enum([
   'fetch-failed',
   'checkout-failed',
   'branch-in-other-worktree',
+  'ff-diverged',
 ]) satisfies StandardSchemaV1;
 export type CheckoutFailureReason = z.infer<typeof CheckoutFailureReasonSchema>;
 
@@ -640,3 +690,77 @@ export const CheckoutResponseSchema = z.discriminatedUnion('ok', [
     .loose(),
 ]) satisfies StandardSchemaV1;
 export type CheckoutResponse = z.infer<typeof CheckoutResponseSchema>;
+
+// ─── Target-status (share-link receive integrity) ─────────────────────
+
+/**
+ * Closed verdict enum for `POST /api/share/target-status` — why a receiver's
+ * open of a share link missed, computed AFTER a targeted fetch:
+ *
+ * - `on-origin` — the target exists at `origin/<branch>`; the receiver's local
+ *   ref was just stale (switch-and-update recovers it).
+ * - `renamed` — git proves the target moved; `renamedTo` carries the new path
+ *   (verified to exist at the origin ref before it is offered).
+ * - `deleted` — a removal commit exists and it was not a rename.
+ * - `never-on-branch` — the removal-commit lookup is EMPTY: the path never
+ *   existed on this branch (e.g. never pushed). Messaged distinctly from
+ *   `deleted` — never "removed".
+ * - `changed-locally` — the target is still on `origin/<branch>` AND in the
+ *   receiver's committed HEAD, but they removed or renamed it in their own
+ *   working tree without syncing. They are NOT behind, so "pull" is the wrong
+ *   guidance; the copy tells them they changed it locally.
+ * - `unknown` — the fetch failed (offline / auth / timeout); the caller falls
+ *   back to today's guidance.
+ *
+ * Closed for v1. Consumers parse tolerantly (see the response schema): an
+ * unrecognized verdict a newer server adds degrades to `unknown` rather than a
+ * parse failure, preserving the fail-open contract.
+ */
+export const ShareTargetStatusVerdictSchema = z.enum([
+  'on-origin',
+  'renamed',
+  'deleted',
+  'never-on-branch',
+  'changed-locally',
+  'unknown',
+]) satisfies StandardSchemaV1;
+export type ShareTargetStatusVerdict = z.infer<typeof ShareTargetStatusVerdictSchema>;
+
+/**
+ * Request body for `POST /api/share/target-status`. `branch` is the share
+ * link's target branch (validated via the shared seven-rule predicate);
+ * `path` is the content-relative target path (empty string = content-root
+ * folder share); `kind` disambiguates doc vs folder for the removal-commit
+ * lookup.
+ */
+export const ShareTargetStatusRequestSchema = z
+  .object({
+    branch: refineBranchName(z.string().min(1)),
+    path: z.string(),
+    kind: z.enum(['doc', 'folder']),
+  })
+  .loose() satisfies StandardSchemaV1;
+export type ShareTargetStatusRequest = z.infer<typeof ShareTargetStatusRequestSchema>;
+
+/**
+ * Response body for `POST /api/share/target-status`, discriminated on
+ * `verdict`. Only `renamed` carries `renamedTo` (the redirect target), so the
+ * illegal state "renamed with no destination" is unrepresentable.
+ *
+ * The whole union is value-tolerant: any parse failure — an unrecognized
+ * verdict from a newer server, or a malformed `renamed` missing `renamedTo` —
+ * collapses to `{ verdict: 'unknown' }`, so a skewed client degrades to today's
+ * guidance instead of throwing. Members are `.loose()` so the desktop proxy
+ * passes unknown additive fields through.
+ */
+export const ShareTargetStatusResponseSchema = z
+  .discriminatedUnion('verdict', [
+    z.object({ verdict: z.literal('on-origin') }).loose(),
+    z.object({ verdict: z.literal('renamed'), renamedTo: z.string().min(1) }).loose(),
+    z.object({ verdict: z.literal('deleted') }).loose(),
+    z.object({ verdict: z.literal('never-on-branch') }).loose(),
+    z.object({ verdict: z.literal('changed-locally') }).loose(),
+    z.object({ verdict: z.literal('unknown') }).loose(),
+  ])
+  .catch({ verdict: 'unknown' }) satisfies StandardSchemaV1;
+export type ShareTargetStatusResponse = z.infer<typeof ShareTargetStatusResponseSchema>;

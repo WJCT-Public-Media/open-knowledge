@@ -58,6 +58,13 @@ mock.module('@/hooks/use-git-sync-status', () => ({
   }),
 }));
 
+// The freshness warning row inside the popover reads the project-local config
+// binding (for its "Enable auto-sync" gate). Stub the context so mounting the
+// popover doesn't require a full <ConfigProvider>.
+mock.module('@/lib/config-provider', () => ({
+  useConfigContext: () => ({ projectLocalBinding: { patch: () => ({ ok: true }) } }),
+}));
+
 const { ShareButton } = await import('./ShareButton');
 const { TooltipProvider } = await import('@/components/ui/tooltip');
 
@@ -162,5 +169,59 @@ describe('ShareButton', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ kind: 'doc', docPath: 'docs/readme.md' }),
     });
+  });
+
+  test('threads an absent freshness from the response into a warning row', async () => {
+    globalThis.fetch = mock(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            shareUrl: 'https://openknowledge.ai/d/Share123',
+            sharedUrl: 'https://github.com/inkeep/open-knowledge/blob/main/docs/readme.md',
+            branch: 'main',
+            freshness: 'absent',
+          }),
+          { status: 200 },
+        ),
+      ),
+    ) as never;
+    renderShareButton({ kind: 'doc', docName: 'docs/readme' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Share doc' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('share-button-popover')).not.toBeNull();
+    });
+    // The mocked status reports a remote with sync off, so an absent target is
+    // the strong dead-link cell.
+    expect(screen.getByTestId('share-freshness-row').textContent).toContain(
+      "This doc isn't on GitHub yet",
+    );
+  });
+
+  test('renders no warning row when the response reports current freshness', async () => {
+    globalThis.fetch = mock(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            shareUrl: 'https://openknowledge.ai/d/Share123',
+            sharedUrl: 'https://github.com/inkeep/open-knowledge/blob/main/docs/readme.md',
+            branch: 'main',
+            freshness: 'current',
+          }),
+          { status: 200 },
+        ),
+      ),
+    ) as never;
+    renderShareButton({ kind: 'doc', docName: 'docs/readme' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Share doc' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('share-button-popover')).not.toBeNull();
+    });
+    expect(screen.queryByTestId('share-freshness-row')).toBeNull();
   });
 });

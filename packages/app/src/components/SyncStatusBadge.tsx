@@ -28,6 +28,7 @@ import type { GitSyncStatus } from '@/hooks/use-git-sync-status';
 import { useGitSyncStatusDetailed } from '@/hooks/use-git-sync-status';
 import { useConfigContext } from '@/lib/config-provider';
 import { filePathToDocName, hashFromDocName } from '@/lib/doc-hash';
+import { triggerSync } from '@/lib/trigger-sync';
 import { EnableSyncConfirmDialog } from './EnableSyncConfirmDialog';
 import { Button } from './ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
@@ -35,6 +36,21 @@ import { Switch } from './ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Fire-and-forget manual sync from a badge button. The badge's own status
+ * stream drives the visible state, so a rejected trigger (offline / server
+ * down) needs no UI handling — but it gets a breadcrumb rather than being
+ * swallowed silently, so a "Sync now did nothing" report is triageable.
+ */
+function triggerSyncFromBadge(): void {
+  triggerSync('sync').catch((err) => {
+    console.warn(
+      '[sync-badge] manual sync trigger failed',
+      err instanceof Error ? err.message : err,
+    );
+  });
+}
 
 function formatRelative(iso: string | null): string {
   if (!iso) return t`never`;
@@ -49,14 +65,6 @@ function formatRelative(iso: string | null): string {
     return t`${hours}h ago`;
   }
   return new Date(iso).toLocaleDateString();
-}
-
-async function triggerSync(op: 'sync' | 'push' | 'pull'): Promise<void> {
-  await fetch('/api/sync/trigger', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ op }),
-  });
 }
 
 // ── inner: icon + color per state ────────────────────────────────────────────
@@ -560,7 +568,7 @@ function PopoverBody({ status, onSignIn, onSetIdentity }: PopoverBodyProps) {
           status.state !== 'disabled' &&
           status.state !== 'auth-error' &&
           status.state !== 'conflict' && (
-            <Button variant="outline" size="xs" onClick={() => void triggerSync('sync')}>
+            <Button variant="outline" size="xs" onClick={triggerSyncFromBadge}>
               <Trans>Sync now</Trans>
             </Button>
           )}
@@ -570,7 +578,7 @@ function PopoverBody({ status, onSignIn, onSetIdentity }: PopoverBodyProps) {
           </Button>
         )}
         {enabled && status.state === 'offline' && (
-          <Button variant="outline" size="xs" onClick={() => void triggerSync('sync')}>
+          <Button variant="outline" size="xs" onClick={triggerSyncFromBadge}>
             <Trans>Retry</Trans>
           </Button>
         )}

@@ -26,6 +26,7 @@
  * unit-testable without React.
  */
 
+import type { ShareFreshness } from '@inkeep/open-knowledge-core';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { CircleHelp, Share2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -42,6 +43,8 @@ import {
   runShareAction,
   type ShareTargetInput,
 } from '@/lib/share/run-share-action';
+import { cn } from '@/lib/utils';
+import { ShareFreshnessWarning, shareFreshnessRowVisible } from './ShareFreshnessWarning';
 
 /** Docs page explaining the share flow (links out of the popover). */
 const SHARE_DOCS_URL = 'https://openknowledge.ai/docs/features/share';
@@ -75,6 +78,7 @@ export function ShareButton({ input, onClickWhenNoRemote }: ShareButtonProps) {
   const [sharePopover, setSharePopover] = useState<{
     url: string;
     autoCopyFailed: boolean;
+    freshness?: ShareFreshness;
   } | null>(null);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -89,6 +93,7 @@ export function ShareButton({ input, onClickWhenNoRemote }: ShareButtonProps) {
 
   const hasRemote = status?.hasRemote === true;
   const triggerDisabled = input === null;
+  const showFreshnessRow = shareFreshnessRowVisible(sharePopover?.freshness, status);
 
   async function handleClick() {
     if (busy) return;
@@ -116,9 +121,17 @@ export function ShareButton({ input, onClickWhenNoRemote }: ShareButtonProps) {
         },
       );
       if (result.kind === 'copied') {
-        setSharePopover({ url: result.shareUrl, autoCopyFailed: false });
+        setSharePopover({
+          url: result.shareUrl,
+          autoCopyFailed: false,
+          freshness: result.freshness,
+        });
       } else if (result.kind === 'clipboard-failed') {
-        setSharePopover({ url: result.shareUrl, autoCopyFailed: true });
+        setSharePopover({
+          url: result.shareUrl,
+          autoCopyFailed: true,
+          freshness: result.freshness,
+        });
       }
     } catch {
       // runShareAction handles its own transport + clipboard rejections
@@ -157,7 +170,7 @@ export function ShareButton({ input, onClickWhenNoRemote }: ShareButtonProps) {
       </PopoverAnchor>
       <PopoverContent
         align="end"
-        className="flex w-80 flex-col gap-2"
+        className={cn('flex flex-col gap-2', showFreshnessRow ? 'w-96' : 'w-80')}
         data-testid="share-button-popover"
       >
         {/* Mono/uppercase muted label — the same treatment the help menu uses
@@ -201,6 +214,11 @@ export function ShareButton({ input, onClickWhenNoRemote }: ShareButtonProps) {
             </div>
           </div>
         </div>
+        <ShareFreshnessWarning
+          freshness={sharePopover?.freshness}
+          status={status}
+          kind={input?.kind ?? 'doc'}
+        />
         <a
           href={SHARE_DOCS_URL}
           target="_blank"

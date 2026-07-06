@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 
-import type { BranchInfoResponse, CheckoutResponse } from '@inkeep/open-knowledge-core';
+import type {
+  BranchInfoResponse,
+  CheckoutResponse,
+  ShareTargetStatusResponse,
+} from '@inkeep/open-knowledge-core';
 import { RUNTIME_VERSION } from '@inkeep/open-knowledge-server';
 
 import {
@@ -8,6 +12,7 @@ import {
   proxyAwaitBranchSwitched,
   proxyFetchBranchInfo,
   proxyRunCheckout,
+  proxyShareTargetStatus,
   resolveProjectServerOrigin,
   type ServerLockReadShape,
 } from './branch-info-proxy';
@@ -279,6 +284,124 @@ describe('proxyRunCheckout', () => {
     const result = await proxyRunCheckout(
       { projectPath: '/tmp/p', branch: 'main' },
       buildDeps({ fetch: fetchMock }),
+    );
+    expect(result).toBeNull();
+  });
+
+  test('omits fastForward from the body unless requested', async () => {
+    let capturedBody: string | undefined;
+    const fetchMock: typeof fetch = (async (_url, init) => {
+      capturedBody = String(init?.body ?? '');
+      return new Response(JSON.stringify({ ok: true } satisfies CheckoutResponse), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+    await proxyRunCheckout(
+      { projectPath: '/tmp/p', branch: 'main' },
+      buildDeps({ fetch: fetchMock }),
+    );
+    expect(JSON.parse(capturedBody as string)).toEqual({ branch: 'main' });
+  });
+
+  test('threads fastForward:true into the checkout body (Switch and update branch)', async () => {
+    let capturedBody: string | undefined;
+    const fetchMock: typeof fetch = (async (_url, init) => {
+      capturedBody = String(init?.body ?? '');
+      return new Response(JSON.stringify({ ok: true } satisfies CheckoutResponse), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+    await proxyRunCheckout(
+      { projectPath: '/tmp/p', branch: 'feat/x', fastForward: true },
+      buildDeps({ fetch: fetchMock }),
+    );
+    expect(JSON.parse(capturedBody as string)).toEqual({ branch: 'feat/x', fastForward: true });
+  });
+
+  test('returns the ff-diverged reason verbatim so the dialog can show the honest note', async () => {
+    const body: CheckoutResponse = { ok: false, reason: 'ff-diverged' };
+    const fetchMock: typeof fetch = (async () =>
+      new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })) as typeof fetch;
+    const result = await proxyRunCheckout(
+      { projectPath: '/tmp/p', branch: 'feat/x', fastForward: true },
+      buildDeps({ fetch: fetchMock }),
+    );
+    expect(result).toEqual(body);
+  });
+});
+
+describe('proxyShareTargetStatus', () => {
+  test('POSTs branch/path/kind and returns the on-origin verdict', async () => {
+    let capturedBody: string | undefined;
+    let capturedUrl = '';
+    const fetchMock: typeof fetch = (async (url, init) => {
+      capturedUrl = String(url);
+      capturedBody = String(init?.body ?? '');
+      const okBody: ShareTargetStatusResponse = { verdict: 'on-origin' };
+      return new Response(JSON.stringify(okBody), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as typeof fetch;
+    const result = await proxyShareTargetStatus(
+      { projectPath: '/tmp/p', branch: 'feat/x', path: 'docs/a.md', kind: 'doc' },
+      buildDeps({ fetch: fetchMock }),
+    );
+    expect(result).toEqual({ verdict: 'on-origin' });
+    expect(capturedUrl).toContain('/api/share/target-status');
+    expect(JSON.parse(capturedBody as string)).toEqual({
+      branch: 'feat/x',
+      path: 'docs/a.md',
+      kind: 'doc',
+    });
+  });
+
+  test('returns the renamed verdict with renamedTo verbatim', async () => {
+    const body: ShareTargetStatusResponse = { verdict: 'renamed', renamedTo: 'guides/a.md' };
+    const fetchMock: typeof fetch = (async () =>
+      new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })) as typeof fetch;
+    const result = await proxyShareTargetStatus(
+      { projectPath: '/tmp/p', branch: 'main', path: 'docs/a.md', kind: 'doc' },
+      buildDeps({ fetch: fetchMock }),
+    );
+    expect(result).toEqual(body);
+  });
+
+  test('returns null on a non-2xx transport failure (dialog falls back to today guidance)', async () => {
+    const fetchMock: typeof fetch = (async () =>
+      new Response(null, { status: 500 })) as typeof fetch;
+    const result = await proxyShareTargetStatus(
+      { projectPath: '/tmp/p', branch: 'main', path: '', kind: 'folder' },
+      buildDeps({ fetch: fetchMock }),
+    );
+    expect(result).toBeNull();
+  });
+
+  test('coerces a malformed 200 body to the unknown verdict (never throws)', async () => {
+    const fetchMock: typeof fetch = (async () =>
+      new Response(JSON.stringify({ verdict: 'bogus-future-value' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })) as typeof fetch;
+    const result = await proxyShareTargetStatus(
+      { projectPath: '/tmp/p', branch: 'main', path: 'docs/a.md', kind: 'doc' },
+      buildDeps({ fetch: fetchMock }),
+    );
+    expect(result).toEqual({ verdict: 'unknown' });
+  });
+
+  test('returns null when the server lock never resolves', async () => {
+    const result = await proxyShareTargetStatus(
+      { projectPath: '/tmp/p', branch: 'main', path: 'docs/a.md', kind: 'doc' },
+      buildDeps({ readServerLock: () => null }),
     );
     expect(result).toBeNull();
   });

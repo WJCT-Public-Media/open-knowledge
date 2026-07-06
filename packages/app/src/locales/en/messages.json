@@ -106,6 +106,7 @@
     "2BBAbc": ["List"],
     "2FYpfJ": ["More"],
     "2GT3Hf": ["Global"],
+    "2IYGkU": ["This doc has unpushed changes. Recipients will see the last pushed version."],
     "2QM24L": ["All tags"],
     "2RBzMG": ["Network error — check your connection and try again"],
     "2XQ8Ww": ["Open preview when agent edits"],
@@ -131,6 +132,7 @@
     "36aWJD": ["Join us on Discord"],
     "379t2h": ["Unified diff"],
     "38foVZ": ["Loading diff"],
+    "3BnyYc": ["This doc isn't on GitHub yet. The link won't work until it's pushed."],
     "3DTatP": ["Copy a prompt for your agent, start a blank file, or scaffold from a template."],
     "3Fcb0I": ["Open graph"],
     "3HNlwb": ["Hello, world!"],
@@ -386,6 +388,7 @@
     "99eR72": ["Visual editor table selection"],
     "9Bd18D": ["Failed to load hub pages"],
     "9NJWgv": ["Backlinks"],
+    "9OIqw4": ["You don't have write access to this repo."],
     "9PQysm": ["Hide advanced"],
     "9R7pRC": ["No tags match \"", ["trimmed"], "\". Continue typing to create one."],
     "9UQ730": ["Clone"],
@@ -428,6 +431,7 @@
     "AB4qw9": ["New terminal"],
     "AE7BY3": ["The terminal session ended."],
     "AIn2Yv": [["displayName"], " CLI, ", ["hint"]],
+    "AItsE5": ["Open it there"],
     "ALhMYW": ["Terminal"],
     "AQ-Lfg": ["Couldn't load templates"],
     "AQGtjK": [
@@ -570,6 +574,7 @@
     "EDl9kS": ["Subscribe"],
     "EDm3wJ": ["Loading diff renderer"],
     "EEYbdt": ["Publish"],
+    "EHu0x2": ["Syncing"],
     "EJuO7B": ["Connect a GitHub account to browse and sync your repositories."],
     "EL_YRd": ["Mirror of <0>api-spec</0>"],
     "EOjU5V": ["Inline Math Properties"],
@@ -673,6 +678,7 @@
       "."
     ],
     "GK-IRZ": ["Undo buttons are disabled — per-session state has been garbage-collected."],
+    "GLxIKR": ["How to push manually"],
     "GN6L5F": ["Filename"],
     "GQDSBN": ["Layout options"],
     "GUYwCr": ["Dismiss notice"],
@@ -688,6 +694,7 @@
     "GhjUB_": ["Reconnected"],
     "Gp_twO": ["Local path"],
     "GsBUCk": ["Loading settings"],
+    "Gt4gOO": ["This folder has unpushed changes. Recipients will see the last pushed version."],
     "GubkSu": ["Use a starter pack"],
     "GuqOb1": ["Failed to load headings"],
     "Gx0VS1": ["e.g. drafts/ or *.draft.md"],
@@ -706,6 +713,13 @@
     "Hl89Qd": ["Loading templates"],
     "HlmZBk": ["Documents response did not match expected shape."],
     "Hnl9nT": ["Set where pasted and dropped files are stored for this project."],
+    "HoWElC": [
+      "This ",
+      ["targetNoun"],
+      " has been moved, renamed, or deleted in your local copy of branch <0>",
+      ["branch"],
+      "</0>. Please commit your changes or enable auto-sync."
+    ],
     "Hp1l6f": ["Current"],
     "HpK_8d": ["Reload"],
     "HptUxX": ["Number"],
@@ -769,6 +783,7 @@
     "K-h9cT": ["Couldn't save the resolution for ", ["filePath"], "."],
     "K0N7zS": ["Config sharing status read failed"],
     "K1ckLX": ["Failed to create folder"],
+    "K6MQQk": ["Sync is failing. See the sync status for details."],
     "K6jjWB": [["packName"], " was already set up. Nothing to do."],
     "K6jxcj": ["Add a key"],
     "K8-WWn": ["Move between table cells"],
@@ -974,6 +989,7 @@
     "Oxyd5f": ["Pick a name"],
     "OyIC0Q": ["Project name"],
     "P-ye9o": ["Could not open folder picker"],
+    "P0HC30": ["This ", ["targetNoun"], " moved to <0>", ["0"], "</0>. Open it there?"],
     "P3NS4G": ["Pattern syntax error (line ", ["lineNumber"], "): ", ["message"]],
     "P3hnm0": ["File too large to open"],
     "P47EWZ": ["Could not update sidebar settings"],
@@ -1004,6 +1020,7 @@
     "PqYWiC": [
       "Couldn't restart the server automatically. Try running `ok stop all` in a terminal, then reopen this project — or restart your computer if it persists."
     ],
+    "PrJYSN": ["This folder isn't on GitHub yet. The link won't work until it's pushed."],
     "PrhzDE": ["Pan up"],
     "Pyp1NA": ["Restore to this point?"],
     "Q5fqMz": ["Connection error — try again"],
@@ -1143,6 +1160,13 @@
     "Ua78MH": ["no response"],
     "UaDyeb": ["Hide selection preview"],
     "UaRsDu": ["Show worktrees"],
+    "Uay5NL": [
+      "This ",
+      ["targetNoun"],
+      " was added to branch <0>",
+      ["shareBranch"],
+      "</0> recently. Switch and update to open it."
+    ],
     "Uci-Ph": ["Ordered List"],
     "Ud0Pj9": [
       "<0>Mirror source removed.</0> The doc <1>",
@@ -1155,6 +1179,11 @@
     "UhpfxY": ["Pan left"],
     "UkQGhd": ["Hide replace"],
     "Up2_7p": ["Copy full path"],
+    "UuYo7g": [
+      "This ",
+      ["targetNoun"],
+      " has been moved, renamed, or deleted in your local copy. Please commit your changes or enable auto-sync."
+    ],
     "Uuj_R4": ["New from template"],
     "Uw6ERJ": ["Couldn't copy: ", ["detail"]],
     "UyROxs": [["mins", "plural", { "one": ["#", " min ago"], "other": ["#", " min ago"] }]],
@@ -1238,6 +1267,7 @@
     "XYlJJT": ["Setting up"],
     "XcGbim": ["Show hidden files"],
     "Xet9MX": ["Failed to load backlinks"],
+    "Xewl6B": ["Your local copy is behind. Pull the latest changes, then open the link again."],
     "XfzqjK": ["template \"", ["name"], "\""],
     "Xl-UUg": ["guides/install or https://example.com"],
     "XmJfZT": ["name"],
@@ -1429,6 +1459,7 @@
     "c5rF4v": ["What is this knowledge base for?"],
     "c863eW": ["Could not switch to ", ["shareBranch"], ". Try switching manually."],
     "c8iK2Y": ["No templates found."],
+    "c8jBgX": ["Checking for updates on GitHub"],
     "cEoyWz": ["Add item to ", ["keyName"]],
     "cF9DyA": ["Reconnecting after server restart"],
     "cIptmH": ["In the Claude Desktop App"],
@@ -1457,6 +1488,11 @@
     "csDS2L": ["Available"],
     "ct2kv5": ["No headings in ", ["pageTarget"]],
     "cuA8QW": ["Organize specs"],
+    "d1JjXo": [
+      "Your local copy of branch <0>",
+      ["branch"],
+      "</0> is behind. Pull the latest changes, then open the link again."
+    ],
     "d2uTPx": ["Server error (HTTP ", ["status"], ")"],
     "d5rK4X": [["chars", "plural", { "one": ["char"], "other": ["chars"] }]],
     "dD7NPy": ["Outline"],
@@ -1551,6 +1587,7 @@
     "fqSfXY": ["Replace"],
     "fuJZKk": ["Search branches"],
     "fwhX-N": ["Indent or outdent source"],
+    "fxbCNQ": ["Synced. The link is up to date."],
     "g3UF2V": ["Accept"],
     "g4XBm0": ["Small section heading."],
     "g58Kwy": [
@@ -1588,6 +1625,7 @@
     "goO4Ll": ["Editor status bar"],
     "gp3I7-": ["Before syncing, set your identity for git commits:"],
     "gtEbeW": ["Highlight"],
+    "gwykHF": ["This doc hasn't synced to GitHub yet. The link will work after the next sync."],
     "h06R3C": ["No pages are missing outgoing graph links."],
     "h6EvY-": [
       "This will replace the current document content with the version from <0>",
@@ -1609,6 +1647,7 @@
     "hGmuTc": ["Docs tagged #", ["tagDocsName"]],
     "hHMv6l": ["Delete block"],
     "hIQkLb": ["New chat"],
+    "hItdtk": ["Browse folder"],
     "hLy8b1": ["Updated to Version ", ["version"]],
     "hQXiDc": ["Search branches..."],
     "hSBIG-": ["A title, description, tags — anything that describes this folder."],
@@ -1634,6 +1673,13 @@
     "i3f2kh": ["No matching commands."],
     "i92eAT": ["We'll create a repository and start syncing — no terminal needed."],
     "i9OyGp": ["Undo or redo"],
+    "i9TPUi": [
+      "This ",
+      ["targetNoun"],
+      " isn't on branch <0>",
+      ["branch"],
+      "</0>. It may not have been pushed yet."
+    ],
     "i9toLO": ["Agent configuration file"],
     "iAoh55": ["Update \"", ["0"], "\"?"],
     "iDZtvM": ["Failed to load templates: ", ["message"]],
@@ -1709,6 +1755,13 @@
     ],
     "kCqCyf": ["Open CodeMirror's lint diagnostics panel."],
     "kFLlsI": ["Insert a footnote reference + matching definition stub."],
+    "kLv8d3": [
+      "Your copy of branch <0>",
+      ["shareBranch"],
+      "</0> has changes that aren't on GitHub. The ",
+      ["targetNoun"],
+      " will appear once the branch syncs."
+    ],
     "kNqMMd": ["Folder"],
     "kPtvEH": ["The pack skill <0>", ["0"], "</0> will be (re)installed."],
     "kUn-CN": ["Sync off"],
@@ -1725,6 +1778,7 @@
     "kmKqZg": ["Clusters"],
     "knjOzA": ["Tag value"],
     "kolRU1": ["Do you want to permanently delete instead?"],
+    "kpqWwG": ["This ", ["targetNoun"], " was removed from branch <0>", ["branch"], "</0>."],
     "ku0yLQ": ["Pages are embedded the first time a search needs them."],
     "ky9Tuc": ["Edit ", ["0"], " source"],
     "l17ab4": ["Could not write project files. Try a different location."],
@@ -1847,6 +1901,7 @@
       ". Try <0>ok status</0> or check <1>.ok/local/last-spawn-error.log</1>."
     ],
     "npcziF": ["Install on"],
+    "nqV0Kk": ["This folder hasn't synced to GitHub yet. The link will work after the next sync."],
     "nrGWJ7": [
       "Git identity isn't set — commits use a default author. Set yours so teammates see your name."
     ],
@@ -2067,6 +2122,7 @@
     "u3wRF-": ["Published"],
     "u6Hp4N": ["Markdown"],
     "u7H-Wn": ["Show panel (", ["panelShortcutLabel"], ")"],
+    "uA_jXp": ["Switch and update branch"],
     "uCaIdy": ["GitHub sign-in is missing or expired. Reconnect to resume syncing."],
     "uDlyqd": [
       "Document the architecture of this repo: create an overview page that links to a page per major module describing its responsibilities and entry points."

@@ -24,6 +24,7 @@ import type {
   LocalOpOkInitResponse,
   OkFolderState,
   RecentProjectEntry,
+  ShareTargetStatusResponse,
   TerminalCli,
   WorktreeCreateRequest,
   WorktreeCreateResult,
@@ -916,9 +917,28 @@ export interface OkDesktopBridge {
     }): Promise<BranchInfoResponse | null>;
     /**
      * Proxy `POST /api/git/checkout` against the project's running server.
-     * See canonical JSDoc in `packages/desktop/src/shared/bridge-contract.ts`.
+     * `fastForward` (on-origin "Switch and update branch") fast-forwards the
+     * target branch to origin's tip before checkout; divergence → `ff-diverged`
+     * (nothing mutated). See canonical JSDoc in
+     * `packages/desktop/src/shared/bridge-contract.ts`.
      */
-    runCheckout(request: { projectPath: string; branch: string }): Promise<CheckoutResponse | null>;
+    runCheckout(request: {
+      projectPath: string;
+      branch: string;
+      fastForward?: boolean;
+    }): Promise<CheckoutResponse | null>;
+    /**
+     * Proxy `POST /api/share/target-status` for the branch-switch dialog's
+     * verdict pivot (on-origin / renamed / deleted / never-on-branch /
+     * unknown). See canonical JSDoc in
+     * `packages/desktop/src/shared/bridge-contract.ts`.
+     */
+    fetchTargetStatus(request: {
+      projectPath: string;
+      branch: string;
+      path: string;
+      kind: 'doc' | 'folder';
+    }): Promise<ShareTargetStatusResponse | null>;
     /**
      * Gate dialog dismissal on the `branch-switched` broadcast landing
      * in the project window. See canonical JSDoc in

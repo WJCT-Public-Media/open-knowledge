@@ -17,7 +17,7 @@
 import { Trans, useLingui } from '@lingui/react/macro';
 import { Folder, FolderOpenIcon, GitBranch, Loader2Icon, PlusIcon, XIcon } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { type ComponentType, useEffect, useState } from 'react';
+import { type ComponentType, lazy, Suspense, useEffect, useState } from 'react';
 import { useThemeBridge } from '@/hooks/use-theme-bridge';
 import type {
   OkDesktopBridge,
@@ -43,9 +43,15 @@ import { GithubIcon } from './icons/github';
 import { OkIcon } from './icons/ok';
 import { McpConsentDialog } from './McpConsentDialog';
 import { basenameOf } from './project-switcher-recents';
-import { ShareReceiveDialog } from './ShareReceiveDialog';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
+
+// Cold-path launcher surface: renders nothing until main fires
+// `ok:share:received`. Lazy so its clone / auth-preflight / Q2-picker code
+// (and the transports it pulls in) splits out of the main bundle.
+const ShareReceiveDialog = lazy(() =>
+  import('./ShareReceiveDialog').then((m) => ({ default: m.ShareReceiveDialog })),
+);
 
 // Re-exports for tests — keeping the surface here avoids churn in existing
 // test files that import directly from NavigatorApp.tsx and keeps the
@@ -418,20 +424,22 @@ export function NavigatorApp({ bridge }: { bridge: OkDesktopBridge }) {
           streamlined clone (folder picker → progress toast → done) via
           the shared cloneController. IPC transports for the Navigator
           window (no backing API server). */}
-      <ShareReceiveDialog
-        bridge={bridge}
-        cloneController={createCloneController({
-          bridge,
-          authQueryTransport: ipcAuthQueryTransport(bridge),
-          cloneTransport: ipcCloneTransport(bridge),
-          openSignIn: () =>
-            new Promise<OkLocalOpAuthStatusResponse | null>((resolve) => {
-              // Wrap in function so useState doesn't treat `resolve` as an updater.
-              setShareSignInResolver(() => resolve);
-              setAuthModalOpen(true);
-            }),
-        })}
-      />
+      <Suspense fallback={null}>
+        <ShareReceiveDialog
+          bridge={bridge}
+          cloneController={createCloneController({
+            bridge,
+            authQueryTransport: ipcAuthQueryTransport(bridge),
+            cloneTransport: ipcCloneTransport(bridge),
+            openSignIn: () =>
+              new Promise<OkLocalOpAuthStatusResponse | null>((resolve) => {
+                // Wrap in function so useState doesn't treat `resolve` as an updater.
+                setShareSignInResolver(() => resolve);
+                setAuthModalOpen(true);
+              }),
+          })}
+        />
+      </Suspense>
     </div>
   );
 }

@@ -731,3 +731,73 @@ describe('share_link — transport / protocol error paths', () => {
     expect(result.content[0]?.text).toContain('unexpected share-construct-url response shape');
   });
 });
+
+describe('share_link — freshness relay (FR6)', () => {
+  test('threads a stale freshness into structuredContent and prepends the fact line', async () => {
+    await writeFile(resolve(tmpDir, 'notes.md'), '# notes');
+    mockResponse = { status: 200, body: { ...successBody(), freshness: 'stale' } };
+    const { server, getTool } = createFakeServer();
+    register(server, makeDeps(baseUrl));
+    const result = await getTool().handler({ path: 'notes' });
+    expect(result.structuredContent).toMatchObject({ ok: true, freshness: 'stale' });
+    expect(result.content[0]?.text).toContain('has unpushed changes');
+    expect(result.content[0]?.text).toContain('Share link for doc');
+  });
+
+  test('threads an absent freshness and prepends the dead-link fact line', async () => {
+    await writeFile(resolve(tmpDir, 'notes.md'), '# notes');
+    mockResponse = { status: 200, body: { ...successBody(), freshness: 'absent' } };
+    const { server, getTool } = createFakeServer();
+    register(server, makeDeps(baseUrl));
+    const result = await getTool().handler({ path: 'notes' });
+    expect(result.structuredContent).toMatchObject({ ok: true, freshness: 'absent' });
+    expect(result.content[0]?.text).toContain("isn't on GitHub yet");
+  });
+
+  test('uses the "folder" word in the fact line for a folder share', async () => {
+    await mkdir(resolve(tmpDir, 'guides'), { recursive: true });
+    mockResponse = { status: 200, body: { ...successBody(), freshness: 'absent' } };
+    const { server, getTool } = createFakeServer();
+    register(server, makeDeps(baseUrl));
+    const result = await getTool().handler({ path: 'guides' });
+    expect(result.content[0]?.text).toContain("This folder isn't on GitHub yet");
+  });
+
+  test('adds no warning when the target is current', async () => {
+    await writeFile(resolve(tmpDir, 'notes.md'), '# notes');
+    mockResponse = { status: 200, body: { ...successBody(), freshness: 'current' } };
+    const { server, getTool } = createFakeServer();
+    register(server, makeDeps(baseUrl));
+    const result = await getTool().handler({ path: 'notes' });
+    expect(result.structuredContent).toMatchObject({ ok: true, freshness: 'current' });
+    const text = result.content[0]?.text ?? '';
+    expect(text).not.toContain('unpushed');
+    expect(text).not.toContain("isn't on GitHub");
+    expect(text.startsWith('Share link for')).toBe(true);
+  });
+
+  test('omits freshness and adds no warning when the server omits it (fail-open)', async () => {
+    await writeFile(resolve(tmpDir, 'notes.md'), '# notes');
+    mockResponse = { status: 200, body: successBody() };
+    const { server, getTool } = createFakeServer();
+    register(server, makeDeps(baseUrl));
+    const result = await getTool().handler({ path: 'notes' });
+    expect(result.structuredContent).toMatchObject({ ok: true });
+    expect(result.structuredContent?.freshness).toBeUndefined();
+    expect(result.content[0]?.text?.startsWith('Share link for')).toBe(true);
+  });
+
+  test('tolerates an unknown freshness value: no warning, field omitted, tool still succeeds (D21)', async () => {
+    await writeFile(resolve(tmpDir, 'notes.md'), '# notes');
+    mockResponse = { status: 200, body: { ...successBody(), freshness: 'catching-up' } };
+    const { server, getTool } = createFakeServer();
+    register(server, makeDeps(baseUrl));
+    const result = await getTool().handler({ path: 'notes' });
+    // The core schema's value-tolerant catch coerces the unknown value to
+    // undefined at parse, so the relay degrades to silence rather than a crash.
+    expect(result.isError).toBeUndefined();
+    expect(result.structuredContent).toMatchObject({ ok: true });
+    expect(result.structuredContent?.freshness).toBeUndefined();
+    expect(result.content[0]?.text?.startsWith('Share link for')).toBe(true);
+  });
+});

@@ -65,7 +65,10 @@ interface DocumentSizeMeta {
   size?: number;
 }
 
-function normalizeTargetPath(target: string): { normalizedTarget: string; expectsFolder: boolean } {
+export function normalizeTargetPath(target: string): {
+  normalizedTarget: string;
+  expectsFolder: boolean;
+} {
   const trimmed = target.trim();
   return {
     normalizedTarget: normalizeDocNameInput(trimmed).replace(/\/+$/g, ''),

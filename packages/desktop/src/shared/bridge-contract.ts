@@ -25,6 +25,7 @@ import type {
   EditorId,
   LocalOpOkInitResponse,
   OkFolderState,
+  ShareTargetStatusResponse,
   TerminalCli,
   WorktreeCreateRequest,
   WorktreeCreateResult,
@@ -1260,8 +1261,36 @@ export interface OkDesktopBridge {
      * `{ok: true}`. The CRDT transition is still in flight at HTTP 200 —
      * navigation waits on the CC1 `branch-switched` signal landing in the
      * project window via `awaitBranchSwitched` (below).
+     *
+     * `fastForward` (on-origin "Switch and update branch") tells the server to
+     * fast-forward the target branch's local ref to origin's tip before the
+     * checkout, so a stale receiver lands the switch WITH a recently-pushed
+     * doc. On divergence the server refuses and returns `ff-diverged` (nothing
+     * mutated) — the receive flow never merges. Omitted = today's plain switch.
      */
-    runCheckout(request: { projectPath: string; branch: string }): Promise<CheckoutResponse | null>;
+    runCheckout(request: {
+      projectPath: string;
+      branch: string;
+      fastForward?: boolean;
+    }): Promise<CheckoutResponse | null>;
+    /**
+     * Proxy `POST /api/share/target-status` for the branch-switch dialog's
+     * verdict pivot. When the origin-existence hint from `fetchBranchInfo` is
+     * `false`, the dialog asks main to run the fetch-backed verdict (on-origin
+     * / renamed / deleted / never-on-branch / unknown) rather than treating the
+     * stale hint as a terminal denial.
+     *
+     * Returns `null` on any transport-level failure; the dialog treats that
+     * the same as an `unknown` verdict (today's guidance). A 200 with an
+     * unexpected body degrades to `{ verdict: 'unknown' }` via the schema's
+     * value-tolerant parse, never a throw.
+     */
+    fetchTargetStatus(request: {
+      projectPath: string;
+      branch: string;
+      path: string;
+      kind: 'doc' | 'folder';
+    }): Promise<ShareTargetStatusResponse | null>;
     /**
      * Wait for the project's running server to report `currentBranch === branch`
      * via `GET /api/server-info`. The share-receive branch-switch dialog calls

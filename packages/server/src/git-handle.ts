@@ -38,6 +38,14 @@ interface GitHandleOptions {
   gitIndexFile?: string;
   /** gh token relayed to the credential helper via env (see {@link RelayGhToken}). */
   ghToken?: RelayGhToken;
+  /**
+   * Per-operation block timeout (ms) — simple-git kills the git child if it
+   * emits no output for this long. The target-status fetch sets it so a hung
+   * credentialed fetch degrades to an `unknown` verdict instead of stalling the
+   * receiver's miss surface. Omitted = no timeout (the historical default that
+   * the checkout/sync callers rely on).
+   */
+  timeoutMs?: number;
 }
 
 export interface GitHandle {
@@ -158,7 +166,7 @@ export function applyGitEnv(
  * preserved through simple-git's env replacement) lives in `buildGitEnv`.
  */
 export function createGitInstance(projectDir: string, options: GitHandleOptions = {}): GitHandle {
-  const { credentialArgs = [], gitIndexFile, ghToken } = options;
+  const { credentialArgs = [], gitIndexFile, ghToken, timeoutMs } = options;
 
   const env: Record<string, string | undefined> = buildGitEnv(ghToken);
   if (gitIndexFile) {
@@ -187,6 +195,7 @@ export function createGitInstance(projectDir: string, options: GitHandleOptions 
     baseDir: projectDir,
     config: gitConfig,
     unsafe: { allowUnsafeCredentialHelper: true },
+    ...(timeoutMs === undefined ? {} : { timeout: { block: timeoutMs } }),
   };
 
   const git = simpleGit(gitOptions as Partial<SimpleGitOptions>).env(env as Record<string, string>);

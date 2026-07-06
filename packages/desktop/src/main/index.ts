@@ -137,6 +137,7 @@ import {
   proxyAwaitBranchSwitched,
   proxyFetchBranchInfo,
   proxyRunCheckout,
+  proxyShareTargetStatus,
 } from './branch-info-proxy.ts';
 import { wrapperPathInBundle } from './bundle-paths.ts';
 import {
@@ -144,7 +145,10 @@ import {
   startBundleReplaceWatcher,
 } from './bundle-replace-detector.ts';
 import { cascadePosition } from './cascade-position.ts';
-import { checkTargetExists as checkTargetExistsImpl } from './check-target-exists.ts';
+import {
+  checkTargetExists as checkTargetExistsImpl,
+  computeShareTargetMissing,
+} from './check-target-exists.ts';
 import {
   cliProbeArgs,
   resolveClaudeReadiness,
@@ -3144,6 +3148,15 @@ function registerIpcHandlers() {
         `ok:project:open rejected: invalid entryPoint '${String(request.entryPoint)}'`,
       );
     }
+    // Renderer-initiated share-receive opens (fresh clone, multi-worktree pivot)
+    // reach window-open here instead of through the URL-scheme dispatcher, which
+    // is where `dispatchResolvedShare` probes the target. Run the same probe so a
+    // moved/deleted target flags `targetMissing` and the editor renders the
+    // honest verdict panel instead of the create-mode editor. Synchronous native
+    // probe — no new IPC — computed once for both the warm and cold branches.
+    const targetMissing =
+      request.pendingDeepLinkTarget !== undefined &&
+      computeShareTargetMissing(checkTargetExistsImpl, request.path, request.pendingDeepLinkTarget);
     // Warm-focus path for share-receive: when an existing window holds the
     // requested project, focus it and dispatch the deep-link directly. Mirrors
     // the URL-scheme warm path in url-scheme.ts so the IPC and the deep-link
@@ -3158,6 +3171,9 @@ function registerIpcHandlers() {
           kind: request.pendingDeepLinkTarget.kind,
           branch: request.pendingBranch ?? null,
           multiCandidate: request.pendingMultiCandidate === true,
+          // Only carry the flag when set — keeps the common (present) case's
+          // payload identical to the pre-gate shape.
+          ...(targetMissing ? { targetMissing: true } : {}),
         });
         return undefined;
       }
@@ -3191,6 +3207,7 @@ function registerIpcHandlers() {
       request.pendingBranch,
       request.pendingMultiCandidate,
       request.pendingShareBranchSwitch,
+      targetMissing || undefined,
     );
     return undefined;
   });
@@ -3266,6 +3283,10 @@ function registerIpcHandlers() {
 
   handle('ok:project:run-checkout', async (_event, request) => {
     return proxyRunCheckout(request, branchInfoProxyDeps);
+  });
+
+  handle('ok:project:fetch-target-status', async (_event, request) => {
+    return proxyShareTargetStatus(request, branchInfoProxyDeps);
   });
 
   handle('ok:project:await-branch-switched', async (_event, request) => {

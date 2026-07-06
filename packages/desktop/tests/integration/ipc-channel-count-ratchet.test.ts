@@ -250,8 +250,20 @@ const CHANNELS_SRC = readFileSync(SRC_PATH, 'utf-8');
  *     theme-applied fires on the show-gate edge + matchMedia changes, these
  *     fire once content is usable) nor `ok:editor:*` (editor-area state, not a
  *     launch metric). New `ok:startup:*` namespace, single member.
+ *
+ * Bumped from 76 to 77 for the share-receive branch-switch dialog's verdict
+ * pivot:
+ *
+ *   - `ok:project:fetch-target-status` — proxies `POST /api/share/target-status`
+ *     so the dialog can fetch a real verdict (on-origin / renamed / deleted /
+ *     never-on-branch / unknown) when the network-free origin hint is stale.
+ *     Could not fold into `ok:project:fetch-branch-info` (a GET proxy that is
+ *     deliberately network-free — the whole point of a separate endpoint is to
+ *     keep branch-info's fast path off the network) nor `ok:project:run-checkout`
+ *     (a POST that MUTATES the working tree; this is a read-only fetch+classify).
+ *     Extends the existing `ok:project:*` namespace, single member.
  */
-const REQUEST_CHANNEL_CAP = 76;
+const REQUEST_CHANNEL_CAP = 77;
 
 /**
  * Extract the body of an interface block by name. Returns the substring

@@ -17,11 +17,15 @@
  * The dialog MUST NOT navigate when checkout returns `{ok: true}` — navigation
  * waits on the CC1 `branch-switched` signal so the CRDT transition is fully
  * settled before the doc opens. `classifyCheckoutOutcome` returns
- * `'await-cc1'` for this case; the listener registration is owned by a
- * follow-up story.
+ * `'await-cc1'` for this case; the dialog then waits on that signal before
+ * opening the doc.
  */
 
-import type { BranchInfoResponse, CheckoutResponse } from '@inkeep/open-knowledge-core';
+import type {
+  BranchInfoResponse,
+  CheckoutResponse,
+  ShareTargetStatusResponse,
+} from '@inkeep/open-knowledge-core';
 
 /**
  * Discriminated outcome of `selectBranchSwitchVariant` — the four cells of
@@ -149,6 +153,15 @@ export type CheckoutOutcome =
        */
       readonly action: 'pivot-to-other-worktree';
       readonly otherWorktreePath: string;
+    }
+  | {
+      /**
+       * The fast-forward-only pre-checkout update was refused because the
+       * local branch diverged from origin, so the checkout was never
+       * attempted. Dialog shows the diverged verdict cell — an honest note
+       * plus a plain switch — and leaves reconciliation to the sync engine.
+       */
+      readonly action: 'branch-diverged';
     };
 
 /**
@@ -186,6 +199,8 @@ export function classifyCheckoutOutcome(response: CheckoutResponse): CheckoutOut
       }
       return { action: 'pivot-to-other-worktree', otherWorktreePath: path };
     }
+    case 'ff-diverged':
+      return { action: 'branch-diverged' };
     default: {
       const _exhaustive: never = response.reason;
       throw new Error(`Unhandled CheckoutFailureReason: ${String(_exhaustive)}`);
@@ -215,9 +230,54 @@ export function classifyCheckoutOutcome(response: CheckoutResponse): CheckoutOut
  * `applyCheckoutOutcome`) are pure and exhaustively unit-tested so the
  * React component stays declarative.
  */
+/**
+ * Resolved verdict for the branch-switch dialog's origin-hint pivot. When
+ * `branch-info` reports `shareTargetOnOriginBranch === false` on the
+ * switch-to-recover variant, the dialog fetches a real verdict rather than
+ * over-promising that a plain switch recovers the doc:
+ *
+ * - `on-origin` — the doc IS at origin's tip (the local ref was just stale);
+ *   offer "Switch and update branch" (fast-forward + checkout).
+ * - `renamed` — the doc moved; offer to open `renamedTo` after the switch.
+ * - `deleted` — a removal commit exists; honest terminal message.
+ * - `never-on-branch` — the path never existed on this branch; messaged
+ *   distinctly from `deleted` (never "removed").
+ * - `diverged` — reached only after a fast-forward attempt found the local
+ *   branch diverged from origin; offer a plain switch with an honest note,
+ *   reconciliation left to the sync engine.
+ *
+ * `unknown` and `changed-locally` verdicts (and a null proxy result) never
+ * reach here — they fall back to the `ready` variant so the dialog offers
+ * today's plain switch. (`changed-locally` is a receive-miss-only verdict: the
+ * shared target-status endpoint can return it, but the branch-switch dialog has
+ * no cell for it, so it degrades to the plain switch.)
+ */
+type VerdictResolution =
+  | { readonly kind: 'on-origin' }
+  | { readonly kind: 'renamed'; readonly renamedTo: string }
+  | { readonly kind: 'deleted' }
+  | { readonly kind: 'never-on-branch' }
+  | { readonly kind: 'diverged' };
+
 export type BranchSwitchDialogState =
   | { readonly phase: 'loading' }
   | { readonly phase: 'ready'; readonly info: BranchInfoResponse }
+  | {
+      /**
+       * The origin-existence hint was `false` on the switch-to-recover
+       * variant; a `target-status` fetch is in flight. The dialog shows a
+       * lightweight checking state. `info` is preserved so an `unknown`
+       * verdict can fall back to the `ready` variant without re-fetching.
+       */
+      readonly phase: 'verdict-pending';
+      readonly info: BranchInfoResponse;
+    }
+  | {
+      /** A `target-status` (or post-fast-forward) verdict resolved. */
+      readonly phase: 'verdict';
+      readonly info: BranchInfoResponse;
+      readonly resolution: VerdictResolution;
+    }
   | {
       readonly phase: 'switching';
       readonly info: BranchInfoResponse;
@@ -261,18 +321,72 @@ export function applyBranchInfo(
 }
 
 /**
- * Transition from `ready` to `switching` when the user clicks Switch.
- * Stores the pending doc on the new state — the CC1 listener reads it
- * after `branch-switched` to fire navigation. From non-ready phases this
- * is an identity no-op so a delayed click can't race a checkout already
- * in flight.
+ * Transition to `switching` when the user clicks a switch affordance. Fires
+ * from `ready` (the plain switch) or `verdict` (the on-origin / renamed /
+ * diverged cells re-offer a switch). `pendingDoc` is the navigation target the
+ * CC1 listener opens after `branch-switched` — the original share path for a
+ * plain / on-origin switch, or `renamedTo` for the rename offer. From every
+ * other phase this is an identity no-op so a delayed click can't race a
+ * checkout already in flight.
  */
 export function markSwitching(
   state: BranchSwitchDialogState,
   pendingDoc: string,
 ): BranchSwitchDialogState {
-  if (state.phase !== 'ready') return state;
+  if (state.phase !== 'ready' && state.phase !== 'verdict') return state;
   return { phase: 'switching', info: state.info, pendingDoc };
+}
+
+/**
+ * True when the branch-switch dialog should replace its plain-switch offer
+ * with a fetch-backed verdict. Fires only on the "switch to recover" variant
+ * (target missing on the current branch, clean tree) AND when the network-free
+ * origin hint is explicitly `false` — i.e. the local remote-tracking ref does
+ * not carry the target. A `true` or omitted hint keeps today's plain switch
+ * (fail-open): the post-switch guard backstops the residual miss.
+ */
+export function shouldProbeTargetStatus(info: BranchInfoResponse): boolean {
+  return selectBranchSwitchVariant(info).kind === 'B' && info.shareTargetOnOriginBranch === false;
+}
+
+/**
+ * Transition `ready` → `verdict-pending` when the dialog kicks off the
+ * target-status fetch. Identity from every other phase so a delayed dispatch
+ * can't rewind a switch already in flight. The caller gates on
+ * `shouldProbeTargetStatus`.
+ */
+export function markVerdictPending(state: BranchSwitchDialogState): BranchSwitchDialogState {
+  if (state.phase !== 'ready') return state;
+  return { phase: 'verdict-pending', info: state.info };
+}
+
+/**
+ * Apply a `target-status` response to the pending verdict state. A `null`
+ * proxy result or an `unknown` verdict falls back to the `ready` variant so
+ * the dialog offers today's plain switch (fail-open, backstopped by the
+ * post-switch guard). Every other verdict resolves to its `verdict` cell.
+ * Identity from non-`verdict-pending` phases so a late fetch can't clobber a
+ * state the user already advanced past.
+ */
+export function applyVerdict(
+  state: BranchSwitchDialogState,
+  response: ShareTargetStatusResponse | null,
+): BranchSwitchDialogState {
+  if (state.phase !== 'verdict-pending') return state;
+  // Fail-open (null / `unknown`) AND `changed-locally` (a receive-miss-only
+  // verdict with no branch-switch cell) fall back to today's plain switch.
+  if (
+    response === null ||
+    response.verdict === 'unknown' ||
+    response.verdict === 'changed-locally'
+  ) {
+    return { phase: 'ready', info: state.info };
+  }
+  const resolution: VerdictResolution =
+    response.verdict === 'renamed'
+      ? { kind: 'renamed', renamedTo: response.renamedTo }
+      : { kind: response.verdict };
+  return { phase: 'verdict', info: state.info, resolution };
 }
 
 /**
@@ -370,6 +484,14 @@ export function applyCheckoutOutcome(
     return {
       state: { phase: 'dismissed', reason: outcome.reason },
       sideEffect: { kind: 'toast', reason: outcome.reason },
+    };
+  }
+  if (outcome.action === 'branch-diverged') {
+    // The fast-forward pre-update refused the divergent branch and skipped the
+    // checkout. Surface the diverged verdict cell (honest note + plain switch)
+    // instead of a toast — the user chooses whether to switch without the doc.
+    return {
+      state: { phase: 'verdict', info: state.info, resolution: { kind: 'diverged' } },
     };
   }
   return {

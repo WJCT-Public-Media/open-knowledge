@@ -404,6 +404,7 @@ const bridge: OkDesktopBridge = {
     readHeadBranch: (projectPath: string) => invoke('ok:project:read-head-branch', projectPath),
     fetchBranchInfo: (request) => invoke('ok:project:fetch-branch-info', request),
     runCheckout: (request) => invoke('ok:project:run-checkout', request),
+    fetchTargetStatus: (request) => invoke('ok:project:fetch-target-status', request),
     awaitBranchSwitched: (request) => invoke('ok:project:await-branch-switched', request),
     okInit: (request) => invoke('ok:project:ok-init', request),
     close: () => invoke('ok:project:close'),

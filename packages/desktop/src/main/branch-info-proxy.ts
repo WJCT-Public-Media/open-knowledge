@@ -33,12 +33,17 @@
 
 import { resolve as joinPath } from 'node:path';
 
-import type { BranchInfoResponse, CheckoutResponse } from '@inkeep/open-knowledge-core';
+import type {
+  BranchInfoResponse,
+  CheckoutResponse,
+  ShareTargetStatusResponse,
+} from '@inkeep/open-knowledge-core';
 import {
   BranchInfoResponseSchema,
   CheckoutResponseSchema,
   clientVersionHeaders,
   ServerInfoSuccessSchema,
+  ShareTargetStatusResponseSchema,
 } from '@inkeep/open-knowledge-core';
 import { RUNTIME_VERSION } from '@inkeep/open-knowledge-server';
 
@@ -166,7 +171,7 @@ export async function proxyFetchBranchInfo(
   if (parsed instanceof Promise) {
     // Standard Schema permits async validators; ours is sync. Defensive null
     // so a future schema swap doesn't silently invent a value.
-    deps.log?.warn('[branch-info-proxy] unexpected async validator');
+    deps.log?.warn('[branch-info-proxy] branch-info unexpected async validator');
     return null;
   }
   if (parsed.issues) {
@@ -260,9 +265,16 @@ export async function proxyAwaitBranchSwitched(
   }
 }
 
-/** Proxy `POST /api/git/checkout`. Mirrors `proxyFetchBranchInfo`. */
+/**
+ * Proxy `POST /api/git/checkout`. Mirrors `proxyFetchBranchInfo`.
+ *
+ * `fastForward` rides in the body only when the caller requests it (the
+ * on-origin "Switch and update branch" cell): the server fast-forwards the
+ * target branch to origin's tip before checking out. Omitted → today's plain
+ * checkout, so existing callers are byte-for-byte unchanged on the wire.
+ */
 export async function proxyRunCheckout(
-  request: { projectPath: string; branch: string },
+  request: { projectPath: string; branch: string; fastForward?: boolean },
   deps: BranchInfoProxyDeps,
   signal?: AbortSignal,
 ): Promise<CheckoutResponse | null> {
@@ -276,7 +288,11 @@ export async function proxyRunCheckout(
     const res = await deps.fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...DESKTOP_MAIN_VERSION_HEADERS },
-      body: JSON.stringify({ branch: request.branch }),
+      body: JSON.stringify(
+        request.fastForward
+          ? { branch: request.branch, fastForward: true }
+          : { branch: request.branch },
+      ),
       signal: composeFetchSignal(timeoutMs, signal),
     });
     if (!res.ok) {
@@ -292,11 +308,76 @@ export async function proxyRunCheckout(
   }
   const parsed = CheckoutResponseSchema['~standard'].validate(raw);
   if (parsed instanceof Promise) {
-    deps.log?.warn('[branch-info-proxy] unexpected async validator');
+    deps.log?.warn('[branch-info-proxy] checkout unexpected async validator');
     return null;
   }
   if (parsed.issues) {
     deps.log?.warn('[branch-info-proxy] checkout shape invalid', {
+      issues: parsed.issues.length,
+    });
+    return null;
+  }
+  return parsed.value;
+}
+
+/**
+ * Proxy `POST /api/share/target-status` for the branch-switch dialog's verdict
+ * pivot. The server runs a targeted fetch, then classifies why a share target
+ * missed (on-origin / renamed / deleted / never-on-branch / unknown).
+ *
+ * Returns `null` only on a transport-level failure (no server lock, non-2xx,
+ * network error) — the dialog treats that the same as an `unknown` verdict and
+ * falls back to today's guidance. A 200 with an unexpected body is NOT null:
+ * the response schema's `.catch` coerces it to `{ verdict: 'unknown' }`, so a
+ * skewed server degrades to the fail-open verdict rather than a dropped call.
+ *
+ * The HTTP timeout is generous (30s) because the server's own fetch may take
+ * network time before it returns its `unknown` verdict; a shorter proxy timeout
+ * would abort the request before the server's fail-open answer arrives.
+ */
+export async function proxyShareTargetStatus(
+  request: { projectPath: string; branch: string; path: string; kind: 'doc' | 'folder' },
+  deps: BranchInfoProxyDeps,
+  signal?: AbortSignal,
+): Promise<ShareTargetStatusResponse | null> {
+  const origin = await resolveProjectServerOrigin(request.projectPath, deps, signal);
+  if (origin === null) return null;
+  if (signal?.aborted) return null;
+  const url = `${origin}/api/share/target-status`;
+  const timeoutMs = deps.requestTimeoutMs ?? 30_000;
+  let raw: unknown;
+  try {
+    const res = await deps.fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...DESKTOP_MAIN_VERSION_HEADERS },
+      body: JSON.stringify({
+        branch: request.branch,
+        path: request.path,
+        kind: request.kind,
+      }),
+      signal: composeFetchSignal(timeoutMs, signal),
+    });
+    if (!res.ok) {
+      deps.log?.warn('[branch-info-proxy] non-2xx from target-status', { status: res.status });
+      return null;
+    }
+    raw = await res.json();
+  } catch (err) {
+    deps.log?.warn('[branch-info-proxy] target-status fetch failed', {
+      err: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+  const parsed = ShareTargetStatusResponseSchema['~standard'].validate(raw);
+  if (parsed instanceof Promise) {
+    deps.log?.warn('[branch-info-proxy] target-status unexpected async validator');
+    return null;
+  }
+  // The schema `.catch`es any parse failure to `{verdict: 'unknown'}`, so
+  // `issues` is never populated here; the guard mirrors the sibling proxies so
+  // a future schema swap that drops the catch surfaces as null, not a throw.
+  if (parsed.issues) {
+    deps.log?.warn('[branch-info-proxy] target-status shape invalid', {
       issues: parsed.issues.length,
     });
     return null;

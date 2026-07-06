@@ -342,3 +342,65 @@ describe('move outputSchema admits the cross-level skill-move payloads (CORR-1)'
     });
   }
 });
+
+describe('share_link outputSchema admits the freshness success payloads (S3)', () => {
+  // The `{text}`-only sweep can't catch a handler-emitted field the schema
+  // omits (it never sends `freshness`), so validate the EXACT success
+  // structuredContent — with and without freshness — against the compiled
+  // share_link schema. A strict client (Claude/AJV) rejects the whole result
+  // with "additional properties" if `freshness` isn't declared, and the agent
+  // silently loses the warning it was supposed to relay.
+  function shareLinkOutputJsonSchema(): Record<string, unknown> {
+    const cwd = newProject();
+    const captured: Array<{ name: string; outputSchema?: unknown }> = [];
+    const server = {
+      registerTool(name: string, cfg: { outputSchema?: unknown }) {
+        captured.push({ name, outputSchema: cfg.outputSchema });
+      },
+      tool() {},
+    } as unknown as ServerInstance;
+    registerAllTools(server, {
+      config: BASE_CONFIG,
+      resolveCwd: async () => cwd,
+      serverUrl: undefined,
+    });
+    const shareLink = captured.find((r) => r.name === 'share_link');
+    if (!shareLink?.outputSchema) {
+      throw new Error('share_link tool did not register an outputSchema');
+    }
+    return compileOutputSchemaForClient(shareLink.outputSchema);
+  }
+
+  const base = {
+    ok: true,
+    shareUrl: 'https://openknowledge.ai/d/enc',
+    sharedUrl: 'https://github.com/o/r/blob/main/notes.md',
+    branch: 'main',
+    resolvedKind: 'doc',
+    previewUrl: null,
+  };
+  const withFreshness = {
+    ...base,
+    freshness: 'stale',
+    text: 'This doc has unpushed changes. Recipients will see the last pushed version.\n\nShare link for doc `notes` on branch `main`:\nhttps://openknowledge.ai/d/enc',
+  };
+  const withoutFreshness = {
+    ...base,
+    text: 'Share link for doc `notes` on branch `main`:\nhttps://openknowledge.ai/d/enc',
+  };
+
+  for (const [label, payload] of [
+    ['success with freshness', withFreshness],
+    ['success without freshness (happy-path passthrough)', withoutFreshness],
+  ] as const) {
+    test(`${label} structuredContent validates against the compiled share_link schema`, () => {
+      const validator = new AjvJsonSchemaValidator();
+      const validate = validator.getValidator(shareLinkOutputJsonSchema());
+      const result = validate(payload) as { valid: boolean; errorMessage?: string };
+      expect(result.valid).toBe(true);
+      if (!result.valid) {
+        expect(result.errorMessage).not.toMatch(/additional propert/i);
+      }
+    });
+  }
+});

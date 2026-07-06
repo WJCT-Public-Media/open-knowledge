@@ -160,6 +160,8 @@ import {
   SharePublishOwnersResponseSchema,
   SharePublishRequestSchema,
   SharePublishResponseSchema,
+  ShareTargetStatusRequestSchema,
+  ShareTargetStatusResponseSchema,
   SKILL_NAME_REGEX,
   SkillDeleteSuccessSchema,
   SkillFileDeleteSuccessSchema,
@@ -330,6 +332,7 @@ import {
   SHARE_BASE_URL,
   SHARE_CONSTRUCT_URL_HANDLER_TAG,
 } from './share/construct-url.ts';
+import { computeShareFreshness } from './share/freshness.ts';
 import {
   branchExistsOnOrigin,
   readGitHeadBranch,
@@ -352,6 +355,10 @@ import {
   SHARE_PUBLISH_OWNERS_KEY,
   SHARE_PUBLISH_TIMEOUT_MS,
 } from './share/publish.ts';
+import {
+  computeShareTargetStatus,
+  SHARE_TARGET_STATUS_HANDLER_TAG,
+} from './share/target-status.ts';
 import { buildAndOpenSkill } from './skill-install.ts';
 import { readSkillManagement, writeSkillManagement } from './skill-management.ts';
 import {
@@ -16451,12 +16458,23 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
           sharedUrl = buildGitHubTreeUrl(origin.owner, origin.repo, branch, treePath);
         }
         const shareUrl = `${SHARE_BASE_URL}${encodeShareUrl(sharedUrl)}`;
-        emitShareConstructUrlLog('ok', { branchExists: true, kind: body.kind });
+        // Freshness probes the repo-relative path of the shared target: it
+        // lives under content.dir, so join contentRel with the content-relative
+        // share path. For the dominant content.dir === '.' case contentRel is
+        // '' and this is just sharePath; an empty result is the content root.
+        const freshnessPath =
+          contentRel === ''
+            ? sharePath
+            : sharePath === ''
+              ? contentRel
+              : `${contentRel}/${sharePath}`;
+        const freshness = await computeShareFreshness(projectDir, branch, freshnessPath, body.kind);
+        emitShareConstructUrlLog('ok', { branchExists: true, kind: body.kind, freshness });
         successResponse(
           res,
           200,
           ShareConstructUrlResponseSchema,
-          { ok: true, shareUrl, sharedUrl, branch },
+          { ok: true, shareUrl, sharedUrl, branch, freshness },
           { handler: SHARE_CONSTRUCT_URL_HANDLER_TAG },
         );
       } catch (err) {
@@ -16554,6 +16572,79 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
   );
 
   /**
+   * `POST /api/share/target-status` — receive-side verdict for a share link
+   * whose target is missing on the receiver's current ref. Runs a targeted
+   * `git fetch origin <branch>` (authenticated by the user's ambient git
+   * credential helper, same as checkout's fetch; no explicit token injection)
+   * bounded by a timeout, then classifies the miss from git's rename detection:
+   * on-origin (the local ref was stale) / renamed (+ a new path verified to
+   * resolve at the origin ref) / deleted / never-on-branch / unknown (fetch
+   * failed). Fail-open: any error returns `unknown`, and the caller falls back
+   * to today's guidance.
+   *
+   * Updates only remote-tracking refs, no CRDT mutation — so the
+   * attribution-sweep meta-test exempts it (see EXEMPT_HANDLERS).
+   */
+  const handleShareTargetStatus = withValidation(
+    ShareTargetStatusRequestSchema,
+    async (_req, res, body) => {
+      try {
+        if (!projectDir) {
+          errorResponse(
+            res,
+            500,
+            'urn:ok:error:internal-server-error',
+            'projectDir is not configured for this server.',
+            { handler: SHARE_TARGET_STATUS_HANDLER_TAG },
+          );
+          return;
+        }
+        // Validate the path shape before it reaches git's `<ref>:<path>`
+        // ref-spec, mirroring the sibling share handlers (construct-url's
+        // `isValidSharePath`, branch-info's `isValidBranchInfoPath`) —
+        // precedent #55 content-scope predicate symmetry. Kind-aware: an empty
+        // path is the folder-root sentinel, invalid for a doc; `..`, `.git`,
+        // control chars, and backslashes are rejected so a malformed path can't
+        // reach git and degrade the verdict classification.
+        if (!isValidBranchInfoPath(body.path, body.kind)) {
+          errorResponse(res, 400, 'urn:ok:error:invalid-request', 'path is missing or malformed.', {
+            handler: SHARE_TARGET_STATUS_HANDLER_TAG,
+          });
+          return;
+        }
+        // The target lives under content.dir; map the content-relative request
+        // path to the repo-relative path git reads (same join as construct-url;
+        // '' for the dominant content.dir === '.' case).
+        const contentRel = toGitRelativePath(projectDir, contentDir);
+        if (contentRel === null) {
+          throw new Error('content dir is not contained within the project dir');
+        }
+        const gitPath =
+          contentRel === ''
+            ? body.path
+            : body.path === ''
+              ? contentRel
+              : `${contentRel}/${body.path}`;
+        const status = await computeShareTargetStatus(projectDir, body.branch, gitPath, body.kind);
+        successResponse(res, 200, ShareTargetStatusResponseSchema, status, {
+          handler: SHARE_TARGET_STATUS_HANDLER_TAG,
+        });
+      } catch (err) {
+        errorResponse(res, 500, 'urn:ok:error:internal-server-error', 'Internal server error.', {
+          handler: SHARE_TARGET_STATUS_HANDLER_TAG,
+          cause: err,
+        });
+      }
+    },
+    {
+      handler: SHARE_TARGET_STATUS_HANDLER_TAG,
+      method: 'POST',
+      preBodyGate: (req, res) =>
+        checkLocalOpSecurity(req, res, { handler: SHARE_TARGET_STATUS_HANDLER_TAG }),
+    },
+  );
+
+  /**
    * `POST /api/git/checkout` — share-receive branch-switch executor.
    *
    * Wrapped in `withParentLock` so checkout serializes against the
@@ -16594,7 +16685,9 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
       }
 
       try {
-        const outcome = await withParentLock(() => runCheckoutFlow(projectDir, body.branch));
+        const outcome = await withParentLock(() =>
+          runCheckoutFlow(projectDir, body.branch, { fastForward: body.fastForward === true }),
+        );
         successResponse(res, 200, CheckoutResponseSchema, outcome, {
           handler: CHECKOUT_HANDLER_TAG,
         });
@@ -17265,6 +17358,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
     '/api/__embed-detect': handleEmbedDetect,
     '/api/server-info': handleServerInfo,
     '/api/share/construct-url': handleShareConstructUrl,
+    '/api/share/target-status': handleShareTargetStatus,
     '/api/git/branch-info': handleBranchInfo,
     '/api/git/checkout': handleCheckout,
     '/api/share/publish/owners': handleSharePublishOwners,

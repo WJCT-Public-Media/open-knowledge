@@ -1,5 +1,5 @@
 import { mediaKindForSidebarAssetExtension, SHOW_INSTALL_SKILL } from '@inkeep/open-knowledge-core';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { lazy, type ReactNode, Suspense, useEffect, useRef, useState } from 'react';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ConnectingBanner } from '@/components/ConnectingBanner';
 import { CreateProjectMenuTrigger } from '@/components/CreateProjectMenuTrigger';
@@ -21,7 +21,6 @@ import {
   withLargeFileOpenGuard,
 } from '@/components/navigation-targets';
 import { PageListProvider, usePageList } from '@/components/PageListContext';
-import { ShareBranchSwitchDialog } from '@/components/ShareBranchSwitchDialog';
 import { SystemDocSubscriber } from '@/components/SystemDocSubscriber';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import {
@@ -42,6 +41,25 @@ import { mark, ProfilerBoundary } from '@/lib/perf';
 import { SingleFileModeProvider, useSingleFileMode } from '@/lib/single-file-mode';
 import { useServerKeepalive } from '@/lib/use-server-keepalive';
 import { isSettingsShortcut, SETTINGS_OPEN_HASH } from '@/lib/use-settings-route';
+
+// Cold-path receive surface: only mounts when main routes a
+// 'project-branch-switch' payload. Lazy so its branch-info / checkout / variant
+// code (and the target-status client it pulls in) splits out of the main bundle.
+const ShareBranchSwitchDialog = lazy(() =>
+  import('@/components/ShareBranchSwitchDialog').then((m) => ({
+    default: m.ShareBranchSwitchDialog,
+  })),
+);
+
+// Cold-path receive surface: the honest verdict modal for a share deep link
+// whose target is absent on the receiver's branch. Self-gates on
+// `missDialogStore`; lazy so its verdict-fetch code splits out of the main
+// bundle until a miss actually occurs.
+const ShareReceiveMissDialog = lazy(() =>
+  import('@/components/ShareReceiveMissDialog').then((m) => ({
+    default: m.ShareReceiveMissDialog,
+  })),
+);
 
 /**
  * Hashes that open overlay dialogs (Settings, Install Claude Desktop)
@@ -505,7 +523,12 @@ function AppBody() {
             'project-branch-switch' payload to this editor window.
             Clone / locate / consent surfaces live on the Navigator,
             never in an editor (see NavigatorApp). */}
-        {desktopBridge ? <ShareBranchSwitchDialog bridge={desktopBridge} /> : null}
+        {desktopBridge ? (
+          <Suspense fallback={null}>
+            <ShareBranchSwitchDialog bridge={desktopBridge} />
+            <ShareReceiveMissDialog />
+          </Suspense>
+        ) : null}
         <CommandPalette
           bridge={desktopBridge}
           open={commandPaletteOpen}

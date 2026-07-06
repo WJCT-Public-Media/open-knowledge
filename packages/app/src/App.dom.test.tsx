@@ -158,6 +158,10 @@ mock.module('@/components/ShareBranchSwitchDialog', () => ({
   ShareBranchSwitchDialog: () => <div data-testid="share-branch-switch-dialog" />,
 }));
 
+mock.module('@/components/ShareReceiveMissDialog', () => ({
+  ShareReceiveMissDialog: () => <div data-testid="share-receive-miss-dialog" />,
+}));
+
 mock.module('@/components/NewItemDialog', () => ({
   isNewItemShortcut: () => false,
   NewItemDialog: ({ open, initialDir }: { open: boolean; initialDir: string }) => (

@@ -5,12 +5,15 @@ import { type BranchInfoResponse, BranchInfoResponseSchema } from '@inkeep/open-
 import {
   applyBranchInfo,
   applyCheckoutOutcome,
+  applyVerdict,
   type BranchSwitchDialogState,
   classifyCheckoutOutcome,
   formatCurrentLabel,
   initialBranchSwitchState,
   markSwitching,
+  markVerdictPending,
   selectBranchSwitchVariant,
+  shouldProbeTargetStatus,
 } from './branch-switch-flow';
 
 const cleanInfo = (overrides: Partial<BranchInfoResponse> = {}): BranchInfoResponse =>
@@ -375,18 +378,6 @@ describe('classifyCheckoutOutcome — branch-in-other-worktree (FR6 / J5)', () =
 });
 
 describe('applyCheckoutOutcome — J5 transition', () => {
-  function cleanInfo(): BranchInfoResponse {
-    return {
-      currentBranch: 'main',
-      currentHeadSha: null,
-      detached: false,
-      targetBranchExists: true,
-      docExistsOnTarget: true,
-      docExistsOnCurrent: true,
-      dirtyConflicts: { conflicts: false, files: [] },
-    };
-  }
-
   test('switching → branch-in-other-worktree carries otherWorktreePath + preserves pendingDoc + info', () => {
     const switching: BranchSwitchDialogState = {
       phase: 'switching',
@@ -450,7 +441,7 @@ describe('applyCheckoutOutcome — J5 transition', () => {
     // typed result returns the unchanged state with no side-effect so a
     // delayed checkout response can't fire a ghost toast after the user
     // has already chosen the pivot CTA path.
-    const lateResponse = applyCheckoutOutcome(pivot, { ok: true, currentBranch: 'feat-bar' });
+    const lateResponse = applyCheckoutOutcome(pivot, { ok: true });
     expect(lateResponse.state).toBe(pivot);
     expect(lateResponse.sideEffect).toBeUndefined();
 
@@ -464,5 +455,172 @@ describe('applyCheckoutOutcome — J5 transition', () => {
     });
     expect(lateOtherFailure.state).toBe(pivot);
     expect(lateOtherFailure.sideEffect).toBeUndefined();
+  });
+});
+
+describe('shouldProbeTargetStatus (origin-hint pivot gate)', () => {
+  test('true on the switch-to-recover variant when the origin hint is false', () => {
+    expect(
+      shouldProbeTargetStatus(
+        cleanInfo({ shareTargetExists: false, shareTargetOnOriginBranch: false }),
+      ),
+    ).toBe(true);
+  });
+
+  test('false when the origin hint is true (doc is on origin — plain switch is fine)', () => {
+    expect(
+      shouldProbeTargetStatus(
+        cleanInfo({ shareTargetExists: false, shareTargetOnOriginBranch: true }),
+      ),
+    ).toBe(false);
+  });
+
+  test('false when the hint is omitted (fail-open to today plain switch)', () => {
+    expect(shouldProbeTargetStatus(cleanInfo({ shareTargetExists: false }))).toBe(false);
+  });
+
+  test('false when the target already exists on the current branch (variant A, not a miss)', () => {
+    expect(
+      shouldProbeTargetStatus(
+        cleanInfo({ shareTargetExists: true, shareTargetOnOriginBranch: false }),
+      ),
+    ).toBe(false);
+  });
+
+  test('false when a dirty conflict blocks the switch (variant D, no recovery via switch)', () => {
+    expect(
+      shouldProbeTargetStatus(
+        cleanInfo({
+          shareTargetExists: false,
+          shareTargetOnOriginBranch: false,
+          dirtyConflicts: { conflicts: true, files: ['x.md'] },
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('markVerdictPending', () => {
+  test('ready → verdict-pending, preserving info', () => {
+    const ready: BranchSwitchDialogState = { phase: 'ready', info: cleanInfo() };
+    expect(markVerdictPending(ready)).toEqual({ phase: 'verdict-pending', info: cleanInfo() });
+  });
+
+  test('identity from non-ready phases (a late dispatch cannot rewind a switch)', () => {
+    const switching: BranchSwitchDialogState = {
+      phase: 'switching',
+      info: cleanInfo(),
+      pendingDoc: 'docs/foo.md',
+    };
+    expect(markVerdictPending(switching)).toBe(switching);
+  });
+});
+
+describe('applyVerdict', () => {
+  const pending: BranchSwitchDialogState = { phase: 'verdict-pending', info: cleanInfo() };
+
+  test('on-origin resolves to the on-origin verdict cell', () => {
+    expect(applyVerdict(pending, { verdict: 'on-origin' })).toEqual({
+      phase: 'verdict',
+      info: cleanInfo(),
+      resolution: { kind: 'on-origin' },
+    });
+  });
+
+  test('renamed carries renamedTo through to the resolution', () => {
+    expect(applyVerdict(pending, { verdict: 'renamed', renamedTo: 'guides/a.md' })).toEqual({
+      phase: 'verdict',
+      info: cleanInfo(),
+      resolution: { kind: 'renamed', renamedTo: 'guides/a.md' },
+    });
+  });
+
+  test('deleted resolves to the deleted terminal cell', () => {
+    expect(applyVerdict(pending, { verdict: 'deleted' })).toEqual({
+      phase: 'verdict',
+      info: cleanInfo(),
+      resolution: { kind: 'deleted' },
+    });
+  });
+
+  test('never-on-branch resolves distinctly from deleted', () => {
+    expect(applyVerdict(pending, { verdict: 'never-on-branch' })).toEqual({
+      phase: 'verdict',
+      info: cleanInfo(),
+      resolution: { kind: 'never-on-branch' },
+    });
+  });
+
+  test('unknown verdict falls back to ready (today plain switch)', () => {
+    expect(applyVerdict(pending, { verdict: 'unknown' })).toEqual({
+      phase: 'ready',
+      info: cleanInfo(),
+    });
+  });
+
+  test('null proxy result falls back to ready (fail-open on transport failure)', () => {
+    expect(applyVerdict(pending, null)).toEqual({ phase: 'ready', info: cleanInfo() });
+  });
+
+  test('identity from non-verdict-pending phases (a late fetch cannot clobber a switch in flight)', () => {
+    const switching: BranchSwitchDialogState = {
+      phase: 'switching',
+      info: cleanInfo(),
+      pendingDoc: 'docs/foo.md',
+    };
+    expect(applyVerdict(switching, { verdict: 'on-origin' })).toBe(switching);
+  });
+});
+
+describe('markSwitching from a verdict cell', () => {
+  test('on-origin verdict → switching, carrying the navigation target', () => {
+    const verdict: BranchSwitchDialogState = {
+      phase: 'verdict',
+      info: cleanInfo(),
+      resolution: { kind: 'on-origin' },
+    };
+    expect(markSwitching(verdict, 'docs/notes.md')).toEqual({
+      phase: 'switching',
+      info: cleanInfo(),
+      pendingDoc: 'docs/notes.md',
+    });
+  });
+
+  test('renamed verdict → switching, navigating to the renamed path', () => {
+    const verdict: BranchSwitchDialogState = {
+      phase: 'verdict',
+      info: cleanInfo(),
+      resolution: { kind: 'renamed', renamedTo: 'guides/notes.md' },
+    };
+    expect(markSwitching(verdict, 'guides/notes.md')).toEqual({
+      phase: 'switching',
+      info: cleanInfo(),
+      pendingDoc: 'guides/notes.md',
+    });
+  });
+});
+
+describe('classifyCheckoutOutcome — ff-diverged (FR9 fast-forward refusal)', () => {
+  test('ff-diverged classifies to the branch-diverged action', () => {
+    expect(classifyCheckoutOutcome({ ok: false, reason: 'ff-diverged' })).toEqual({
+      action: 'branch-diverged',
+    });
+  });
+});
+
+describe('applyCheckoutOutcome — ff-diverged transition', () => {
+  test('switching → verdict{diverged} with no toast (dialog offers a plain switch)', () => {
+    const switching: BranchSwitchDialogState = {
+      phase: 'switching',
+      info: cleanInfo(),
+      pendingDoc: 'docs/notes.md',
+    };
+    const result = applyCheckoutOutcome(switching, { ok: false, reason: 'ff-diverged' });
+    expect(result.state).toEqual({
+      phase: 'verdict',
+      info: cleanInfo(),
+      resolution: { kind: 'diverged' },
+    });
+    expect(result.sideEffect).toBeUndefined();
   });
 });

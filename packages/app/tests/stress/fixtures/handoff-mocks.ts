@@ -413,6 +413,7 @@ export async function installHandoffMocks(page: Page, cfg: HandoffMockConfig): P
           readHeadBranch: async () => ({ currentBranch: null, headSha: null, detached: false }),
           fetchBranchInfo: async () => null,
           runCheckout: async () => null,
+          fetchTargetStatus: async () => null,
           awaitBranchSwitched: async () => ({ ok: false, reason: 'timeout' as const }),
           okInit: async () => ({
             ok: false as const,

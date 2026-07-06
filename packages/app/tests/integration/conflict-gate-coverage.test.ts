@@ -172,6 +172,10 @@ const EXEMPT_HANDLERS = new Set([
   // is a read endpoint with no lock per the lock-free-reads contract.
   'handleBranchInfo',
   'handleCheckout',
+  // `/api/share/target-status` — receive-side git verdict (fetch + rename
+  // detection). Updates only remote-tracking refs, never Y.Doc content, so the
+  // per-doc conflict gate does not apply. Same posture as `handleBranchInfo`.
+  'handleShareTargetStatus',
   // Test-only handlers. Wipe + rebuild semantics; conflict gate is orthogonal
   // (the wipe IS the resolution path in test scope).
   'handleTestReset',

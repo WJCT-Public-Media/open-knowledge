@@ -16,8 +16,17 @@
 
 import { realpathSync } from 'node:fs';
 import { type CheckoutFailureReason, isBranchNotFoundGitError } from '@inkeep/open-knowledge-core';
+import { truncateError } from './error-format.ts';
 import { dirtyFilesOverlapWith } from './git-dirty.ts';
 import { createGitInstance } from './git-handle.ts';
+
+/**
+ * Block timeout for the fast-forward fetches. These run inside `withParentLock`,
+ * so a hung fetch would hold the lock indefinitely — bound it (matching the
+ * receive-side target-status fetch) so a stalled network degrades to
+ * `unavailable` rather than wedging the checkout path.
+ */
+const FF_FETCH_TIMEOUT_MS = 15_000;
 
 export type CheckoutOutcome =
   | { ok: true }
@@ -42,7 +51,7 @@ export type CheckoutOutcome =
  * Older git (e.g. macOS system git) emits "checked out at"; newer git (e.g.
  * the Linux CI image) emits "used by worktree at". Matching only the former
  * silently drops the typed branch-in-other-worktree outcome on newer git,
- * collapsing the pivot into a generic checkout-failed.
+ * collapsing the in-place pivot into a generic checkout-failed.
  *
  * Branch names with single quotes inside them never reach here — git refuses
  * to create branches with single quotes (`refname` validation). A worktree
@@ -128,11 +137,27 @@ export const isBranchNotFoundFetchError = isBranchNotFoundGitError;
  * No internal try/catch wraps the whole flow — errors at each step are
  * either mapped to a typed outcome (steps 2, 4) or propagated to the
  * handler boundary for the catch-all 500 path.
+ *
+ * `opts.fastForward` prepends a fast-forward-only update of the target
+ * branch's local ref to origin's tip (step 0). It runs inside the same
+ * caller-held lock as the checkout so the ref move and the switch are atomic.
+ * On divergence the update is refused and `ff-diverged` short-circuits the
+ * flow WITHOUT checking out — the receive flow never merges. On a successful
+ * advance the branch is now local, so the fetch in step 2 is skipped and the
+ * dirty re-check in step 3 runs against the fast-forwarded tip.
  */
 export async function runCheckoutFlow(
   projectDir: string,
   branch: string,
+  opts?: { readonly fastForward?: boolean },
 ): Promise<CheckoutOutcome> {
+  if (opts?.fastForward) {
+    const ff = await fastForwardBranchToOrigin(projectDir, branch);
+    if (ff === 'diverged') {
+      return { ok: false, reason: 'ff-diverged' };
+    }
+  }
+
   const { git } = createGitInstance(projectDir);
 
   const branchIsLocal = await git
@@ -187,9 +212,104 @@ export async function runCheckoutFlow(
     // gates (rev-parse, fetch, dirty-overlap) all passed, so the most likely
     // causes are lock contention, filesystem permissions, or partial merge
     // state — which are the hardest to reproduce without a stderr breadcrumb.
-    const message = err instanceof Error ? err.message : String(err);
-    const truncated = message.length > 500 ? `${message.slice(0, 500)}…` : message;
+    const truncated = truncateError(err);
     console.warn(`[git-checkout] action=checkout-failed branch=${branch} error=${truncated}`);
     return { ok: false, reason: 'checkout-failed' };
   }
+}
+
+/**
+ * Outcome of {@link fastForwardBranchToOrigin}.
+ *
+ * - `advanced` — the local branch was fast-forwarded to origin's tip (ref move
+ *   only; verified by re-reading the ref).
+ * - `up-to-date` — the local branch already contains origin's tip (equal, or
+ *   ahead with unpushed commits), or isn't local yet (checkout will create it
+ *   at origin's tip). Nothing to update.
+ * - `diverged` — the local branch and origin have diverged (neither is an
+ *   ancestor of the other). REFUSED: nothing mutated. The receive flow never
+ *   merges — reconciliation is the sync engine's job.
+ * - `unavailable` — the initial fetch failed, origin's ref couldn't be resolved
+ *   (offline / branch not on origin), or the fast-forward advance did not reach
+ *   origin's tip (a rare origin-moved-again race). Callers fall back to today's
+ *   behavior; any ref move that did land was still a fast-forward.
+ */
+export type FastForwardOutcome = 'advanced' | 'up-to-date' | 'diverged' | 'unavailable';
+
+/**
+ * Fast-forward-only pre-checkout update of a NOT-checked-out branch to origin's
+ * tip. First fetches origin's branch into the remote-tracking ref (working tree
+ * and `refs/heads` untouched) to learn origin's tip, then advances
+ * `refs/heads/<branch>` ONLY when the local tip is a strict ancestor of it. The
+ * advance is a fast-forward-only `git fetch origin <branch>:<branch>`: git
+ * refuses a non-fast-forward ref update without `--force`, so even a regression
+ * in the ancestry classification below could never rewrite the branch
+ * non-linearly. The branch is not checked out, so the ref move never touches the
+ * working tree; it is never a merge or rebase. Divergence is refused with
+ * nothing mutated; the sync engine owns reconciliation.
+ *
+ * The advance is VERIFIED by re-reading the ref rather than trusting any exit
+ * code, and the ancestry check uses `git merge-base` (which signals via stdout)
+ * rather than `merge-base --is-ancestor` (exit-code-only, which simple-git
+ * cannot branch on — it rejects on stderr, not exit status). merge-base also
+ * distinguishes "local is ahead (up-to-date)" from "diverged (refuse)" — a
+ * rejected fast-forward fetch alone cannot tell those apart.
+ *
+ * PRECONDITION: `branch` must not be the checked-out branch. `git` refuses to
+ * move the current branch's ref this way; callers FF the TARGET branch before
+ * switching to it, so it is never HEAD.
+ */
+export async function fastForwardBranchToOrigin(
+  projectDir: string,
+  branch: string,
+): Promise<FastForwardOutcome> {
+  const { git } = createGitInstance(projectDir, { timeoutMs: FF_FETCH_TIMEOUT_MS });
+
+  const revParse = (ref: string): Promise<string | null> =>
+    git
+      .raw(['rev-parse', '--verify', ref])
+      .then((sha) => sha.trim())
+      .catch(() => null);
+
+  try {
+    await git.raw(['fetch', 'origin', branch]);
+  } catch (err) {
+    const truncated = truncateError(err);
+    console.warn(`[git-checkout] action=ff-fetch-failed branch=${branch} error=${truncated}`);
+    return 'unavailable';
+  }
+
+  const originTip = await revParse(`refs/remotes/origin/${branch}`);
+  if (!originTip) return 'unavailable';
+
+  const localTip = await revParse(`refs/heads/${branch}`);
+  // Not local yet — checkout will create it at origin's tip; nothing to FF.
+  if (!localTip || localTip === originTip) return 'up-to-date';
+
+  // `git merge-base <a> <b>` prints the best common ancestor on stdout; when it
+  // equals the local tip, local is strictly behind origin (fast-forwardable).
+  const mergeBase = await git
+    .raw(['merge-base', localTip, originTip])
+    .then((sha) => sha.trim())
+    .catch(() => '');
+
+  if (mergeBase === localTip) {
+    // Fast-forwardable. git's fetch refuses a non-fast-forward ref update, so a
+    // rejection or network failure here (e.g. origin advanced to a non-FF tip
+    // between the two fetches) throws and degrades to `unavailable` — never a
+    // merge, never a forced move.
+    try {
+      await git.raw(['fetch', 'origin', `${branch}:${branch}`]);
+    } catch (err) {
+      const truncated = truncateError(err);
+      console.warn(`[git-checkout] action=ff-advance-failed branch=${branch} error=${truncated}`);
+      return 'unavailable';
+    }
+    const after = await revParse(`refs/heads/${branch}`);
+    return after === originTip ? 'advanced' : 'unavailable';
+  }
+  // Local already contains origin's tip (ahead with unpushed commits).
+  if (mergeBase === originTip) return 'up-to-date';
+  // Genuinely diverged — refuse, mutate nothing.
+  return 'diverged';
 }

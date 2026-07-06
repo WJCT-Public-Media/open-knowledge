@@ -1008,6 +1008,10 @@ msgstr ""
 msgid "Browse"
 msgstr ""
 
+#: src/components/share-receive-miss-content.tsx
+msgid "Browse folder"
+msgstr ""
+
 #: src/components/CloneDialog.tsx
 msgid "Browse your repos:"
 msgstr ""
@@ -1098,6 +1102,11 @@ msgstr ""
 #: src/components/handoff/OpenInAgentContextSubmenu.tsx
 #: src/components/handoff/OpenInAgentMenu.tsx
 msgid "Checking for installed agents"
+msgstr ""
+
+#: src/components/share-receive-miss-content.tsx
+#: src/components/ShareBranchSwitchDialog.tsx
+msgid "Checking for updates on GitHub"
 msgstr ""
 
 #: src/components/ShareReceiveDialog.tsx
@@ -2311,6 +2320,7 @@ msgstr ""
 msgid "Docs tagged #{tagDocsName}"
 msgstr ""
 
+#: src/components/share-receive-miss-content.tsx
 #: src/components/ShareBranchSwitchDialog.tsx
 #: src/components/ShareReceiveDialog.tsx
 msgid "document"
@@ -2551,6 +2561,8 @@ msgstr ""
 
 #: src/components/AutoSyncOnboardingDialog.tsx
 #: src/components/EnableSyncConfirmDialog.tsx
+#: src/components/share-receive-miss-content.tsx
+#: src/components/ShareFreshnessWarning.tsx
 msgid "Enable auto-sync"
 msgstr ""
 
@@ -3018,6 +3030,7 @@ msgstr ""
 msgid "Fold, unfold, fold all, or unfold all source ranges."
 msgstr ""
 
+#: src/components/share-receive-miss-content.tsx
 #: src/components/ShareBranchSwitchDialog.tsx
 #: src/components/ShareReceiveDialog.tsx
 #: src/components/TemplateProperties.tsx
@@ -3316,6 +3329,10 @@ msgstr ""
 
 #: src/components/ShareButton.tsx
 msgid "How does sharing work?"
+msgstr ""
+
+#: src/components/ShareFreshnessWarning.tsx
+msgid "How to push manually"
 msgstr ""
 
 #: src/editor/slash-command/embed-starter-items.tsx
@@ -4630,6 +4647,11 @@ msgstr ""
 
 #: src/components/ShareBranchSwitchDialog.tsx
 msgid "Open in current branch"
+msgstr ""
+
+#: src/components/share-receive-miss-content.tsx
+#: src/components/ShareBranchSwitchDialog.tsx
+msgid "Open it there"
 msgstr ""
 
 #. placeholder {0}: state.importable
@@ -6313,6 +6335,10 @@ msgstr ""
 msgid "Summarize everything I changed this week"
 msgstr ""
 
+#: src/components/ShareBranchSwitchDialog.tsx
+msgid "Switch and update branch"
+msgstr ""
+
 #: src/components/CommandPalette.tsx
 #: src/components/ProjectSwitcher.tsx
 #: src/lib/keyboard-shortcuts.ts
@@ -6357,10 +6383,15 @@ msgstr ""
 msgid "Sync failed — check the server logs for details."
 msgstr ""
 
+#: src/components/ShareFreshnessWarning.tsx
+msgid "Sync is failing. See the sync status for details."
+msgstr ""
+
 #: src/components/SyncStatusBadge.tsx
 msgid "Sync is off — your edits will not sync to the remote repository."
 msgstr ""
 
+#: src/components/ShareFreshnessWarning.tsx
 #: src/components/SyncStatusBadge.tsx
 msgid "Sync now"
 msgstr ""
@@ -6405,6 +6436,14 @@ msgstr ""
 
 #: src/components/SyncStatusBadge.tsx
 msgid "Synced"
+msgstr ""
+
+#: src/components/ShareFreshnessWarning.tsx
+msgid "Synced. The link is up to date."
+msgstr ""
+
+#: src/components/ShareFreshnessWarning.tsx
+msgid "Syncing"
 msgstr ""
 
 #: src/components/TrashFailureModal.tsx
@@ -6644,8 +6683,35 @@ msgstr ""
 msgid "There's no project folder for this window, so a terminal can't start here."
 msgstr ""
 
+#: src/components/share-receive-miss-content.tsx
+msgid "This {targetNoun} has been moved, renamed, or deleted in your local copy of branch <0>{branch}</0>. Please commit your changes or enable auto-sync."
+msgstr ""
+
+#: src/components/share-receive-miss-content.tsx
+msgid "This {targetNoun} has been moved, renamed, or deleted in your local copy. Please commit your changes or enable auto-sync."
+msgstr ""
+
+#: src/components/share-receive-miss-content.tsx
+msgid "This {targetNoun} isn't on branch <0>{branch}</0>. It may not have been pushed yet."
+msgstr ""
+
+#. placeholder {0}: branchSwitchState.resolution.renamedTo
+#. placeholder {0}: resolution.renamedTo
+#: src/components/share-receive-miss-content.tsx
+#: src/components/ShareBranchSwitchDialog.tsx
+msgid "This {targetNoun} moved to <0>{0}</0>. Open it there?"
+msgstr ""
+
 #: src/components/ShareBranchSwitchDialog.tsx
 msgid "This {targetNoun} only exists on branch <0>{shareBranch}</0>. You have uncommitted changes that prevent switching. Commit or stash your changes, then open the share link again."
+msgstr ""
+
+#: src/components/ShareBranchSwitchDialog.tsx
+msgid "This {targetNoun} was added to branch <0>{shareBranch}</0> recently. Switch and update to open it."
+msgstr ""
+
+#: src/components/share-receive-miss-content.tsx
+msgid "This {targetNoun} was removed from branch <0>{branch}</0>."
 msgstr ""
 
 #: src/components/ShareBranchSwitchDialog.tsx
@@ -6658,6 +6724,18 @@ msgstr ""
 
 #: src/components/ShareReceiveDialog.tsx
 msgid "This branch is checked out in:"
+msgstr ""
+
+#: src/components/ShareFreshnessWarning.tsx
+msgid "This doc has unpushed changes. Recipients will see the last pushed version."
+msgstr ""
+
+#: src/components/ShareFreshnessWarning.tsx
+msgid "This doc hasn't synced to GitHub yet. The link will work after the next sync."
+msgstr ""
+
+#: src/components/ShareFreshnessWarning.tsx
+msgid "This doc isn't on GitHub yet. The link won't work until it's pushed."
 msgstr ""
 
 #: src/components/GraphPanel.tsx
@@ -6680,8 +6758,20 @@ msgstr ""
 msgid "This file is too large to open in the built-in text editor (1 MB limit). Use Open file below to open it in another app."
 msgstr ""
 
+#: src/components/ShareFreshnessWarning.tsx
+msgid "This folder has unpushed changes. Recipients will see the last pushed version."
+msgstr ""
+
+#: src/components/ShareFreshnessWarning.tsx
+msgid "This folder hasn't synced to GitHub yet. The link will work after the next sync."
+msgstr ""
+
 #: src/components/FolderOverview.tsx
 msgid "This folder is empty."
+msgstr ""
+
+#: src/components/ShareFreshnessWarning.tsx
+msgid "This folder isn't on GitHub yet. The link won't work until it's pushed."
 msgstr ""
 
 #: src/components/DeleteConfirmationDialog.tsx
@@ -7393,6 +7483,10 @@ msgstr ""
 msgid "You don't have permission to push to this repo."
 msgstr ""
 
+#: src/components/ShareFreshnessWarning.tsx
+msgid "You don't have write access to this repo."
+msgstr ""
+
 #: src/components/DiffViewBoundary.tsx
 msgid "You modified <0>{filePath}</0> locally, but it was deleted upstream."
 msgstr ""
@@ -7425,6 +7519,10 @@ msgstr ""
 msgid "You're subscribed!"
 msgstr ""
 
+#: src/components/ShareBranchSwitchDialog.tsx
+msgid "Your copy of branch <0>{shareBranch}</0> has changes that aren't on GitHub. The {targetNoun} will appear once the branch syncs."
+msgstr ""
+
 #: src/components/settings/SettingsDialogBody.tsx
 #: src/components/SyncStatusBadge.tsx
 msgid "Your GitHub session expired — sign in again to verify push access."
@@ -7436,6 +7534,14 @@ msgstr ""
 
 #: src/components/PublishToGitHubDialog.tsx
 msgid "Your knowledge base is now on GitHub at <0>{ownerLogin}/{repoName}</0>."
+msgstr ""
+
+#: src/components/share-receive-miss-content.tsx
+msgid "Your local copy is behind. Pull the latest changes, then open the link again."
+msgstr ""
+
+#: src/components/share-receive-miss-content.tsx
+msgid "Your local copy of branch <0>{branch}</0> is behind. Pull the latest changes, then open the link again."
 msgstr ""
 
 #: src/components/settings/EmbeddingsKeySection.tsx

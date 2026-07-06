@@ -46,6 +46,8 @@
 import { toast } from 'sonner';
 import type { OkDesktopBridge } from '@/lib/desktop-bridge-types';
 import { encodeShareTargetForHash } from '@/lib/doc-hash';
+import { missDialogStore } from '@/lib/share/miss-dialog-store';
+import { pendingReceiveNavStore } from '@/lib/share/pending-receive-nav-store';
 
 interface InstallDeepLinkListenerOptions {
   /** Bridge resolved from `window.okDesktop`. Absent in web/CLI. */
@@ -110,23 +112,24 @@ export function installDeepLinkListener(
     // folder-share — those payloads carry no `kind`, and the doc form is the
     // back-compat target.
     const kind = evt.kind ?? 'doc';
-    // Stale-branch gate: main's target-existence probe found the share's
-    // target absent on the receiver's checked-out branch (target added on the
-    // remote branch but not yet fetched). Surface a toast in-context instead
-    // of navigating into a blank editor / empty folder, and skip the hash nav
-    // so the window stays on its current view.
+    // Keep the share target's file extension: the verdict fetch needs the real
+    // repo path, and both stores normalize for matching.
+    const nav = { kind, path: evt.doc, branch: evt.branch ?? null };
+    // Main's pre-nav stat probe already found the target absent on the
+    // receiver's checked-out branch (deleted / renamed / not yet fetched). Show
+    // the honest verdict as a modal WITHOUT navigating to the dead path — no
+    // phantom tab is opened and create-mode can't fork. The in-tab
+    // `pendingReceiveNav` panel stays the backstop for a miss discovered only
+    // AFTER navigation (main said present, but the local ref no longer carries
+    // it), which the branch below arms.
     if (evt.targetMissing === true) {
-      const label = kind === 'folder' ? 'folder' : 'file';
-      const onBranch =
-        evt.branch === undefined || evt.branch === null || evt.branch === ''
-          ? ''
-          : ` on branch ${evt.branch}`;
-      emitToast(`This ${label} isn't in your local checkout${onBranch} yet`, {
-        description: 'Pull the latest changes, then open the share link again.',
-        duration: 5000,
-      });
+      missDialogStore.arm(nav);
       return;
     }
+    // Arm the renderer's in-tab miss backstop before navigating, then navigate.
+    // The store self-clears once navigation leaves this target, so a later
+    // wiki-link to the same path is create-on-navigate again.
+    pendingReceiveNavStore.arm(nav);
     // `branch` rides the hash as `?branch=` ONLY for doc shares (a
     // defense-in-depth signal for the renderer's branch-switch trigger). Folder
     // shares resolve the branch-switch upstream before navigation, so the folder

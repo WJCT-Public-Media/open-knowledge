@@ -18,6 +18,7 @@ import { join } from 'node:path';
 import {
   type ShareConstructUrlErrorCode,
   ShareConstructUrlResponseSchema,
+  type ShareFreshness,
 } from '@inkeep/open-knowledge-core';
 import { z } from 'zod';
 import { SUPPORTED_DOC_EXTENSIONS } from '../../doc-extensions.ts';
@@ -62,6 +63,24 @@ interface ShareLinkSuccess {
   sharedUrl: string;
   branch: string;
   resolvedKind: ShareKind;
+  freshness?: ShareFreshness;
+}
+
+/**
+ * The relayable warning an agent prepends to a share link when the target
+ * isn't current on origin — the `share_link` mirror of the popover's fact line
+ * (kind substitutes doc/folder). `current` and `undefined` (the fail-open and
+ * unknown-value cases) get no warning, so an older client that can't interpret
+ * a newer freshness value degrades to silence rather than a bad relay.
+ */
+function freshnessWarning(freshness: ShareFreshness | undefined, kind: ShareKind): string {
+  if (freshness === 'absent') {
+    return `This ${kind} isn't on GitHub yet. The link won't work until it's pushed.\n\n`;
+  }
+  if (freshness === 'stale') {
+    return `This ${kind} has unpushed changes. Recipients will see the last pushed version.\n\n`;
+  }
+  return '';
 }
 
 /**
@@ -266,6 +285,12 @@ const OutputSchema = outputSchemaWithText({
     .enum(['doc', 'folder'])
     .optional()
     .describe('Kind the target resolved to (success only).'),
+  freshness: z
+    .enum(['current', 'stale', 'absent'])
+    .optional()
+    .describe(
+      'Whether the shared target matches origin (success only): current, stale (unpushed edits), or absent (not on origin). Omitted when the probe could not run.',
+    ),
   error: z
     .enum([
       'no-remote',
@@ -432,13 +457,16 @@ export function register(server: ServerInstance, deps: ShareLinkDeps): void {
         return textPlusStructured(`Error: ${message}`, structured, true);
       }
 
-      const { shareUrl, sharedUrl, branch } = body;
+      const { shareUrl, sharedUrl, branch, freshness } = body;
       const structured: ShareLinkSuccess = {
         ok: true,
         shareUrl,
         sharedUrl,
         branch,
         resolvedKind: resolved.kind,
+        // Omit rather than emit `undefined` so the fail-open / unknown-value
+        // case leaves the field absent (the outputSchema declares it optional).
+        ...(freshness ? { freshness } : {}),
       };
       // Preview hint is route-only and symmetric across kinds: a doc previews
       // at `/#/<doc>`, a folder at `/#/<folderPath>/` (`/#/` for the
@@ -460,8 +488,11 @@ export function register(server: ServerInstance, deps: ShareLinkDeps): void {
         preview = { ...preview, url: folderRoute };
       }
       const displayPath = args.path === '' ? '(content root)' : args.path;
+      // Prepend the freshness fact line so an agent relays the same caution a
+      // human would see in the popover before handing over a stale/dead link.
+      const warning = freshnessWarning(freshness, resolved.kind);
       return textPlusStructured(
-        `Share link for ${resolved.kind} \`${displayPath}\` on branch \`${branch}\`:\n${shareUrl}`,
+        `${warning}Share link for ${resolved.kind} \`${displayPath}\` on branch \`${branch}\`:\n${shareUrl}`,
         {
           ...structured,
           previewUrl: preview?.url ?? null,

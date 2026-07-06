@@ -30,7 +30,14 @@
  * existing channels is preferred over net-new hand-rolled channels until
  * that migration lands.
  *
- * Count is 76 (ratchet cap 76). Full rationale in the ratchet test header.
+ * Count is 77 (ratchet cap 77). The 74→75 bump reconciled a merge collision:
+ * the worktree selector (`ok:worktree:dispatch`) and the terminal-controls PR
+ * (`ok:terminal:cli-installed-map`) each landed in the base tree's single free
+ * slot concurrently. The 75→76 bump then unioned in the desktop
+ * startup-instrumentation channel (`ok:startup:renderer-marks`), which landed
+ * on main in parallel. The 76→77 bump added the share-receive branch-switch
+ * dialog's verdict probe (`ok:project:fetch-target-status`). Full rationale in
+ * the ratchet test header.
  */
 
 import type {
@@ -40,6 +47,7 @@ import type {
   EditorId,
   LocalOpOkInitResponse,
   OkFolderState,
+  ShareTargetStatusResponse,
   TerminalCli,
   WorktreeCreateRequest,
   WorktreeCreateResult,
@@ -662,11 +670,28 @@ export interface RequestChannels {
    * be parsed; the dialog treats this as a generic checkout-failed and
    * stays open. Server-classified failures (`dirty-conflict`,
    * `branch-not-found`, `fetch-failed`, `checkout-failed`) are returned
-   * verbatim so the dialog can map each to its own toast copy.
+   * verbatim so the dialog can map each to its own toast copy. `fastForward`
+   * (on-origin "Switch and update branch") asks the server to fast-forward the
+   * target branch to origin's tip before checkout; divergence returns the
+   * verbatim `ff-diverged` reason so the dialog can offer a plain switch.
    */
   'ok:project:run-checkout': {
-    args: [request: { projectPath: string; branch: string }];
+    args: [request: { projectPath: string; branch: string; fastForward?: boolean }];
     result: CheckoutResponse | null;
+  };
+  /**
+   * Proxy `POST /api/share/target-status` against the project's running server
+   * for the branch-switch dialog's verdict pivot. When `fetch-branch-info`'s
+   * origin-existence hint is `false`, the dialog asks main to run the
+   * fetch-backed verdict (on-origin / renamed / deleted / never-on-branch /
+   * unknown) instead of treating the stale hint as a terminal denial. Returns
+   * `null` on transport failure (the dialog treats it as `unknown`); a 200 with
+   * an unexpected body degrades to `{verdict:'unknown'}` via the schema's
+   * value-tolerant parse. Never throws.
+   */
+  'ok:project:fetch-target-status': {
+    args: [request: { projectPath: string; branch: string; path: string; kind: 'doc' | 'folder' }];
+    result: ShareTargetStatusResponse | null;
   };
   /**
    * Poll the project's `GET /api/server-info` until `currentBranch` matches
