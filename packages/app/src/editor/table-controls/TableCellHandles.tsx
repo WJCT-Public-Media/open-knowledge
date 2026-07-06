@@ -65,14 +65,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { getFindReplaceState } from '../find-replace/tiptap-find-replace-extension';
+import { useTableDragReorder } from './useTableDragReorder';
 
 type Axis = 'column' | 'row';
 
 interface ActiveCell {
   /** Top cell of the active column — anchor for the column handle. */
-  columnAnchor: HTMLElement;
+  columnAnchor: HTMLTableCellElement;
   /** Left cell of the active row — anchor for the row handle. */
-  rowAnchor: HTMLElement;
+  rowAnchor: HTMLTableCellElement;
   isFirstColumn: boolean;
   isFirstRow: boolean;
 }
@@ -195,11 +196,22 @@ function CellHandle({
   items,
 }: {
   editor: Editor;
-  anchor: HTMLElement;
+  anchor: HTMLTableCellElement;
   axis: Axis;
   items: MenuItem[];
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Controlled Radix open state — the drag hook coordinates against it so
+  // a pending drag never flashes the menu open. The hook's pointerup calls
+  // onClickGesture when the gesture stayed under the drag threshold, and
+  // we translate that into `setOpen(true)`.
+  const [open, setOpen] = useState(false);
+  const drag = useTableDragReorder({
+    editor,
+    axis,
+    anchor,
+    onClickGesture: () => setOpen(true),
+  });
 
   useEffect(() => {
     const el = ref.current;
@@ -233,43 +245,75 @@ function CellHandle({
   const HandleIcon = axis === 'column' ? Ellipsis : EllipsisVertical;
 
   return (
-    <div ref={ref} data-testid="table-cell-handle" className="absolute left-0 top-0 z-10 opacity-0">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="secondary"
-            // The transparent `::before` (-inset-6px) expands the click target
-            // to ~24px (WCAG 2.5.8) without enlarging the visible 12px pill.
-            className={
-              axis === 'column'
-                ? 'h-3 w-7 rounded-full p-0 text-gray-700 dark:text-muted-foreground bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 hover:text-foreground dark:hover:bg-gray-600 dark:hover:text-gray-100 relative before:absolute before:-inset-[6px] before:content-[""]'
-                : 'h-7 w-3 rounded-full p-0 text-gray-700 dark:text-muted-foreground bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 hover:text-foreground dark:hover:bg-gray-600 dark:hover:text-gray-100 relative before:absolute before:-inset-[6px] before:content-[""]'
-            }
-            aria-label={axis === 'column' ? 'Column options' : 'Row options'}
-          >
-            <HandleIcon className="size-3.5" aria-hidden />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align={axis === 'column' ? 'center' : 'start'}
-          side={axis === 'column' ? 'bottom' : 'right'}
-          // Override the shadcn default `w-(--radix-…-trigger-width)`: the trigger
-          // is a tiny handle, so width-to-trigger collapses the menu and wraps
-          // labels. Size to content instead, with a comfortable floor.
-          className="w-auto min-w-44 whitespace-nowrap"
+    <>
+      <div
+        ref={ref}
+        data-testid="table-cell-handle"
+        className="absolute left-0 top-0 z-10 opacity-0"
+      >
+        <DropdownMenu
+          open={open}
+          onOpenChange={(next) => {
+            if (drag.shouldAllowOpen(next)) setOpen(next);
+          }}
         >
-          {items.map((item) => (
-            <Fragment key={item.label}>
-              {item.separatorBefore && <DropdownMenuSeparator />}
-              <DropdownMenuItem onSelect={() => item.run(editor)}>
-                <item.icon aria-hidden />
-                {item.label}
-              </DropdownMenuItem>
-            </Fragment>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="secondary"
+              onPointerDown={drag.onPointerDown}
+              // The transparent `::before` (-inset-6px) expands the click target
+              // to ~24px (WCAG 2.5.8) without enlarging the visible 12px pill.
+              // `cursor-grab` telegraphs the drag affordance; the drag hook
+              // swaps it for `grabbing` on the body during an active gesture.
+              className={
+                axis === 'column'
+                  ? 'h-3 w-7 rounded-full p-0 text-gray-700 dark:text-muted-foreground bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 hover:text-foreground dark:hover:bg-gray-600 dark:hover:text-gray-100 relative cursor-grab before:absolute before:-inset-[6px] before:content-[""]'
+                  : 'h-7 w-3 rounded-full p-0 text-gray-700 dark:text-muted-foreground bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 hover:text-foreground dark:hover:bg-gray-600 dark:hover:text-gray-100 relative cursor-grab before:absolute before:-inset-[6px] before:content-[""]'
+              }
+              aria-label={axis === 'column' ? 'Column options' : 'Row options'}
+            >
+              <HandleIcon className="size-3.5" aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align={axis === 'column' ? 'center' : 'start'}
+            side={axis === 'column' ? 'bottom' : 'right'}
+            // Override the shadcn default `w-(--radix-…-trigger-width)`: the trigger
+            // is a tiny handle, so width-to-trigger collapses the menu and wraps
+            // labels. Size to content instead, with a comfortable floor.
+            className="w-auto min-w-44 whitespace-nowrap"
+          >
+            {items.map((item) => (
+              <Fragment key={item.label}>
+                {item.separatorBefore && <DropdownMenuSeparator />}
+                <DropdownMenuItem onSelect={() => item.run(editor)}>
+                  <item.icon aria-hidden />
+                  {item.label}
+                </DropdownMenuItem>
+              </Fragment>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      {drag.indicator && (
+        // Fixed-position drop indicator. Escapes the transformed-ancestor
+        // trap that `strategy: 'absolute'` was chosen to avoid — we compute
+        // client coordinates directly from the table's DOMRect, so fixed
+        // positioning is correct here (unlike the handles, whose autoUpdate
+        // tracks scroll via floating-ui). The `pointerEvents: 'none'` keeps
+        // the indicator from intercepting the ongoing gesture.
+        <div
+          aria-hidden
+          className="pointer-events-none fixed z-50 bg-primary"
+          style={{
+            left: drag.indicator.rect.left,
+            top: drag.indicator.rect.top,
+            width: drag.indicator.rect.width,
+            height: drag.indicator.rect.height,
+          }}
+        />
+      )}
+    </>
   );
 }
 

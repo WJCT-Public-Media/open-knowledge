@@ -16,16 +16,22 @@
  */
 
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { sharedExtensions } from '@inkeep/open-knowledge-core';
 import type { JSONContent } from '@tiptap/core';
+import { getSchema } from '@tiptap/core';
 import type { Fragment } from '@tiptap/pm/model';
-import { Schema } from '@tiptap/pm/model';
+import { Fragment as PmFragment, type Node as PmNode, Schema } from '@tiptap/pm/model';
+import { EditorState, type TextSelection } from '@tiptap/pm/state';
+import { CellSelection, TableMap } from '@tiptap/pm/tables';
 import type { EditorView } from '@tiptap/pm/view';
 
 import {
   createClipboardHtmlSerializer,
   createClipboardTextSerializer,
   findDescriptorRoot,
+  serializeCellSelectionAsText,
   sliceToDocJson,
+  wrapAsTableFragment,
 } from './serialize.ts';
 
 // Minimal schema that lets us synthesise a `doc > paragraph > text` tree.
@@ -538,5 +544,220 @@ describe('sliceToDocJson — inline-first wrapping branch', () => {
     expect(docJson.content?.[0]?.type).toBe('paragraph');
     // Image is one level deep, NOT two — confirms no extra wrap was added.
     expect(docJson.content?.[0]?.content?.[0]?.type).toBe('image');
+  });
+});
+
+// Shared schema for the CellSelection tests below. Real table nodes from core's
+// shared extensions — `wrapAsTableFragment` and `serializeCellSelectionAsText`
+// both switch on `type === schema.nodes.table` / `tableRow`, so a hand-rolled
+// schema wouldn't exercise the type-identity checks.
+const tableSchema = getSchema(sharedExtensions);
+
+function tableCell(text: string, header = false): PmNode {
+  const cellType = header ? tableSchema.nodes.tableHeader : tableSchema.nodes.tableCell;
+  const p = tableSchema.nodes.paragraph.create(null, text ? [tableSchema.text(text)] : []);
+  return cellType.createChecked(null, p);
+}
+
+function tableRow(cells: PmNode[]): PmNode {
+  return tableSchema.nodes.tableRow.createChecked(null, cells);
+}
+
+function tableNode(rows: string[][]): PmNode {
+  return tableSchema.nodes.table.createChecked(
+    null,
+    rows.map((r, i) => tableRow(r.map((c) => tableCell(c, i === 0)))),
+  );
+}
+
+describe('wrapAsTableFragment — normalize CellSelection.content() shapes', () => {
+  // `CellSelection.content()` returns a different fragment shape depending on
+  // which cells are selected. The paste-side handler needs a top-level
+  // `<table>` element to recognize the payload as a table, so every input
+  // shape must round-trip through this normalizer as `Fragment<table>`.
+
+  test('Fragment<table> → passed through unchanged', () => {
+    const t = tableNode([
+      ['H1', 'H2'],
+      ['a', 'b'],
+    ]);
+    const input = PmFragment.from(t);
+    const out = wrapAsTableFragment(input, tableSchema);
+    expect(out.firstChild?.type).toBe(tableSchema.nodes.table);
+    expect(out.childCount).toBe(1);
+    // Same table node identity — nothing rebuilt when already wrapped.
+    expect(out.firstChild).toBe(t);
+  });
+
+  test('Fragment<tableRow> → wrapped in a table', () => {
+    // Cells within a single row's worth of selection yield a bare row.
+    const row = tableRow([tableCell('a'), tableCell('b')]);
+    const input = PmFragment.from(row);
+    const out = wrapAsTableFragment(input, tableSchema);
+    expect(out.firstChild?.type).toBe(tableSchema.nodes.table);
+    // Table has one row with two cells preserved.
+    const wrappedTable = out.firstChild;
+    expect(wrappedTable?.childCount).toBe(1);
+    const wrappedRow = wrappedTable?.child(0);
+    expect(wrappedRow?.type).toBe(tableSchema.nodes.tableRow);
+    expect(wrappedRow?.childCount).toBe(2);
+    expect(wrappedRow?.child(0).textContent).toBe('a');
+    expect(wrappedRow?.child(1).textContent).toBe('b');
+  });
+
+  test('Fragment<tableCell> → wrapped in row, then table', () => {
+    // A single-cell selection yields just the cell.
+    const cell = tableCell('lone');
+    const input = PmFragment.from(cell);
+    const out = wrapAsTableFragment(input, tableSchema);
+    expect(out.firstChild?.type).toBe(tableSchema.nodes.table);
+    const wrappedRow = out.firstChild?.child(0);
+    expect(wrappedRow?.type).toBe(tableSchema.nodes.tableRow);
+    expect(wrappedRow?.child(0).textContent).toBe('lone');
+  });
+
+  test('empty fragment → returned as-is (no throw, no synthesis)', () => {
+    const empty = PmFragment.empty;
+    expect(wrapAsTableFragment(empty, tableSchema)).toBe(empty);
+  });
+
+  test('non-table schema → fragment returned unchanged', () => {
+    // Defense against a hypothetical schema that lacks table nodes: the
+    // guard clause should bail without throwing so the caller falls through.
+    const plainSchema = new Schema({
+      nodes: {
+        doc: { content: 'block+' },
+        paragraph: { group: 'block', content: 'text*' },
+        text: {},
+      },
+    });
+    const p = plainSchema.node('paragraph', null, [plainSchema.text('hello')]);
+    const frag = PmFragment.from(p);
+    expect(wrapAsTableFragment(frag, plainSchema)).toBe(frag);
+  });
+});
+
+// Build a real CellSelection over an anchor→head cell range on a fresh doc.
+// `CellSelection` resolves anchor/head positions where `nodeAfter` is the
+// target cell and `node(-1)` is the table — i.e. the position immediately
+// before the cell within its row. `TableMap.positionAt(row, col, tableStart)`
+// returns exactly that.
+function tableStateWithSelection(
+  rows: string[][],
+  anchorCoords: [number, number],
+  headCoords: [number, number],
+) {
+  const t = tableNode(rows);
+  const doc = tableSchema.nodes.doc.create(null, t);
+  const state = EditorState.create({ schema: tableSchema, doc });
+  // Table is doc's first child, so it starts at position 0 (before the table
+  // node); position 1 is the first position inside the table (before the
+  // first row). `TableMap.positionAt` expects the "inside table" start.
+  const tableStart = 1;
+  const map = TableMap.get(t);
+  const anchorPos = map.positionAt(anchorCoords[0], anchorCoords[1], t) + tableStart;
+  const headPos = map.positionAt(headCoords[0], headCoords[1], t) + tableStart;
+  const $anchor = state.doc.resolve(anchorPos);
+  const $head = state.doc.resolve(headPos);
+  const selection = new CellSelection($anchor, $head);
+  const tr = state.tr.setSelection(selection as unknown as TextSelection);
+  return state.apply(tr);
+}
+
+describe('serializeCellSelectionAsText — spreadsheet clipboard convention', () => {
+  // Multi-cell copies must emit `\t`-separated cells and `\n`-separated rows
+  // for `text/plain`, matching what Excel / Sheets / Numbers exchange. The
+  // markdown pipeline can't serialize tableRow / tableCell fragments as
+  // top-level doc content, so without this branch the text collapses to
+  // concatenated cell strings and column boundaries disappear.
+
+  test('2×2 selection → two tab-separated rows joined with a newline', () => {
+    const state = tableStateWithSelection(
+      [
+        ['Col X', 'Col Y'],
+        ['Andrew', 'Sarah'],
+        ['Robert', 'Miles'],
+      ],
+      [1, 0], // anchor: Andrew
+      [2, 1], // head: Miles
+    );
+    const text = serializeCellSelectionAsText(state.selection as CellSelection);
+    expect(text).toBe('Andrew\tSarah\nRobert\tMiles');
+  });
+
+  test('single-row multi-cell selection → one tab-separated row, no newline', () => {
+    const state = tableStateWithSelection(
+      [
+        ['H1', 'H2', 'H3'],
+        ['a', 'b', 'c'],
+      ],
+      [1, 0],
+      [1, 2],
+    );
+    const text = serializeCellSelectionAsText(state.selection as CellSelection);
+    expect(text).toBe('a\tb\tc');
+  });
+
+  test('single-cell selection → cell text with no tabs, no newlines', () => {
+    const state = tableStateWithSelection(
+      [
+        ['H1', 'H2'],
+        ['a', 'b'],
+      ],
+      [1, 1],
+      [1, 1],
+    );
+    const text = serializeCellSelectionAsText(state.selection as CellSelection);
+    expect(text).toBe('b');
+  });
+
+  test('whole-column selection → cells joined by newlines, no tabs', () => {
+    const state = tableStateWithSelection(
+      [
+        ['H1', 'H2'],
+        ['a', 'b'],
+        ['c', 'd'],
+      ],
+      [0, 0],
+      [2, 0],
+    );
+    const text = serializeCellSelectionAsText(state.selection as CellSelection);
+    expect(text).toBe('H1\na\nc');
+  });
+});
+
+describe('createClipboardTextSerializer — CellSelection routing decision', () => {
+  // The `if (view.state.selection instanceof CellSelection)` branch is the
+  // core behavior fix for the multi-cell copy bug. The
+  // serializeCellSelectionAsText tests above cover the tab / newline
+  // formatting; this describes pins the ROUTING decision — a regression
+  // that removes the CellSelection guard would silently fall through to
+  // the markdown path and re-introduce the empty-copy bug.
+
+  test('CellSelection state → routes to spreadsheet text, skips markdown pipeline', () => {
+    const state = tableStateWithSelection(
+      [
+        ['H1', 'H2'],
+        ['a', 'b'],
+        ['c', 'd'],
+      ],
+      [1, 0],
+      [2, 1],
+    );
+    // If the routing decision breaks, this markdown mock is invoked and
+    // returns the sentinel. A passing test proves the CellSelection branch
+    // fired instead.
+    const md = fakeMdManager();
+    md.serialize = mock(() => 'MARKDOWN-PATH-FALLTHROUGH');
+    // biome-ignore lint/suspicious/noExplicitAny: fake md manager shape
+    const serializer = createClipboardTextSerializer({ mdManager: md as any });
+    // Real state carries the CellSelection; the slice arg is unused by
+    // the CellSelection branch but must be a valid Slice for the type.
+    const slice = state.selection.content();
+    const text = serializer(slice, {
+      state,
+    } as unknown as Parameters<ReturnType<typeof createClipboardTextSerializer>>[1]);
+    expect(text).toBe('a\tb\nc\td');
+    expect(md.serialize).not.toHaveBeenCalled();
   });
 });

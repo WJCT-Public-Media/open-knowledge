@@ -32,8 +32,9 @@
 import type { MarkdownManager } from '@inkeep/open-knowledge-core';
 import { markdownToHtml } from '@inkeep/open-knowledge-core';
 import type { JSONContent } from '@tiptap/core';
-import type { Schema, Slice } from '@tiptap/pm/model';
+import type { Node, Schema, Slice } from '@tiptap/pm/model';
 import { DOMSerializer, Fragment, Slice as SliceCtor } from '@tiptap/pm/model';
+import { CellSelection } from '@tiptap/pm/tables';
 import type { EditorView } from '@tiptap/pm/view';
 import {
   type SerializeResult,
@@ -65,6 +66,32 @@ export interface ClipboardHtmlSerializerHandle {
  */
 export function createClipboardTextSerializer(deps: WysiwygSerializerDeps) {
   return (slice: Slice, view: EditorView): string => {
+    // CellSelection copies belong to the table clipboard convention, not
+    // to the markdown pipeline. `\t`-separated cells / `\n`-separated
+    // rows is what browsers and spreadsheets (Excel, Sheets, Numbers)
+    // exchange as `text/plain`; it also pastes cleanly into GitHub /
+    // Slack. The default markdown path serializes tableRow / tableCell
+    // fragments as top-level doc content, which the schema rejects, so
+    // the text collapses to the concatenated cell strings and paste-
+    // side loses column boundaries entirely.
+    //
+    // Wrapped in try/catch to match the file's documented error-path
+    // discipline (see header): text-serializer throw → fall through to
+    // markdown / PM textBetween. `forEachCell` and `resolve(pos).before()`
+    // are the throw surfaces here; both are low-probability but real
+    // (RangeError on a stale position after a race with a remote edit).
+    if (view.state.selection instanceof CellSelection) {
+      try {
+        return serializeCellSelectionAsText(view.state.selection);
+      } catch (err) {
+        logSerializeFail({
+          view: 'wysiwyg',
+          kind: 'text',
+          reason: `cellselection:${(err as Error)?.message ?? 'unknown'}`,
+        });
+        // Fall through to the markdown path below.
+      }
+    }
     try {
       return sliceToMarkdown(slice, view.state.schema, deps.mdManager);
     } catch (err) {
@@ -76,6 +103,23 @@ export function createClipboardTextSerializer(deps: WysiwygSerializerDeps) {
       return slice.content.textBetween(0, slice.content.size, '\n\n');
     }
   };
+}
+
+export function serializeCellSelectionAsText(selection: CellSelection): string {
+  const rows: string[][] = [];
+  let currentRowTop: number | null = null;
+  let currentRow: string[] = [];
+  selection.forEachCell((cell, pos) => {
+    const rowTop = selection.$anchorCell.doc.resolve(pos).before();
+    if (currentRowTop === null || rowTop !== currentRowTop) {
+      if (currentRow.length > 0) rows.push(currentRow);
+      currentRow = [];
+      currentRowTop = rowTop;
+    }
+    currentRow.push(cell.textContent);
+  });
+  if (currentRow.length > 0) rows.push(currentRow);
+  return rows.map((r) => r.join('\t')).join('\n');
 }
 
 /**
@@ -115,6 +159,38 @@ class MdastClipboardSerializer extends DOMSerializer {
     target?: HTMLElement | DocumentFragment,
   ): HTMLElement | DocumentFragment {
     const view = this.view;
+    // Table-cell selection escape hatch. The walker's containment guard
+    // (see `clipboard-walker.ts` `selectionPartiallyCoversTopLevelNode`)
+    // bails on any selection that only partially covers a top-level
+    // block — and a `CellSelection` is by definition inside the top-
+    // level `<table>`, so the walker always returns empty for it.
+    // Falling through to the markdown tier is worse: `sliceToDocJson`
+    // can't fit tableRow / tableCell fragments as top-level doc content,
+    // so markdown output is empty and the `text/html` clipboard payload
+    // collapses to `""`. Paste-side (any target — our own, GitHub,
+    // Sheets) then reads only `text/plain` and the entire multi-cell
+    // selection lands in one cell.
+    //
+    // For CellSelection, use the schema's default DOMSerializer directly
+    // on the fragment. The fragment already carries `table` + `tableRow`
+    // + `tableCell` structure from `CellSelection.content()`, so
+    // `serializeFragment` produces standard `<table><tr><td>...` HTML
+    // that every paste handler understands.
+    if (view && view.state.selection instanceof CellSelection) {
+      try {
+        const schema = fragment.firstChild?.type.schema ?? view.state.schema;
+        const defaultSerializer = DOMSerializer.fromSchema(schema);
+        const wrapped = wrapAsTableFragment(fragment, schema);
+        return defaultSerializer.serializeFragment(wrapped, { document }, target);
+      } catch (err) {
+        logSerializeFail({
+          view: 'wysiwyg',
+          kind: 'html',
+          reason: `cellselection:${(err as Error)?.message ?? 'unknown'}`,
+        });
+        // Fall through to the standard tiers below.
+      }
+    }
     // Walker tier (primary). When a view is attached AND there's an active
     // selection, capture whatever React rendered + whatever CSS resolved.
     // A walker throw or empty result falls through to the markdown tier
@@ -361,6 +437,44 @@ export function sliceToDocJson(slice: Slice, schema: Schema): JSONContent {
     return empty.toJSON() as JSONContent;
   }
   return docNode.toJSON() as JSONContent;
+}
+
+/**
+ * Ensure a fragment for a `CellSelection` is wrapped in a `<table>` node.
+ *
+ * `CellSelection.content()` returns different shapes depending on the
+ * selection:
+ *   - Cells across multiple rows or spanning the whole row →
+ *     `Fragment<table>` where the top-level child is the `table` node
+ *     containing the selected `tableRow` children.
+ *   - Cells within a single row → `Fragment<tableRow>` (cells wrapped in
+ *     a row but NOT in a table).
+ *   - A single cell → `Fragment<tableCell>` (bare cell).
+ *
+ * The default DOMSerializer needs the outer `<table>` element for the
+ * paste-side to recognize the shape as a table, so we normalize every
+ * incoming fragment to `Fragment<table>` before serializing. Uses the
+ * schema's node types so it works with any table-flavored schema
+ * (GFM tables, custom extensions).
+ */
+export function wrapAsTableFragment(fragment: Fragment, schema: Schema): Fragment {
+  const tableType = schema.nodes.table;
+  const rowType = schema.nodes.tableRow;
+  if (!tableType || !rowType) return fragment;
+  const first = fragment.firstChild;
+  if (!first) return fragment;
+  if (first.type === tableType) return fragment;
+  const rows: Node[] = [];
+  fragment.forEach((child) => {
+    if (child.type === rowType) {
+      rows.push(child);
+    } else {
+      const row = rowType.createAndFill(null, child);
+      if (row) rows.push(row);
+    }
+  });
+  const table = tableType.createAndFill(null, Fragment.fromArray(rows));
+  return table ? Fragment.from(table) : fragment;
 }
 
 function parseHtmlToDocumentFragment(html: string): DocumentFragment {
