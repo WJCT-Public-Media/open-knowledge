@@ -9,6 +9,10 @@ function stripDocBoundary(body: string): string {
   return body.replace(/^\n+/, '').replace(/\n+$/, '');
 }
 
+function stripTrailingLineWhitespace(body: string): string {
+  return body.replace(/[ \t]+$/gm, '');
+}
+
 /** Leading ordered-list marker digits (after optional indent), canonicalized
  *  before skeletonizing so remark-stringify's lazy-list renumbering
  *  (`1.`/`1.` → `1.`/`2.`) doesn't read as a content substitution in the
@@ -69,7 +73,10 @@ export function isParseEquivalentBridge(
     }
     return false;
   }
-  if (stripDocBoundary(canonicalLeftBody) !== stripDocBoundary(rightSplit.body)) {
+  if (
+    stripDocBoundary(stripTrailingLineWhitespace(canonicalLeftBody)) !==
+    stripDocBoundary(stripTrailingLineWhitespace(rightSplit.body))
+  ) {
     return false;
   }
   return isSubsequence(contentSkeleton(leftSplit.body), contentSkeleton(canonicalLeftBody));

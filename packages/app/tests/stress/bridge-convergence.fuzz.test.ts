@@ -95,6 +95,7 @@ type Rng = ReturnType<typeof createPRNG>;
 
 type Op =
   | { kind: 'wysiwyg-type'; clientIdx: number; text: string; marker: string }
+  | { kind: 'type-chars'; clientIdx: number; text: string; marker: string }
   | { kind: 'source-type'; clientIdx: number; text: string; marker: string }
   | {
       kind: 'agent-write';
@@ -146,7 +147,7 @@ function randomShortText(rng: Rng): string {
 
 /**
  * Generate ops at the rebalanced distribution (server-authoritative):
- * wysiwyg:25%, source:15%, agent-write:15%, agent-patch:8%, agent-undo:3%,
+ * wysiwyg:17%, type-chars:8%, source:15%, agent-write:15%, agent-patch:8%, agent-undo:3%,
  * external-change:8%, chunked-source-paste:3%, jsx-block:3%, large-embed:3%,
  * sync-pause:6%, sync-resume:8%, wait:3%. Source-type and external-change
  * elevated from theatre rates (0.5% each) to validate the symmetric Observer B
@@ -167,10 +168,18 @@ function generateOps(rng: Rng, clientCount: number, opCount: number): Op[] {
     // Rebalanced distribution (server-authoritative) — see the
     // function docblock for the full per-kind percentages (jsx-block +
     // large-embed added at 3% each for the corrupting constructs).
-    if (roll < 0.25) {
-      // wysiwyg-type (25%): append a paragraph to XmlFragment
+    if (roll < 0.17) {
+      // wysiwyg-type (17%): append a paragraph to XmlFragment
       const marker = `M${markerIdx++}-${randomShortText(rng)}`;
       ops.push({ kind: 'wysiwyg-type', clientIdx, text: marker, marker });
+    } else if (roll < 0.25) {
+      // type-chars (8%, carved from wysiwyg-type): the same paragraph
+      // append delivered one character per transaction, keystroke-style.
+      // Multi-word marker text guarantees trailing-space transients — the
+      // states whole-block ops structurally never produce and the
+      // settlement health checks must absorb on resting-divergent docs.
+      const marker = `M${markerIdx++}-${randomShortText(rng)}`;
+      ops.push({ kind: 'type-chars', clientIdx, text: marker, marker });
     } else if (roll < 0.4) {
       // source-type (15%): Y.Text write simulating CodeMirror input.
       // Elevated from 0.5% to exercise symmetric Observer B path under
@@ -291,6 +300,24 @@ async function applyOp(
       ytext.applyDelta([{ insert: op.text }]);
       paragraph.insert(0, [ytext]);
       client.fragment.push([paragraph]);
+      break;
+    }
+    case 'type-chars': {
+      const client = clients[op.clientIdx];
+      if (!client) return;
+      const paragraph = new Y.XmlElement('paragraph');
+      const ytext = new Y.XmlText();
+      ytext.applyDelta([{ insert: op.text.slice(0, 1) }]);
+      paragraph.insert(0, [ytext]);
+      client.fragment.push([paragraph]);
+      for (const ch of op.text.slice(1)) {
+        // Separate transactions with a yield between them so each keystroke
+        // gets its own drain + settlement instead of coalescing into one.
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        client.doc.transact(() => {
+          ytext.applyDelta([{ retain: ytext.length }, { insert: ch }]);
+        });
+      }
       break;
     }
     case 'source-type': {
@@ -569,6 +596,7 @@ function snapshotClients(clients: TestClient[]): Array<{ ytext: string; fragment
 
 const ALL_OP_KINDS = [
   'wysiwyg-type',
+  'type-chars',
   'source-type',
   'agent-write',
   'agent-patch',
@@ -587,7 +615,7 @@ const WRITE_SURFACE_TO_OP_KIND: Record<string, readonly string[]> = {
   'agent-write-md': ['agent-write'],
   'agent-patch': ['agent-patch'],
   'agent-undo': ['agent-undo'],
-  'observer-a-sync': ['wysiwyg-type'],
+  'observer-a-sync': ['wysiwyg-type', 'type-chars'],
   'observer-b-sync': ['source-type'],
   'file-watcher': ['external-change'],
   // Chunked Source paste: same source-codemirror-typing write surface as source-type, but a
@@ -836,6 +864,7 @@ describe('bridge-convergence fuzzer (FR-17)', () => {
       const updateExpectedBody = (op: Op): void => {
         switch (op.kind) {
           case 'wysiwyg-type':
+          case 'type-chars':
           case 'source-type':
             // Observer A (wysiwyg) / Observer B (source) serializes the new
             // paragraph with a double-newline separator after the existing body.
@@ -917,6 +946,7 @@ describe('bridge-convergence fuzzer (FR-17)', () => {
           // Update marker tracking AFTER the op succeeds (oracle d prefix set).
           if (
             op.kind === 'wysiwyg-type' ||
+            op.kind === 'type-chars' ||
             op.kind === 'source-type' ||
             op.kind === 'agent-write'
           ) {
