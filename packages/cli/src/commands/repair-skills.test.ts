@@ -61,6 +61,10 @@ function depsBuilder(opts: {
   recordedEvents?: SkillInstallEvent[];
   /** When true, `writeRecordedVersion` throws. */
   failWrite?: boolean;
+  /** Per-bundle opt-in decision the sweep reads. Default consented. */
+  bundleDecision?: boolean | null;
+  /** Spy: pushed-to whenever `removeBundleFromDisk` is called. */
+  removals?: string[];
 }): RepairSkillsDeps {
   return {
     resolveProjectBundledSkillDir: () => opts.projectBundleDir,
@@ -73,6 +77,13 @@ function depsBuilder(opts: {
     },
     recordEvent: async (event) => {
       opts.recordedEvents?.push(event);
+    },
+    // Default consented so the user sweep proceeds (existing tests predate the
+    // opt-in gate). Gate-specific tests override these.
+    readBundleDecision: async () => opts.bundleDecision ?? true,
+    writeBundleDecision: async () => {},
+    removeBundleFromDisk: (_home, bundleId) => {
+      opts.removals?.push(bundleId);
     },
   };
 }
@@ -491,6 +502,14 @@ describe('repairSkills — user sweep version gate (AC-B1, AC-B2, AC-B3, AC-B4)'
   });
 
   it('AC-B1: skips user sweep when recorded version equals bundled version', async () => {
+    // The version-current fast-path requires every ENABLED bundle already on
+    // disk (a missing bundle self-heals via reinstall — parity with
+    // installUserSkill). Seed both central dirs so the skip path is exercised.
+    for (const name of ['open-knowledge-discovery', 'open-knowledge-write-skill']) {
+      const dir = join(scratch.home, '.agents', 'skills', name);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'SKILL.md'), 'preexisting');
+    }
     const written: Array<{ home: string; version: string }> = [];
     const result = await repairSkills({
       projectDir: scratch.project,
@@ -511,12 +530,92 @@ describe('repairSkills — user sweep version gate (AC-B1, AC-B2, AC-B3, AC-B4)'
     expect(result.user.reason).toBe('version-current');
     expect(written).toHaveLength(0);
 
-    // Critically: no writes touched the central store either.
-    expect(existsSync(join(scratch.home, '.agents', 'skills', USER_SKILL_DIR_NAME))).toBe(false);
+    // The seeded central store is left byte-untouched by the skip.
+    expect(
+      readFileSync(
+        join(scratch.home, '.agents', 'skills', USER_SKILL_DIR_NAME, 'SKILL.md'),
+        'utf-8',
+      ),
+    ).toBe('preexisting');
 
     expect(logEvents.some((e) => e.event === 'user-skill-reclaim-skipped-version-current')).toBe(
       true,
     );
+  });
+
+  it('D4/G2 cross-actor stomp: a declined bundle is removed and never re-installed by the sweep', async () => {
+    // Seed both bundles on disk, then decline them. The sweep must remove them
+    // and NOT re-install — the CLI half of the invariant that stops `ok start`
+    // from re-adding what the desktop dialog removed.
+    for (const name of ['open-knowledge-discovery', 'open-knowledge-write-skill']) {
+      const dir = join(scratch.home, '.agents', 'skills', name);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'SKILL.md'), 'preexisting');
+    }
+    const written: Array<{ home: string; version: string }> = [];
+    const removals: string[] = [];
+    const result = await repairSkills({
+      projectDir: scratch.project,
+      home: scratch.home,
+      logger: (event) => logEvents.push(event),
+      deps: depsBuilder({
+        projectBundleDir,
+        discoveryBundleDir,
+        bundledVersion: '9.9.9',
+        recordedVersion: '0.6.0', // version mismatch — sweep would install if enabled
+        writtenVersions: written,
+        bundleDecision: false,
+        removals,
+      }),
+    });
+
+    if (result.status !== 'done') throw new Error('unreachable');
+    expect(result.user.outcome).toBe('skipped');
+    if (result.user.outcome === 'skipped') expect(result.user.reason).toBe('all-bundles-declined');
+    // Both declined bundles were torn down; version not advanced.
+    expect(removals.sort()).toEqual(['discovery', 'write-skill']);
+    expect(written).toHaveLength(0);
+  });
+
+  it('mixed decision: the declined bundle is removed while the enabled bundle still installs', async () => {
+    // Seed both on disk, then decline ONLY write-skill. discovery must install
+    // (version mismatch) and write-skill must be torn down — the two gates run
+    // independently per bundle.
+    for (const name of ['open-knowledge-discovery', 'open-knowledge-write-skill']) {
+      const dir = join(scratch.home, '.agents', 'skills', name);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'SKILL.md'), 'preexisting');
+    }
+    for (const host of ['.claude', '.cursor', '.codex']) {
+      mkdirSync(join(scratch.home, host), { recursive: true });
+    }
+    const written: Array<{ home: string; version: string }> = [];
+    const removals: string[] = [];
+    const deps = depsBuilder({
+      projectBundleDir,
+      discoveryBundleDir,
+      bundledVersion: '9.9.9',
+      recordedVersion: '0.6.0',
+      writtenVersions: written,
+      removals,
+    });
+    deps.readBundleDecision = async (_home, name) => name !== 'open-knowledge-write-skill';
+
+    const result = await repairSkills({
+      projectDir: scratch.project,
+      home: scratch.home,
+      logger: (event) => logEvents.push(event),
+      deps,
+    });
+
+    if (result.status !== 'done' || result.user.outcome !== 'done') throw new Error('unreachable');
+    expect(removals).toEqual(['write-skill']);
+    expect(
+      result.user.entries.some(
+        (e) => e.kind === 'central' && (e.outcome === 'written' || e.outcome === 'overwritten'),
+      ),
+    ).toBe(true);
+    expect(written).toHaveLength(1);
   });
 
   it('AC-B2: refreshes central + per-host and advances skill-state when version mismatches', async () => {
@@ -1016,6 +1115,13 @@ describe('repairSkills — JSONL telemetry parity with Desktop', () => {
   });
 
   it('emits NO event on the version-current fast-path', async () => {
+    // Seed both enabled bundles on disk so the version-current fast-path fires
+    // (a missing bundle self-heals via reinstall, which would emit events).
+    for (const name of ['open-knowledge-discovery', 'open-knowledge-write-skill']) {
+      const dir = join(scratch.home, '.agents', 'skills', name);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'SKILL.md'), 'preexisting');
+    }
     const written: Array<{ home: string; version: string }> = [];
     const recordedEvents: SkillInstallEvent[] = [];
 
@@ -1155,6 +1261,7 @@ describe('repairSkills — JSONL telemetry parity with Desktop', () => {
         recordEvent: async () => {
           throw new Error('synthetic telemetry failure');
         },
+        readBundleDecision: async () => true,
       },
     });
 
@@ -1237,7 +1344,11 @@ describe('repairSkillsResultExitCode (PR feedback: standalone exit code mapping)
   function mkDone(opts: {
     projectFailed?: boolean;
     userFailedHost?: boolean;
-    userSkipped?: 'version-current' | 'bundle-missing' | 'version-read-failed';
+    userSkipped?:
+      | 'version-current'
+      | 'bundle-missing'
+      | 'version-read-failed'
+      | 'all-bundles-declined';
   }): RepairSkillsResult {
     const project: RepairSkillsResult extends infer R
       ? R extends { project: infer P }
@@ -1273,6 +1384,14 @@ describe('repairSkillsResultExitCode (PR feedback: standalone exit code mapping)
 
   it('reclaim-disabled skip exits 0', () => {
     expect(repairSkillsResultExitCode({ status: 'skipped', reason: 'reclaim-disabled' })).toBe(0);
+  });
+
+  it('all-bundles-declined user-sweep skip exits 0 (intentional opt-out, not a failure)', () => {
+    // The real shape: runUserSweep returns it as result.user.reason with a
+    // top-level status of 'done' — NOT a top-level skip.
+    const result = mkDone({ userSkipped: 'all-bundles-declined' });
+    expect(result.status).toBe('done');
+    expect(repairSkillsResultExitCode(result)).toBe(0);
   });
 
   it('any other top-level skip exits 1', () => {

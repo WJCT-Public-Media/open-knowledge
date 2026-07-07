@@ -492,14 +492,17 @@ export {
 } from './skill-management.ts';
 export {
   readAllTargets,
+  readBundleDecision,
   readServerPackageVersion,
   readSkillInstallStateSnapshot,
   readTargetRecordedAt,
   readTargetVersion,
+  resolveBundleEnabled,
   SKILL_STATE_TARGETS,
   type SkillInstallStateSnapshot,
   type SkillStateLogger,
   type SkillStateTarget,
+  writeBundleDecision,
   writeTargetVersion,
 } from './skill-state.ts';
 export {

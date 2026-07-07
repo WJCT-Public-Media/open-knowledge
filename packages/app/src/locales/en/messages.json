@@ -62,6 +62,9 @@
     ],
     "0eHrMb": ["Could not complete delete"],
     "0g7rCZ": ["Duplicated to \"", ["0"], "\""],
+    "0inVGS": [
+      "Helps your coding agent recognize OpenKnowledge projects and route reads and writes through it."
+    ],
     "0jD-Gn": ["A team knowledge base, a personal wiki, project docs..."],
     "0kTAXe": ["Open source: ", ["mirrorSrc"]],
     "0njBIq": [
@@ -103,6 +106,7 @@
     "237hSL": ["Ended"],
     "25Pw6a": ["Cloning"],
     "27XW26": ["Clone happens in the Project Navigator. Reclick the share link there."],
+    "28B21t": ["Agent Skills"],
     "29VNqC": ["Unknown error"],
     "29XZXN": ["Set git identity"],
     "2BBAbc": ["List"],
@@ -654,6 +658,7 @@
       ["0"],
       ")."
     ],
+    "FXk_zY": ["Adds a guided workflow for authoring new Agent Skills."],
     "FjkaiT": ["Zoom out"],
     "FnMkli": ["Sync disabled — you don't have permission to push"],
     "FqTpiN": ["Bird wiki"],
@@ -1551,6 +1556,7 @@
       "Add meaning-based ranking to search so conceptually-related pages surface even when they share no keywords. This setting applies only to this computer."
     ],
     "dURmlQ": ["\"frontmatter\" is a reserved property name"],
+    "dXWMFn": ["Removes this skill from your editors."],
     "dbapvC": ["Follow us on social media"],
     "dbhUX1": ["Hide this file"],
     "dbtjJh": ["(opens in new tab)"],

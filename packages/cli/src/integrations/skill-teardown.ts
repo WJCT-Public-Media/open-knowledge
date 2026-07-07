@@ -23,6 +23,7 @@
  * (OK-authored global skills) and `~/Downloads/openknowledge.skill`.
  */
 
+import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   BUNDLE_SKILL_NAME,
@@ -66,4 +67,37 @@ export function userGlobalSkillBundleTargets(home: string): SkillBundleTarget[] 
     }
   }
   return targets;
+}
+
+/**
+ * Remove ONE user-global bundle's directories (central + every per-host copy)
+ * from disk. Used by the opt-out paths (dialog decline, `ok init --no-skills`,
+ * the reclaim/sweep gate) so an unchecked bundle actually leaves — the exact
+ * reverse of `installUserBundleToHostDirs`. Tolerant of already-absent dirs
+ * (`rmSync` with `force`). Only the specific `open-knowledge-*` dirs, never the
+ * shared `~/.agents/skills` root.
+ */
+export function removeUserGlobalSkillBundle(home: string, bundleId: BundleId): void {
+  // Attempt EVERY path before signaling failure. `force` swallows ENOENT but
+  // not EACCES/EBUSY/EIO — a throw on one host copy must not abort the rest, or
+  // a declined bundle half-leaves and the next reclaim sees inconsistent state
+  // across hosts. Collect failures and re-throw at the end so callers whose
+  // telemetry / gate depends on it (they wrap this in try/catch and log
+  // `bundle-remove-failed`) still observe a partial teardown rather than a
+  // false "removed".
+  const failures: Error[] = [];
+  for (const target of userGlobalSkillBundleTargets(home)) {
+    if (target.bundleId !== bundleId) continue;
+    try {
+      rmSync(target.path, { recursive: true, force: true });
+    } catch (err) {
+      failures.push(err instanceof Error ? err : new Error(String(err)));
+    }
+  }
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      `Failed to remove ${failures.length} path(s) for ${bundleId}`,
+    );
+  }
 }

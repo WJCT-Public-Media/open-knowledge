@@ -72,6 +72,7 @@ const sampleShowPayload: OkMcpWiringShowPayload = {
     { id: 'cursor', label: 'Cursor', detected: false, willReplace: false },
   ],
   pathInstall: { shellDetected: true, rcFilesToTouch: ['~/.zshrc'], alreadyInstalled: false },
+  globalSkills: [],
 };
 
 describe('createMcpConsentStore — install', () => {

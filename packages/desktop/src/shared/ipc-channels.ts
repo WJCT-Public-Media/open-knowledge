@@ -388,6 +388,20 @@ export interface McpWiringPathInstallDescriptor {
 export interface McpWiringConfirmRequest {
   readonly editorIds: readonly McpWiringEditorId[];
   readonly pathInstall?: boolean;
+  /** Bundle ids the user left checked. Present ⇒ a skill decision was
+   *  solicited; every offered bundle not listed is recorded declined (and
+   *  removed if already installed). */
+  readonly skills?: readonly string[];
+}
+
+/** One user-global skill row in the first-launch consent dialog. Computed
+ *  read-only at arming time from `USER_GLOBAL_BUNDLE_IDS` + disk/marker state.
+ *  `alreadyInstalled: true` renders the row pre-checked as an existing install
+ *  the user can uncheck to remove. */
+export interface McpWiringGlobalSkillDescriptor {
+  readonly id: string;
+  readonly name: string;
+  readonly alreadyInstalled: boolean;
 }
 
 /** Confirm / skip response shape. `ok:false` surfaces when (a)

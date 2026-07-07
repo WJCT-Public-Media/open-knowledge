@@ -343,6 +343,30 @@ export interface McpWiringPathInstallSurface {
   ): Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
+/**
+ * User-global skills surface consumed by the first-launch consent flow.
+ * Injected (like `McpWiringPathInstallSurface`) so this module stays
+ * electron-free and tests stub it; `main/index.ts` wires the real reclaim +
+ * teardown pipeline in.
+ */
+export interface McpWiringSkillsSurface {
+  /** One row per user-global bundle for the dialog. Read-only — must not
+   *  write. `alreadyInstalled` pre-checks the row (grandfathered install). */
+  computeDescriptors(): Array<{
+    id: string;
+    name: string;
+    alreadyInstalled: boolean;
+  }>;
+  /**
+   * Finalize the per-bundle decision. Records enabled for every id in
+   * `enabledBundleIds` and declined for the rest, then installs the enabled
+   * set and tears down any declined-but-present bundle.
+   */
+  applyConsent(
+    enabledBundleIds: readonly string[],
+  ): Promise<{ ok: true } | { ok: false; error: string }>;
+}
+
 /** Minimal logger surface — bracket-prefix operational + structured events. */
 interface McpWiringLogger {
   info(msg: string, ctx?: object): void;
@@ -412,6 +436,7 @@ interface RunMcpWiringOpts {
  */
 export interface RunMcpWiringFirstLaunchOpts extends RunMcpWiringOpts {
   pathInstall: McpWiringPathInstallSurface;
+  skills: McpWiringSkillsSurface;
 }
 
 export interface RunMcpWiringHandle {
@@ -603,6 +628,7 @@ export function runMcpWiringOnFirstLaunch(opts: RunMcpWiringFirstLaunchOpts): Ru
     ipcMain,
     cli,
     pathInstall,
+    skills,
     forceEnv,
     reclaimDisableEnv,
     forceShow = false,
@@ -725,6 +751,19 @@ export function runMcpWiringOnFirstLaunch(opts: RunMcpWiringFirstLaunchOpts): Ru
     logger.error('path-install descriptor failed — PATH row hidden for this boot', { message });
     logger.event({ event: 'mcp-wiring-path-descriptor-failed', error: message });
     pathDescriptor = { shellDetected: false, rcFilesToTouch: [], alreadyInstalled: false };
+  }
+
+  // Skill rows for the show payload. A descriptor failure degrades to no skill
+  // rows (empty ⇒ no skill decision solicited) rather than taking the dialog
+  // down — the File-menu re-trigger recovers once the cause is fixed.
+  let skillDescriptors: ReturnType<McpWiringSkillsSurface['computeDescriptors']>;
+  try {
+    skillDescriptors = skills.computeDescriptors();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error('skill descriptors failed — skill rows hidden for this boot', { message });
+    logger.event({ event: 'mcp-wiring-skill-descriptors-failed', error: message });
+    skillDescriptors = [];
   }
 
   // Once-per-boot idempotence for SUCCESSFUL handler runs. Flipped
@@ -905,6 +944,50 @@ export function runMcpWiringOnFirstLaunch(opts: RunMcpWiringFirstLaunchOpts): Ru
       logger.info('path consent applied', { decision: pathDecision });
     }
 
+    // Skills leg — apply per-bundle consent when the dialog solicited a
+    // decision (skill rows were offered). Runs after PATH and BEFORE the
+    // marker write so a failed skills leg defers the marker like a failed
+    // editor/PATH write: the dialog stays mounted for a same-boot retry and
+    // re-fires next boot. `request.skills` is the checked subset; every offered
+    // bundle not listed is recorded declined (and removed if present).
+    if (skillDescriptors.length > 0) {
+      const offeredIds = new Set(skillDescriptors.map((d) => d.id));
+      const enabledIds = Array.isArray(request?.skills)
+        ? request.skills.filter((id) => offeredIds.has(id))
+        : [];
+      let skillResult: { ok: true } | { ok: false; error: string };
+      try {
+        skillResult = await skills.applyConsent(enabledIds);
+      } catch (err) {
+        skillResult = { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+      if (!skillResult.ok) {
+        logger.event({ event: 'mcp-wiring-skill-consent-failed', error: skillResult.error });
+        logIpcError({
+          event: 'ipc.error',
+          channel: 'ok:mcp-wiring:confirm',
+          reason: 'skill-consent-failed',
+          handler: 'mcpWiringConfirm',
+          cause: { error: skillResult.error },
+        });
+        handled = false;
+        return {
+          ok: false,
+          error: `Couldn't apply your skill choices (${skillResult.error}). The dialog will reappear on next launch so you can retry.`,
+        };
+      }
+      // Bounded per-bundle consent telemetry (bundle is a closed enum id).
+      for (const d of skillDescriptors) {
+        logger.event({
+          event: enabledIds.includes(d.id)
+            ? 'mcp-wiring-skill-consent-granted'
+            : 'mcp-wiring-skill-consent-declined',
+          bundle: d.id,
+        });
+      }
+      logger.info('skill consent applied', { enabled: enabledIds });
+    }
+
     // Only editors we actually wired count as configured — a declined write
     // touched nothing, so recording it here would falsely claim it's set up.
     const configuredEditors = results
@@ -1031,6 +1114,7 @@ export function runMcpWiringOnFirstLaunch(opts: RunMcpWiringFirstLaunchOpts): Ru
       sendToRenderer(target, 'ok:mcp-wiring:show', {
         detectedEditors: detections,
         pathInstall: pathDescriptor,
+        globalSkills: skillDescriptors,
       });
       logger.info('dispatched show to renderer', {
         detectedCount: detections.length,

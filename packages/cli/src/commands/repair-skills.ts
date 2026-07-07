@@ -32,15 +32,19 @@ import { dirname, join, resolve as resolvePath } from 'node:path';
 import {
   BUNDLE_SKILL_NAME,
   type BundleId,
+  readBundleDecision,
   readServerPackageVersion,
   readTargetVersion,
   recordSkillInstallEvent,
   resolveBundledSkillDir,
+  resolveBundleEnabled,
   type SkillInstallEvent,
   USER_GLOBAL_BUNDLE_IDS,
+  writeBundleDecision,
   writeTargetVersion,
 } from '@inkeep/open-knowledge-server';
 import { Command } from 'commander';
+import { removeUserGlobalSkillBundle } from '../integrations/skill-teardown.ts';
 import { assertProjectPathSafe } from '../integrations/write-project-skill.ts';
 import {
   CHAIN_VERSION_SENTINEL,
@@ -69,6 +73,8 @@ export interface RepairSkillsLogEvent {
   version?: string;
   preexisting?: boolean;
   reason?: string;
+  /** Bundle id for per-bundle events. Matches the desktop reclaim's `bundle:` key. */
+  bundle?: string;
   error?: string;
 }
 
@@ -127,6 +133,12 @@ export interface RepairSkillsDeps {
    * "did this install land?" question is answerable for CLI users too.
    */
   recordEvent?(event: SkillInstallEvent): Promise<void>;
+  /** Override for `readBundleDecision(home, name)` — per-bundle opt-in gate. */
+  readBundleDecision?(home: string, bundleName: string): Promise<boolean | null>;
+  /** Override for `writeBundleDecision(home, name, enabled)` — grandfather materialization. */
+  writeBundleDecision?(home: string, bundleName: string, enabled: boolean): Promise<void>;
+  /** Override for `removeUserGlobalSkillBundle(home, id)` — decline removal. */
+  removeBundleFromDisk?(home: string, bundleId: BundleId): void;
 }
 
 const defaultDeps: Required<RepairSkillsDeps> = {
@@ -137,6 +149,9 @@ const defaultDeps: Required<RepairSkillsDeps> = {
   writeRecordedVersion: (home, version) =>
     writeTargetVersion(home, 'cli-hosts', version, 'cli-start'),
   recordEvent: (event) => recordSkillInstallEvent(event),
+  readBundleDecision: (home, name) => readBundleDecision(home, name),
+  writeBundleDecision: (home, name, enabled) => writeBundleDecision(home, name, enabled),
+  removeBundleFromDisk: (home, bundleId) => removeUserGlobalSkillBundle(home, bundleId),
 };
 
 export interface RepairSkillsContext {
@@ -524,21 +539,6 @@ async function runUserSweep(
     recordedVersion = null;
   }
 
-  if (recordedVersion !== null && recordedVersion === bundledVersion) {
-    logger({
-      event: 'user-skill-reclaim-skipped-version-current',
-      scope: 'user',
-      version: bundledVersion,
-    });
-    // No JSONL event on the version-current fast-path — Desktop force-writes
-    // every launch and emits an `installed` event each time, which makes the
-    // log noisy but answers "did the install land?". The CLI's version-gate
-    // means the same answer is already in `skill-state.yml.cli-hosts` — a
-    // version-current skip is provably equivalent to the prior successful
-    // write, so logging it again is pure noise.
-    return { outcome: 'skipped', reason: 'version-current' };
-  }
-
   // Resolve every user-global built-in bundle's source up front (discovery +
   // write-skill, from the single-source `USER_GLOBAL_BUNDLE_IDS`). The bundles
   // ship together, so a resolve failure means the assets dir is missing for
@@ -568,12 +568,86 @@ async function runUserSweep(
     return { outcome: 'skipped', reason: 'bundle-missing' };
   }
 
-  // Force-install each resolved bundle into the central store + per-host dirs.
+  // Per-bundle opt-in gate — identical policy to the desktop reclaim. Declined
+  // bundles are removed and skipped; unrecorded bundles grandfather to disk
+  // presence (existing install stays + records the decision). Runs BEFORE the
+  // version fast-path so a decline is honored even when the recorded version is
+  // current.
+  const gatedBundles: Array<{ id: BundleId; sourceDir: string }> = [];
+  for (const bundle of resolvedBundles) {
+    const name = BUNDLE_SKILL_NAME[bundle.id];
+    const onDisk = fs.existsSync(join(home, '.agents', 'skills', name));
+    const decision = await deps.readBundleDecision(home, name).catch(() => null);
+    if (!resolveBundleEnabled(decision, { installedOnDisk: onDisk })) {
+      if (onDisk) {
+        try {
+          deps.removeBundleFromDisk(home, bundle.id);
+          logger({
+            event: 'user-skill-reclaim-bundle-declined-removed',
+            scope: 'user',
+            bundle: bundle.id,
+          });
+        } catch (err) {
+          logger({
+            event: 'user-skill-reclaim-bundle-remove-failed',
+            scope: 'user',
+            bundle: bundle.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+      continue;
+    }
+    if (decision === null && onDisk) {
+      // Materialize the grandfathered decision. Fail-soft (the bundle stays
+      // installed regardless), but log so a persistently unwritable state file
+      // — which re-enters this path every boot — leaves a trail.
+      try {
+        await deps.writeBundleDecision(home, name, true);
+      } catch (err) {
+        logger({
+          event: 'user-skill-reclaim-grandfather-write-failed',
+          scope: 'user',
+          bundle: bundle.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    gatedBundles.push(bundle);
+  }
+  if (gatedBundles.length === 0) {
+    return { outcome: 'skipped', reason: 'all-bundles-declined' };
+  }
+
+  // Version fast-path — skip the copy only when the recorded version is current
+  // AND every enabled bundle is already on disk (a freshly-enabled bundle must
+  // install even at the current version).
+  const allEnabledOnDisk = gatedBundles.every((b) =>
+    fs.existsSync(join(home, '.agents', 'skills', BUNDLE_SKILL_NAME[b.id])),
+  );
+  if (recordedVersion !== null && recordedVersion === bundledVersion && allEnabledOnDisk) {
+    logger({
+      event: 'user-skill-reclaim-skipped-version-current',
+      scope: 'user',
+      version: bundledVersion,
+    });
+    // No JSONL event on the version-current fast-path — a version-current skip
+    // is provably equivalent to the prior successful write, so logging it again
+    // is pure noise. (See the pre-existing rationale retained from the eager path.)
+    return { outcome: 'skipped', reason: 'version-current' };
+  }
+
+  // Force-install each enabled bundle into the central store + per-host dirs.
   const entries: UserSkillEntry[] = [];
-  // A bundle that failed to resolve (rare — assets partially present) counts
-  // against the version-advance gate so the next boot retries.
-  let everyCentralWritten = resolvedBundles.length === USER_GLOBAL_BUNDLE_IDS.length;
-  for (const { id, sourceDir } of resolvedBundles) {
+  // Two independent conditions gate the version advance, tracked separately so
+  // the gate below reads plainly. (1) Every user-global bundle resolved — a
+  // bundle that failed to resolve (rare — assets partially present) must leave
+  // the version unrecorded so the next boot retries. Declined bundles are
+  // excluded by choice, not failure, so they don't block the advance.
+  const allBundlesResolved = resolvedBundles.length === USER_GLOBAL_BUNDLE_IDS.length;
+  // (2) Every gated bundle's central write landed.
+  let allGatedCentralsWritten = true;
+  for (const { id, sourceDir } of gatedBundles) {
     const result = installUserBundleToHostDirs(
       home,
       BUNDLE_SKILL_NAME[id],
@@ -583,7 +657,7 @@ async function runUserSweep(
       bundledVersion,
     );
     entries.push(...result.entries);
-    if (!result.centralWritten) everyCentralWritten = false;
+    if (!result.centralWritten) allGatedCentralsWritten = false;
   }
 
   // Gate version advance on EVERY bundle's central write landing — the same
@@ -594,7 +668,7 @@ async function runUserSweep(
   const anyCentralWritten = entries.some(
     (e) => e.kind === 'central' && (e.outcome === 'written' || e.outcome === 'overwritten'),
   );
-  if (everyCentralWritten && anyCentralWritten) {
+  if (allBundlesResolved && allGatedCentralsWritten && anyCentralWritten) {
     let stateWriteError: string | null = null;
     try {
       await deps.writeRecordedVersion(home, bundledVersion);
@@ -615,7 +689,7 @@ async function runUserSweep(
     // One outcome event per installed bundle, gated on the state-file write —
     // an `installed` event paired with a stale `skill-state.yml` would mislead
     // any operator chasing "did the install actually land?".
-    for (const { id } of resolvedBundles) {
+    for (const { id } of gatedBundles) {
       recordEventSoft({
         ts: nowIso(),
         surface: 'cli-start',
@@ -687,10 +761,22 @@ export async function repairSkills(ctx: RepairSkillsContext): Promise<RepairSkil
  */
 function repairSkillsResultExitCode(result: RepairSkillsResult): number {
   if (result.status === 'skipped') {
+    // Top-level skip is only the env kill-switch — an intentional opt-out.
     return result.reason === 'reclaim-disabled' ? 0 : 1;
   }
   if (result.project.outcome === 'skipped') return 1;
-  if (result.user.outcome === 'skipped' && result.user.reason !== 'version-current') return 1;
+  // `all-bundles-declined` arrives here as a user-sweep skip (result.user), NOT
+  // a top-level one. Like `version-current` it is a supported success state
+  // (the user opted out of every skill), so it must exit 0 — a non-zero exit
+  // would break `&&`-chains and CI gates. Every other user-sweep skip is a real
+  // failure.
+  if (
+    result.user.outcome === 'skipped' &&
+    result.user.reason !== 'version-current' &&
+    result.user.reason !== 'all-bundles-declined'
+  ) {
+    return 1;
+  }
   if (result.project.entries.some((e) => e.outcome === 'failed')) return 1;
   if (result.user.outcome === 'done' && result.user.entries.some((e) => e.outcome === 'failed'))
     return 1;

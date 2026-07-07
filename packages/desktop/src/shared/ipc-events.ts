@@ -28,6 +28,7 @@ import type {
 } from './bridge-contract.ts';
 import type {
   McpWiringEditorDetection,
+  McpWiringGlobalSkillDescriptor,
   McpWiringPathInstallDescriptor,
   OnboardingShowPayload,
 } from './ipc-channels.ts';
@@ -152,6 +153,7 @@ export interface EventChannels {
     payload: {
       detectedEditors: readonly McpWiringEditorDetection[];
       pathInstall: McpWiringPathInstallDescriptor;
+      globalSkills: readonly McpWiringGlobalSkillDescriptor[];
     };
   };
   /**
