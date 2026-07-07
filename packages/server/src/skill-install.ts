@@ -8,6 +8,7 @@ import {
   resolveBundledSkillDir,
 } from './build-skill-zip.ts';
 import { tracedMkdir } from './fs-traced.ts';
+import { BUNDLE_SKILL_NAME, type BundleId } from './skill-bundles.ts';
 import { recordSkillInstallEvent, type SkillInstallEventOutcome } from './skill-install-events.ts';
 import {
   readServerPackageVersion,
@@ -74,22 +75,26 @@ export interface InstallUserSkillOptions {
    * a real Windows host.
    */
   platform?: NodeJS.Platform;
+  /**
+   * Which user-global bundle to install. Defaults to `'discovery'` so existing
+   * callers (and the `ok init` discovery leg) are unchanged; `ok init` calls
+   * once per enabled bundle. The central-dir gate + resolve key off
+   * `BUNDLE_SKILL_NAME[bundleId]`.
+   */
+  bundleId?: BundleId;
+  /**
+   * Bypass the version fast-path and always run the install. `ok init` sets
+   * this because it loops `installUserSkill` once per bundle over the SHARED
+   * `cli-hosts` version key: the first bundle's version write would otherwise
+   * satisfy the second bundle's `skip-current` gate, freezing the second
+   * bundle's content at its stale on-disk version on an upgrade-then-reinit.
+   * `ok init` is explicit and infrequent, so always installing is cheap and
+   * correct. The background sweep keeps its own batch-level fast-path.
+   */
+  force?: boolean;
 }
 
 export type InstallUserSkillResult = 'installed' | 'skip-current' | 'failed';
-
-/**
- * Central source directory the `skills` CLI writes when invoked with
- * `add … -g --copy`. The skip-current gate verifies this exists alongside the
- * sidecar version match — sidecar presence alone is not proof the skill is
- * still on disk (e.g. after a manual `npx skills remove -g`).
- *
- * Probes the SLIM `discovery` bundle's install dir, NOT the pre-split
- * `open-knowledge` dir: the user-global path installs discovery-only, and the
- * legacy `open-knowledge` dir is explicitly removed on migration — probing it
- * would wedge the gate permanently.
- */
-const CENTRAL_SKILL_DIR_REL = ['.agents', 'skills', 'open-knowledge-discovery'] as const;
 
 /**
  * Pre-split user-global skill name. The legacy migration removes any install
@@ -111,13 +116,13 @@ const SKILLS_CLI_SPEC = 'skills@~1.5.0';
 /** Subprocess timeout default. */
 const DEFAULT_TIMEOUT_MS = 60_000;
 
-function centralSkillDir(home: string): string {
-  return join(home, ...CENTRAL_SKILL_DIR_REL);
+function centralSkillDir(home: string, bundleName: string): string {
+  return join(home, '.agents', 'skills', bundleName);
 }
 
-async function centralSkillExists(home: string): Promise<boolean> {
+async function centralSkillExists(home: string, bundleName: string): Promise<boolean> {
   try {
-    const info = await stat(centralSkillDir(home));
+    const info = await stat(centralSkillDir(home, bundleName));
     return info.isDirectory();
   } catch {
     return false;
@@ -288,6 +293,8 @@ export async function installUserSkill(
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const surfaceAttribution: SkillStateSurface = opts.surface ?? 'cli-npx-skills-add';
   const platform = opts.platform ?? process.platform;
+  const bundleId = opts.bundleId ?? 'discovery';
+  const bundleName = BUNDLE_SKILL_NAME[bundleId];
 
   const report = async (
     outcome: SkillInstallEventOutcome,
@@ -299,7 +306,7 @@ export async function installUserSkill(
         ts: new Date().toISOString(),
         surface: surfaceAttribution,
         target: 'cli-hosts',
-        bundle: 'discovery',
+        bundle: bundleId,
         outcome,
         ...(version !== undefined ? { version } : {}),
         ...(reason !== undefined ? { reason } : {}),
@@ -331,8 +338,8 @@ export async function installUserSkill(
     );
     return null;
   });
-  if (existingVersion !== null && existingVersion === currentVersion) {
-    if (await centralSkillExists(home)) {
+  if (!opts.force && existingVersion !== null && existingVersion === currentVersion) {
+    if (await centralSkillExists(home, bundleName)) {
       logger.info?.(
         { event: 'skill-install.skip-current', version: currentVersion },
         'OpenKnowledge skill already installed at current version; skipping.',
@@ -344,17 +351,17 @@ export async function installUserSkill(
       {
         event: 'skill-install.reinstall-missing',
         version: currentVersion,
-        path: centralSkillDir(home),
+        path: centralSkillDir(home, bundleName),
       },
       'Sidecar matches current version but skill files are missing; reinstalling.',
     );
   }
 
-  let discoveryDir: string;
+  let bundleDir: string;
   try {
     // checkDesktop:false — the user-global install never auto-points at a
-    // co-installed OK Desktop's discovery bundle.
-    discoveryDir = resolveBundledSkillDir('discovery', { checkDesktop: false });
+    // co-installed OK Desktop's bundle.
+    bundleDir = resolveBundledSkillDir(bundleId, { checkDesktop: false });
   } catch (err) {
     logger.warn(
       {
@@ -362,7 +369,7 @@ export async function installUserSkill(
         reason: 'bundled-asset-missing',
         error: String(err),
       },
-      'Skill install aborted — bundled discovery SKILL.md asset not found.',
+      'Skill install aborted — bundled SKILL.md asset not found.',
     );
     await report('failed', currentVersion, 'bundled-asset-missing');
     return 'failed';
@@ -373,8 +380,8 @@ export async function installUserSkill(
   // fresh machine). Fail-soft — the `add` below is what the install gates on.
   await removeLegacyUserSkill(home, spawnFn, env, timeoutMs, logger, platform);
 
-  // Install the slim `discovery` bundle to every detected agent host.
-  const args = ['-y', SKILLS_CLI_SPEC, 'add', discoveryDir, '--agent', '*', '-g', '-y', '--copy'];
+  // Install the bundle to every detected agent host.
+  const args = ['-y', SKILLS_CLI_SPEC, 'add', bundleDir, '--agent', '*', '-g', '-y', '--copy'];
   const outcome = await runSpawn(spawnFn, 'npx', args, env, timeoutMs, platform);
 
   if (outcome.kind === 'ok') {
@@ -400,7 +407,7 @@ export async function installUserSkill(
     logger.warn(
       { event: 'skill-install.failed', reason: 'timeout', timeoutMs, stderr: outcome.stderr },
       'Skill install subprocess timed out. Run manually: npx ' +
-        `${SKILLS_CLI_SPEC} add ${discoveryDir} --agent '*' -g -y --copy`,
+        `${SKILLS_CLI_SPEC} add ${bundleDir} --agent '*' -g -y --copy`,
     );
     await report('failed', currentVersion, 'timeout');
     return 'failed';
@@ -415,7 +422,7 @@ export async function installUserSkill(
         stderr: outcome.stderr,
       },
       'Skill install failed — `npx` unavailable or spawn errored. Run manually: npx ' +
-        `${SKILLS_CLI_SPEC} add ${discoveryDir} --agent '*' -g -y --copy`,
+        `${SKILLS_CLI_SPEC} add ${bundleDir} --agent '*' -g -y --copy`,
     );
     await report('failed', currentVersion, 'spawn-error');
     return 'failed';
@@ -430,7 +437,7 @@ export async function installUserSkill(
       stderr: outcome.stderr,
     },
     'Skill install subprocess exited non-zero. Run manually: npx ' +
-      `${SKILLS_CLI_SPEC} add ${discoveryDir} --agent '*' -g -y --copy`,
+      `${SKILLS_CLI_SPEC} add ${bundleDir} --agent '*' -g -y --copy`,
   );
   await report('failed', currentVersion, `nonzero-exit:${outcome.exitCode ?? 'unknown'}`);
   return 'failed';

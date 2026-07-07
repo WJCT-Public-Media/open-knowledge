@@ -57,6 +57,7 @@ import {
   EDITOR_TARGETS,
   HOSTS_WITH_USER_SKILL_DIR,
 } from '@inkeep/open-knowledge';
+import { resolveBundleEnabled } from '@inkeep/open-knowledge-core';
 
 interface SkillReclaimLogger {
   event(payload: { event: string; [key: string]: unknown }): void;
@@ -246,6 +247,16 @@ interface ReclaimUserSkillsOpts {
     userGlobalBundles: ReadonlyArray<{ id: string; name: string }>;
     resolveBundledSkillDir(bundle: string): string;
     readServerPackageVersion(): Promise<string>;
+    /** Per-bundle opt-in gate (server `readBundleDecision`): explicit
+     *  recorded enablement, or null when unrecorded. Injected so this module
+     *  stays free of server imports. */
+    readBundleDecision(home: string, bundleName: string): Promise<boolean | null>;
+    /** Materialize a grandfathered install's decision (server
+     *  `writeBundleDecision`) so later actors agree it's opted in. */
+    writeBundleDecision(home: string, bundleName: string, enabled: boolean): Promise<void>;
+    /** Remove a declined bundle's dirs from disk (CLI
+     *  `removeUserGlobalSkillBundle`). Keyed by bundle id. */
+    removeBundleFromDisk(bundleId: string): void;
     writeTargetVersion(
       home: string,
       target: 'cli-hosts',
@@ -448,10 +459,57 @@ export async function reclaimUserSkillsOnLaunch(
   // `open-knowledge-discovery` bundle lands. Fail-soft.
   removeLegacyUserSkillDirs(home, fs, logger);
 
-  // Force-install each resolved user-global bundle (discovery + write-skill)
+  // Per-bundle opt-in gate. Explicit decline (`enabled: false`) is removed and
+  // never re-installed; an unrecorded bundle grandfathers to disk presence
+  // (existing install stays + records the decision, a truly-fresh machine
+  // stays uninstalled until the first-launch dialog records consent). This is
+  // the launch-side half of the cross-actor invariant — the CLI sweep applies
+  // the identical gate.
+  const gatedBundles: typeof resolvedBundles = [];
+  for (const bundle of resolvedBundles) {
+    const onDisk = fs.existsSync(join(home, '.agents', 'skills', bundle.name));
+    const decision = await deps.readBundleDecision(home, bundle.name).catch(() => null);
+    if (!resolveBundleEnabled(decision, { installedOnDisk: onDisk })) {
+      if (onDisk) {
+        try {
+          deps.removeBundleFromDisk(bundle.id);
+          logger.event({ event: 'user-skill-reclaim-bundle-declined-removed', bundle: bundle.id });
+        } catch (err) {
+          logger.event({
+            event: 'user-skill-reclaim-bundle-remove-failed',
+            bundle: bundle.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+      continue;
+    }
+    if (decision === null && onDisk) {
+      // Grandfather: record so later actors don't treat it as fresh. Fail-soft
+      // (the bundle stays installed regardless), but log so a persistently
+      // unwritable state file — which re-enters this path every launch —
+      // leaves a trail instead of retrying invisibly forever.
+      try {
+        await deps.writeBundleDecision(home, bundle.name, true);
+      } catch (err) {
+        logger.event({
+          event: 'user-skill-reclaim-grandfather-write-failed',
+          bundle: bundle.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    gatedBundles.push(bundle);
+  }
+
+  if (gatedBundles.length === 0) {
+    return { status: 'skipped', reason: 'all-bundles-declined' };
+  }
+
+  // Force-install each enabled user-global bundle (discovery + write-skill)
   // into the central store + per-host dirs, each under its own name.
   const entries: UserSkillReclaimEntry[] = [];
-  for (const bundle of resolvedBundles) {
+  for (const bundle of gatedBundles) {
     entries.push(
       ...installUserBundleToHostDirs(home, bundle.name, bundle.sourceDir, fs, logger, version),
     );
@@ -477,7 +535,7 @@ export async function reclaimUserSkillsOnLaunch(
     // state file disagrees) would mislead operators chasing a "did the
     // skill update?" question.
     // One outcome event per installed bundle, gated on the state-file write.
-    for (const bundle of resolvedBundles) {
+    for (const bundle of gatedBundles) {
       await deps
         .recordSkillInstallEvent({
           ts: nowDate().toISOString(),

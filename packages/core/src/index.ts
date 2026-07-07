@@ -1132,6 +1132,7 @@ export {
 } from './sharing/index.ts';
 export {
   emptySkillState,
+  resolveBundleEnabled,
   SKILL_STATE_FILENAME,
   SKILL_STATE_REL,
   SKILL_STATE_SCHEMA_VERSION,
@@ -1139,6 +1140,7 @@ export {
   SKILL_STATE_TARGETS,
   SKILL_STATE_VERSION_RE,
   type SkillState,
+  type SkillStateBundleEntry,
   SkillStateSchema,
   type SkillStateSurface,
   type SkillStateTarget,

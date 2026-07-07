@@ -386,15 +386,27 @@ export interface OkMcpWiringShowPayload {
     readonly rcFilesToTouch: readonly string[];
     readonly alreadyInstalled: boolean;
   };
+  /** Per-bundle opt-in rows for the two user-global skills. Empty ⇒ no skill
+   *  decision solicited. `alreadyInstalled: true` renders the row pre-checked
+   *  as an existing install the user can uncheck to remove. */
+  readonly globalSkills: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly alreadyInstalled: boolean;
+  }[];
 }
 
 /** Confirm payload for `mcpWiring.confirm`. `pathInstall` is the PATH
  *  toggle, tri-state: `true` → append the managed rc block; `false` →
  *  record declined, touch nothing; absent → no PATH decision was solicited
- *  (row hidden or informational). */
+ *  (row hidden or informational).
+ *
+ *  `skills` — bundle ids the user left checked. Present ⇒ a skill decision was
+ *  solicited; every offered bundle not in the list is recorded declined. */
 export interface OkMcpWiringConfirmRequest {
   readonly editorIds: readonly OkMcpWiringEditorId[];
   readonly pathInstall?: boolean;
+  readonly skills?: readonly string[];
 }
 
 /** Result shape for `mcpWiring.confirm` / `skip`. */

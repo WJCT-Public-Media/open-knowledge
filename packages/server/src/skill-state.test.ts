@@ -16,17 +16,56 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   readAllTargets,
+  readBundleDecision,
   readServerPackageVersion,
   readSkillInstallStateSnapshot,
   readTargetRecordedAt,
   readTargetVersion,
+  resolveBundleEnabled,
   skillStateYamlPath,
+  writeBundleDecision,
   writeTargetVersion,
 } from './skill-state.ts';
 
 function freshHome(): string {
   return mkdtempSync(join(tmpdir(), 'ok-skill-state-'));
 }
+
+describe('per-bundle opt-in decisions', () => {
+  test('resolveBundleEnabled: explicit decision wins; absent grandfathers to disk', () => {
+    // Fresh machine (no decision, nothing on disk) — stays uninstalled.
+    expect(resolveBundleEnabled(null, { installedOnDisk: false })).toBe(false);
+    // Grandfather: existing install with no recorded decision — enabled.
+    expect(resolveBundleEnabled(null, { installedOnDisk: true })).toBe(true);
+    // Explicit decisions override disk state either way.
+    expect(resolveBundleEnabled(true, { installedOnDisk: false })).toBe(true);
+    expect(resolveBundleEnabled(false, { installedOnDisk: true })).toBe(false);
+  });
+
+  test('readBundleDecision returns null when the file / entry is absent', async () => {
+    const home = freshHome();
+    expect(await readBundleDecision(home, 'open-knowledge-discovery')).toBeNull();
+  });
+
+  test('writeBundleDecision round-trips and preserves other bundles + targets', async () => {
+    const home = freshHome();
+    // Seed an unrelated target so we can assert it survives the RMW.
+    await writeTargetVersion(home, 'cli-hosts', '1.2.3', 'cli-start');
+
+    await writeBundleDecision(home, 'open-knowledge-discovery', true);
+    await writeBundleDecision(home, 'open-knowledge-write-skill', false);
+
+    expect(await readBundleDecision(home, 'open-knowledge-discovery')).toBe(true);
+    expect(await readBundleDecision(home, 'open-knowledge-write-skill')).toBe(false);
+    // The version target is untouched by bundle writes.
+    expect(await readTargetVersion(home, 'cli-hosts')).toBe('1.2.3');
+
+    // A later flip of one bundle leaves the other intact.
+    await writeBundleDecision(home, 'open-knowledge-discovery', false);
+    expect(await readBundleDecision(home, 'open-knowledge-discovery')).toBe(false);
+    expect(await readBundleDecision(home, 'open-knowledge-write-skill')).toBe(false);
+  });
+});
 
 describe('readServerPackageVersion', () => {
   test('reads the version field from `@inkeep/open-knowledge-server`/package.json', async () => {

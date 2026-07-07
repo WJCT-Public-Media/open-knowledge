@@ -364,6 +364,20 @@ describe('installUserSkill — idempotency (skip-current)', () => {
     expect(readSidecarIfExists(home)).toBe(`${currentVersion}\n`);
   });
 
+  test('force bypasses the skip-current gate → subprocess IS invoked even when the version matches', async () => {
+    const home = freshHome();
+    writeSidecar(home, `${currentVersion}\n`);
+    writeCentralSkill(home);
+    const { spawn, calls } = makeSpawnFake({ outcome: { kind: 'exit', code: 0 } });
+
+    // `ok init` passes force so one bundle's shared-key version write can't
+    // freeze another bundle's content on an upgrade-then-reinit.
+    const result = await installUserSkill({ home, spawn, force: true });
+
+    expect(result).toBe('installed');
+    expect(calls.length).toBe(1);
+  });
+
   test('sidecar without trailing newline still matches (tolerant parse)', async () => {
     const home = freshHome();
     writeSidecar(home, currentVersion);

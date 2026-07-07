@@ -703,6 +703,11 @@ msgstr ""
 msgid "Add the next matching source selection."
 msgstr ""
 
+#. Subtext for the open-knowledge-write-skill skill row
+#: src/components/McpConsentDialogBody.tsx
+msgid "Adds a guided workflow for authoring new Agent Skills."
+msgstr ""
+
 #. placeholder {0}: pathInstall.rcFilesToTouch.join(', ')
 #: src/components/McpConsentDialogBody.tsx
 msgid "Adds a managed block to {0}"
@@ -731,6 +736,11 @@ msgstr ""
 
 #: src/components/FileTree.tsx
 msgid "Agent configuration file"
+msgstr ""
+
+#. Section label above the skill checkboxes in the first-launch dialog
+#: src/components/McpConsentDialogBody.tsx
+msgid "Agent Skills"
 msgstr ""
 
 #. Section label above the editor checkbox list in the first-launch dialog
@@ -3271,6 +3281,11 @@ msgstr ""
 msgid "Hello, world!"
 msgstr ""
 
+#. Subtext for the open-knowledge-discovery skill row
+#: src/components/McpConsentDialogBody.tsx
+msgid "Helps your coding agent recognize OpenKnowledge projects and route reads and writes through it."
+msgstr ""
+
 #: src/components/FileTree.tsx
 msgid "Hidden “{basename}”"
 msgstr ""
@@ -5432,6 +5447,11 @@ msgstr ""
 
 #: src/components/CreateProjectDialog.tsx
 msgid "Remove the parent <0>.git</0> folder"
+msgstr ""
+
+#. Warning shown when the user unchecks an already-installed skill
+#: src/components/McpConsentDialogBody.tsx
+msgid "Removes this skill from your editors."
 msgstr ""
 
 #: src/components/CreateProjectDialog.tsx

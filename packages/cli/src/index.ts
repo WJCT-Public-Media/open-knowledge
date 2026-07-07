@@ -100,6 +100,11 @@ export {
   resolveProjectRoot,
 } from './integrations/resolve-project-root.ts';
 export {
+  removeUserGlobalSkillBundle,
+  type SkillBundleTarget,
+  userGlobalSkillBundleTargets,
+} from './integrations/skill-teardown.ts';
+export {
   type ProjectAiIntegrationsResult,
   writeProjectAiIntegrations,
 } from './integrations/write-project-ai-integrations.ts';

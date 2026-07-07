@@ -23,12 +23,14 @@ const payload: OkMcpWiringShowPayload = {
     rcFilesToTouch: ['~/.zshrc', '~/.config/fish/conf.d/open-knowledge.fish'],
     alreadyInstalled: false,
   },
+  globalSkills: [],
 };
 
 /** Same editors, zero detected — exercises the Add-enable matrix. */
 const noneDetectedPayload: OkMcpWiringShowPayload = {
   detectedEditors: [{ id: 'codex', label: 'Codex', detected: false, willReplace: false }],
   pathInstall: payload.pathInstall,
+  globalSkills: [],
 };
 
 function deferredResult() {
@@ -42,7 +44,26 @@ function deferredResult() {
 interface RecordedConfirm {
   editorIds: readonly string[];
   pathInstall: boolean | undefined;
+  skills?: readonly string[];
 }
+
+/** Payload variant that offers both skill rows — exercises the skills section. */
+const skillsPayload: OkMcpWiringShowPayload = {
+  detectedEditors: [{ id: 'claude', label: 'Claude', detected: true, willReplace: false }],
+  pathInstall: { shellDetected: false, rcFilesToTouch: [], alreadyInstalled: false },
+  globalSkills: [
+    {
+      id: 'discovery',
+      name: 'open-knowledge-discovery',
+      alreadyInstalled: false,
+    },
+    {
+      id: 'write-skill',
+      name: 'open-knowledge-write-skill',
+      alreadyInstalled: true,
+    },
+  ],
+};
 
 function makeHarness({
   confirmResult = async () => ({ ok: true as const }),
@@ -58,7 +79,11 @@ function makeHarness({
   const toastErrors: string[] = [];
   const store: McpConsentStore = {
     confirm: async (request) => {
-      confirmCalls.push({ editorIds: [...request.editorIds], pathInstall: request.pathInstall });
+      confirmCalls.push({
+        editorIds: [...request.editorIds],
+        pathInstall: request.pathInstall,
+        skills: request.skills ? [...request.skills] : undefined,
+      });
       return confirmResult(request.editorIds);
     },
     dismiss: () => {},
@@ -289,6 +314,47 @@ describe('McpConsentDialog PATH consent row', () => {
       expect(harness.confirmCalls).toEqual([
         { editorIds: ['claude', 'cursor'], pathInstall: undefined },
       ]);
+    });
+  });
+});
+
+describe('McpConsentDialog skills section', () => {
+  afterEach(() => cleanup());
+
+  test('FR2: renders one pre-checked row per bundle', async () => {
+    await renderDialog(makeHarness({ snapshot: skillsPayload }));
+    for (const id of ['discovery', 'write-skill']) {
+      expect(
+        screen.getByTestId(`mcp-consent-skill-checkbox-${id}`).getAttribute('aria-checked'),
+      ).toBe('true');
+    }
+  });
+
+  test('FR9: unchecking write-skill sends only the checked bundle on Add', async () => {
+    const harness = await renderDialog(makeHarness({ snapshot: skillsPayload }));
+    await userEvent.click(screen.getByTestId('mcp-consent-skill-checkbox-write-skill'));
+    // Unchecking an already-installed bundle surfaces the removal warning.
+    expect(screen.getByTestId('mcp-consent-skill-warning-write-skill')).toBeTruthy();
+    await userEvent.click(screen.getByTestId('mcp-consent-add'));
+    await waitFor(() => {
+      expect(harness.confirmCalls).toEqual([
+        { editorIds: ['claude'], pathInstall: undefined, skills: ['discovery'] },
+      ]);
+    });
+  });
+
+  test('declining every skill keeps Add enabled and confirms an empty skill set', async () => {
+    const harness = await renderDialog(makeHarness({ snapshot: skillsPayload }));
+    await userEvent.click(screen.getByTestId('mcp-consent-skill-checkbox-discovery'));
+    await userEvent.click(screen.getByTestId('mcp-consent-skill-checkbox-write-skill'));
+    // Uncheck the only detected editor too — Add stays enabled because skills
+    // were offered (declining is itself an action).
+    await userEvent.click(screen.getByTestId('mcp-consent-checkbox-claude'));
+    const add = screen.getByTestId('mcp-consent-add') as HTMLButtonElement;
+    expect(add.disabled).toBe(false);
+    await userEvent.click(add);
+    await waitFor(() => {
+      expect(harness.confirmCalls).toEqual([{ editorIds: [], pathInstall: undefined, skills: [] }]);
     });
   });
 });

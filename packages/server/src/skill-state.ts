@@ -42,7 +42,7 @@ import {
   type SkillStateSurface,
   type SkillStateTarget,
 } from '@inkeep/open-knowledge-core';
-import { atomicWriteFile } from '@inkeep/open-knowledge-core/server';
+import { atomicWriteFile, withFileLock } from '@inkeep/open-knowledge-core/server';
 import { type ParsedNode, parseDocument } from 'yaml';
 import { tracedAtomicFs, tracedMkdir } from './fs-traced.ts';
 
@@ -51,6 +51,7 @@ const readFileAsync = promisify(readFile);
 // Re-exports for downstream callers (HTTP handlers, MCP tools, CLI):
 // keep importing from this module rather than core for a stable surface.
 export {
+  resolveBundleEnabled,
   SKILL_STATE_TARGETS,
   type SkillStateSurface,
   type SkillStateTarget,
@@ -59,6 +60,30 @@ export {
 /** Path to the skill-state YAML file under `$home`. */
 export function skillStateYamlPath(home: string): string {
   return join(home, ...SKILL_STATE_REL);
+}
+
+/**
+ * Serialize a read-modify-write against `skill-state.yml`. Every writer
+ * (`writeBundleDecision`, `writeTargetVersion`) full-file RMWs the same file,
+ * and at desktop launch a fire-and-forget reclaim grandfather-write can race
+ * the dialog's consent decision on the same path. The advisory lock turns
+ * "last writer wins" into "writers serialize", so a grandfather write can't
+ * clobber a freshly-recorded decline. Fail-soft: on lock-acquire timeout,
+ * fall through and write anyway (degrading to the prior last-writer-wins
+ * behavior) rather than dropping the write.
+ */
+async function withSkillStateWriteLock<T>(home: string, fn: () => Promise<T>): Promise<T> {
+  const path = skillStateYamlPath(home);
+  // The lockfile lives beside skill-state.yml; create `~/.ok/` first (the
+  // writer would otherwise be the one to mkdir it, but that runs inside the
+  // lock, so the lockfile's openSync would ENOENT on a fresh home).
+  await tracedMkdir(dirname(path), { recursive: true });
+  try {
+    return await withFileLock(`${path}.lock`, fn);
+  } catch (err) {
+    if ((err as { code?: string }).code === 'LOCK_TIMEOUT') return fn();
+    throw err;
+  }
 }
 
 /**
@@ -242,29 +267,79 @@ export async function writeTargetVersion(
     throw new Error(`Refusing to write invalid version string: ${version}`);
   }
 
-  // Read existing or start fresh. A fresh document is generated when the
-  // file is absent or unreadable — same fail-soft contract as readers.
-  const existing = (await readSkillStateFile(home, logger)) ?? emptySkillState();
-  const recordedAt = new Date().toISOString();
+  await withSkillStateWriteLock(home, async () => {
+    // Read existing or start fresh. A fresh document is generated when the
+    // file is absent or unreadable — same fail-soft contract as readers.
+    const existing = (await readSkillStateFile(home, logger)) ?? emptySkillState();
+    const recordedAt = new Date().toISOString();
 
-  // Preserve existing surface when caller doesn't pass one.
-  const previousEntry = existing.targets[target];
-  const nextSurface = surface !== undefined ? surface : (previousEntry?.surface ?? undefined);
+    // Preserve existing surface when caller doesn't pass one.
+    const previousEntry = existing.targets[target];
+    const nextSurface = surface !== undefined ? surface : (previousEntry?.surface ?? undefined);
 
-  const entry =
-    nextSurface !== undefined
-      ? { version, recordedAt, surface: nextSurface }
-      : { version, recordedAt };
+    const entry =
+      nextSurface !== undefined
+        ? { version, recordedAt, surface: nextSurface }
+        : { version, recordedAt };
 
-  const next: SkillState = {
-    ...existing,
-    targets: {
-      ...existing.targets,
-      [target]: entry,
-    },
-  };
+    const next: SkillState = {
+      ...existing,
+      targets: {
+        ...existing.targets,
+        [target]: entry,
+      },
+    };
 
-  await writeSkillStateFile(home, next);
+    await writeSkillStateFile(home, next);
+  });
+}
+
+// ─── Per-bundle opt-in decisions ───────────────────────────────────────────
+//
+// The two user-global bundles (`open-knowledge-discovery`,
+// `open-knowledge-write-skill`) are opt-out-able via the first-launch consent
+// dialog and `ok init --skills`. The decision lives under the top-level
+// `bundles` map keyed by install NAME, separate from the version-keyed
+// `targets`. Every install actor (desktop reclaim, CLI sweep, `ok init`,
+// dialog confirm) reads `resolveBundleEnabled` (re-exported from core above)
+// so a declined bundle is never re-installed.
+
+/**
+ * Read the recorded opt-in decision for a bundle (by install name). Returns
+ * `null` when the file is absent, unreadable, or carries no entry for this
+ * bundle — the caller applies `resolveBundleEnabled` grandfathering.
+ */
+export async function readBundleDecision(
+  home: string,
+  bundleName: string,
+  logger?: SkillStateLogger,
+): Promise<boolean | null> {
+  const state = await readSkillStateFile(home, logger).catch(() => null);
+  const entry = state?.bundles?.[bundleName];
+  return typeof entry?.enabled === 'boolean' ? entry.enabled : null;
+}
+
+/**
+ * Record an opt-in decision for a bundle. Atomic RMW that preserves `targets`
+ * and any other bundles' decisions; stamps `decidedAt` to now.
+ */
+export async function writeBundleDecision(
+  home: string,
+  bundleName: string,
+  enabled: boolean,
+  logger?: SkillStateLogger,
+): Promise<void> {
+  await withSkillStateWriteLock(home, async () => {
+    const existing = (await readSkillStateFile(home, logger)) ?? emptySkillState();
+    const next: SkillState = {
+      ...existing,
+      bundles: {
+        ...existing.bundles,
+        [bundleName]: { enabled, decidedAt: new Date().toISOString() },
+      },
+    };
+    await writeSkillStateFile(home, next);
+  });
 }
 
 /**

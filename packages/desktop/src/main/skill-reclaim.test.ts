@@ -89,9 +89,16 @@ interface FakeDeps {
     version?: string;
     reason?: string;
   }): Promise<void>;
+  readBundleDecision(home: string, bundleName: string): Promise<boolean | null>;
+  writeBundleDecision(home: string, bundleName: string, enabled: boolean): Promise<void>;
+  removeBundleFromDisk(bundleId: string): void;
   /** Captured state for assertions. */
   stateWrites: Array<{ home: string; version: string }>;
   events: CapturedEvent[];
+  /** Captured per-bundle decisions written (grandfather materialization). */
+  decisionWrites: Array<{ bundleName: string; enabled: boolean }>;
+  /** Captured bundle ids removed on decline. */
+  removals: string[];
 }
 
 /** Default test bundle set — discovery only, so existing single-bundle
@@ -106,9 +113,21 @@ function makeDeps(opts: {
   /** Inject a throw into the writeTargetVersion mock — exercises the
    *  state-write-failure → outcome:'failed' regression guard. */
   stateWriteThrows?: Error;
+  /** Per-bundle opt-in decision the gate reads. Default `true` (consented) so
+   *  existing install-assertion tests hold; `null` grandfathers to disk;
+   *  `false` declines. A map keys by bundle NAME for multi-bundle tests. */
+  bundleDecision?: boolean | null | Record<string, boolean | null>;
 }): FakeDeps {
   const stateWrites: Array<{ home: string; version: string }> = [];
   const events: CapturedEvent[] = [];
+  const decisionWrites: Array<{ bundleName: string; enabled: boolean }> = [];
+  const removals: string[] = [];
+  const decisionFor = (bundleName: string): boolean | null => {
+    const d = opts.bundleDecision;
+    if (d === undefined) return true;
+    if (typeof d === 'object' && d !== null) return d[bundleName] ?? null;
+    return d;
+  };
   return {
     userGlobalBundles: DISCOVERY_ONLY_BUNDLES,
     resolveBundledSkillDir: () => {
@@ -132,8 +151,17 @@ function makeDeps(opts: {
         reason: event.reason,
       });
     },
+    readBundleDecision: async (_home, bundleName) => decisionFor(bundleName),
+    writeBundleDecision: async (_home, bundleName, enabled) => {
+      decisionWrites.push({ bundleName, enabled });
+    },
+    removeBundleFromDisk: (bundleId) => {
+      removals.push(bundleId);
+    },
     stateWrites,
     events,
+    decisionWrites,
+    removals,
   };
 }
 
@@ -437,6 +465,106 @@ describe('reclaimUserSkillsOnLaunch', () => {
     expect(failed?.version).toBe('1.2.3');
     expect(failed?.reason ?? '').toContain('state-write-failed');
     expect(failed?.reason ?? '').toContain('ENOSPC');
+  });
+});
+
+describe('reclaimUserSkillsOnLaunch — per-bundle opt-in gate', () => {
+  const DISCOVERY_DIR = ['.agents', 'skills', 'open-knowledge-discovery'] as const;
+
+  function seedCentral(home: string): void {
+    const dir = join(home, ...DISCOVERY_DIR);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'SKILL.md'), 'preexisting');
+  }
+
+  test('FR1: fresh machine (no decision, nothing on disk) installs nothing', async () => {
+    const home = makeHome();
+    const deps = makeDeps({ bundle: setupBundle(), bundleDecision: null });
+    const r = await reclaimUserSkillsOnLaunch({
+      home,
+      isPackaged: true,
+      platform: 'darwin',
+      executablePath: EXE,
+      deps,
+    });
+    expect(r.status).toBe('skipped');
+    if (r.status === 'skipped') expect(r.reason).toBe('all-bundles-declined');
+    expect(existsSync(join(home, ...DISCOVERY_DIR, 'SKILL.md'))).toBe(false);
+    expect(deps.events.some((e) => e.outcome === 'installed')).toBe(false);
+  });
+
+  test('D3b: declining an installed bundle removes it and does not re-install', async () => {
+    const home = makeHome();
+    seedCentral(home);
+    const deps = makeDeps({ bundle: setupBundle(), bundleDecision: false });
+    const r = await reclaimUserSkillsOnLaunch({
+      home,
+      isPackaged: true,
+      platform: 'darwin',
+      executablePath: EXE,
+      deps,
+    });
+    expect(r.status).toBe('skipped');
+    if (r.status === 'skipped') expect(r.reason).toBe('all-bundles-declined');
+    expect(deps.removals).toEqual(['discovery']);
+    // No install event for the declined bundle.
+    expect(deps.events.some((e) => e.outcome === 'installed')).toBe(false);
+  });
+
+  test('FR4: grandfather — installed with no decision is kept + records enabled', async () => {
+    const home = makeHome();
+    seedCentral(home);
+    const deps = makeDeps({ bundle: setupBundle(), version: '1.0.0', bundleDecision: null });
+    const r = await reclaimUserSkillsOnLaunch({
+      home,
+      isPackaged: true,
+      platform: 'darwin',
+      executablePath: EXE,
+      deps,
+    });
+    expect(r.status).toBe('done');
+    // Force-written (grandfathered install stays) + decision materialized.
+    expect(existsSync(join(home, ...DISCOVERY_DIR, 'SKILL.md'))).toBe(true);
+    expect(deps.decisionWrites).toEqual([
+      { bundleName: 'open-knowledge-discovery', enabled: true },
+    ]);
+    expect(deps.removals).toEqual([]);
+  });
+
+  test('mixed decision: declined bundle is removed while the enabled bundle installs', async () => {
+    const home = makeHome();
+    // Seed both bundles on disk, then decline ONLY write-skill.
+    for (const name of ['open-knowledge-discovery', 'open-knowledge-write-skill']) {
+      const dir = join(home, '.agents', 'skills', name);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'SKILL.md'), 'preexisting');
+    }
+    const deps = {
+      ...makeDeps({
+        bundle: setupBundle(),
+        version: '1.0.0',
+        bundleDecision: {
+          'open-knowledge-discovery': true,
+          'open-knowledge-write-skill': false,
+        },
+      }),
+      userGlobalBundles: [
+        { id: 'discovery', name: 'open-knowledge-discovery' },
+        { id: 'write-skill', name: 'open-knowledge-write-skill' },
+      ],
+    };
+    const r = await reclaimUserSkillsOnLaunch({
+      home,
+      isPackaged: true,
+      platform: 'darwin',
+      executablePath: EXE,
+      deps,
+    });
+    expect(r.status).toBe('done');
+    // write-skill torn down; discovery installed (its central write landed).
+    expect(deps.removals).toEqual(['write-skill']);
+    const installed = deps.events.filter((e) => e.outcome === 'installed').map((e) => e.bundle);
+    expect(installed).toEqual(['discovery']);
   });
 });
 

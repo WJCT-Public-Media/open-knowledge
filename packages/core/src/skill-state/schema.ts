@@ -104,6 +104,23 @@ const TargetEntrySchema = z.looseObject({
 });
 
 /**
+ * Per-bundle opt-in decision. Keyed by a bundle's install NAME (e.g.
+ * `open-knowledge-discovery`), NOT the install target. `enabled: false` is an
+ * explicit decline recorded via the first-launch consent dialog or `ok init
+ * --no-skills`; an absent key means "no recorded decision" (grandfather: the
+ * gate falls back to disk presence). Each leaf `.register()` BEFORE wrappers
+ * per the Zod v4 metadata-binding rule.
+ */
+const BundleDecisionEntrySchema = z.looseObject({
+  enabled: z.boolean().register(skillStateFieldRegistry, {
+    description: 'Whether this user-global skill bundle is opted in.',
+  }),
+  decidedAt: z.iso.datetime().register(skillStateFieldRegistry, {
+    description: 'ISO 8601 timestamp of the opt-in / opt-out decision.',
+  }),
+});
+
+/**
  * Top-level schema. `looseObject` everywhere for forward-compat: a future
  * version can add target keys or per-entry fields without breaking older
  * readers (they project the known shape; unknown keys pass through).
@@ -121,10 +138,34 @@ export const SkillStateSchema = z.looseObject({
       description: 'Per-target install-state entries. Absent target = no recorded install.',
     })
     .default({}),
+  bundles: z
+    .record(z.string(), BundleDecisionEntrySchema)
+    .register(skillStateFieldRegistry, {
+      description:
+        'Per-bundle opt-in decisions keyed by install name. Absent key = no recorded decision.',
+    })
+    .optional(),
 });
 
 export type SkillState = z.infer<typeof SkillStateSchema>;
 export type SkillStateTargetEntry = z.infer<typeof TargetEntrySchema>;
+export type SkillStateBundleEntry = z.infer<typeof BundleDecisionEntrySchema>;
+
+/**
+ * The single per-bundle enablement policy, kept pure (no disk) so it's
+ * trivially testable and shared by every install actor (desktop reclaim, CLI
+ * sweep, `ok init`, dialog confirm). Explicit recorded decision wins; an
+ * unrecorded bundle grandfathers to whatever is on disk (existing install
+ * stays, truly-fresh machine stays uninstalled until the dialog / `ok init`
+ * records a decision). Lives in core so the desktop module can reach it
+ * without importing the server package.
+ */
+export function resolveBundleEnabled(
+  decision: boolean | null,
+  opts: { installedOnDisk: boolean },
+): boolean {
+  return decision ?? opts.installedOnDisk;
+}
 
 /**
  * Build an empty `SkillState` document with a current schema version. Used

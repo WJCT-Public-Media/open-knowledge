@@ -53,6 +53,7 @@ import {
   type ProjectAiIntegrationsResult,
   previewContent,
   readExistingMcpEntry,
+  removeUserGlobalSkillBundle,
   runStop,
   type TrackedRefusal,
   validateLocalFolderForShare,
@@ -83,6 +84,7 @@ import {
   normalizeFsPath,
   prepareSingleFileOpen,
   RUNTIME_VERSION,
+  readBundleDecision,
   readServerLock,
   readServerPackageVersion,
   recordSkillInstallEvent,
@@ -90,6 +92,7 @@ import {
   resolveLockDir,
   USER_GLOBAL_BUNDLE_IDS,
   withSpan,
+  writeBundleDecision,
   writeTargetVersion,
 } from '@inkeep/open-knowledge-server';
 import type { BrowserWindowConstructorOptions } from 'electron';
@@ -2225,6 +2228,47 @@ function buildEnsureCliOnPathOpts() {
   };
 }
 
+/**
+ * Shared opts for `reclaimUserSkillsOnLaunch` — one builder so the launch
+ * fire-and-forget leg and the consent-dialog confirm leg run the identical
+ * gate set (env gates, per-bundle opt-in, install/teardown) against the same
+ * marker. The reclaim itself honors the recorded per-bundle decisions.
+ */
+function buildReclaimUserSkillsOpts(): Parameters<typeof reclaimUserSkillsOnLaunch>[0] {
+  return {
+    home: osHomedir(),
+    isPackaged: app.isPackaged,
+    platform: process.platform,
+    executablePath: app.getPath('exe'),
+    forceEnv: process.env.OK_M6B_FORCE ?? null,
+    reclaimDisableEnv: process.env.OK_RECLAIM_DISABLE ?? null,
+    deps: {
+      // checkDesktop:false — the desktop resolves its own assets.
+      userGlobalBundles: USER_GLOBAL_BUNDLE_IDS.map((id) => ({ id, name: BUNDLE_SKILL_NAME[id] })),
+      resolveBundledSkillDir: (bundle) =>
+        resolveBundledSkillDir(bundle as (typeof USER_GLOBAL_BUNDLE_IDS)[number], {
+          checkDesktop: false,
+        }),
+      readServerPackageVersion,
+      writeTargetVersion: (home, target, version, surface) =>
+        writeTargetVersion(home, target, version, surface),
+      readBundleDecision: (home, name) => readBundleDecision(home, name),
+      writeBundleDecision: (home, name, enabled) => writeBundleDecision(home, name, enabled),
+      // `bundleId` originates from `USER_GLOBAL_BUNDLE_IDS`, so the cast to the
+      // CLI's `BundleId` is sound.
+      removeBundleFromDisk: (bundleId) =>
+        removeUserGlobalSkillBundle(
+          osHomedir(),
+          bundleId as (typeof USER_GLOBAL_BUNDLE_IDS)[number],
+        ),
+      // The reclaim module types `bundle` as `string` to stay import-free; the
+      // values come from `USER_GLOBAL_BUNDLE_IDS` so they're real ids.
+      recordSkillInstallEvent: (event) =>
+        recordSkillInstallEvent(event as Parameters<typeof recordSkillInstallEvent>[0]),
+    },
+  };
+}
+
 function createMcpWiringOpts(opts: ArmMcpWiringOpts = {}) {
   return {
     isPackaged: app.isPackaged,
@@ -2258,6 +2302,48 @@ function createMcpWiringOpts(opts: ArmMcpWiringOpts = {}) {
         // the user consented, so re-announcing the write is noise. The
         // disclosure toast stays reserved for BACKGROUND rc writes (startup
         // self-heal under recorded consent), where it is the only signal.
+        return { ok: true as const };
+      },
+    },
+    // Skills leg of the first-launch consent dialog: per-bundle rows for the
+    // show payload + the confirm finalizer. `applyConsent` records every
+    // bundle's decision, then reuses the launch reclaim (now decision-gated)
+    // to install the enabled set and tear down any declined-but-present
+    // bundle — one code path for install + removal.
+    skills: {
+      computeDescriptors: () =>
+        USER_GLOBAL_BUNDLE_IDS.map((id) => ({
+          id,
+          name: BUNDLE_SKILL_NAME[id],
+          alreadyInstalled: existsSync(
+            join(osHomedir(), '.agents', 'skills', BUNDLE_SKILL_NAME[id]),
+          ),
+        })),
+      applyConsent: async (enabledIds: readonly string[]) => {
+        const home = osHomedir();
+        // The consent dialog is the trust boundary: a failed decision write
+        // must NOT be swallowed. If it were, the reclaim below would re-read a
+        // null decision, grandfather an already-installed declined bundle back
+        // to enabled, and still return ok — silently losing the user's
+        // decline. Surface {ok:false} so mcp-wiring defers the marker and the
+        // dialog re-fires for a retry (same as a failed PATH/editor write).
+        for (const id of USER_GLOBAL_BUNDLE_IDS) {
+          try {
+            await writeBundleDecision(home, BUNDLE_SKILL_NAME[id], enabledIds.includes(id));
+          } catch (err) {
+            return {
+              ok: false as const,
+              error: `Couldn't save your preference for ${BUNDLE_SKILL_NAME[id]}: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            };
+          }
+        }
+        try {
+          await reclaimUserSkillsOnLaunch(buildReclaimUserSkillsOpts());
+        } catch (err) {
+          return { ok: false as const, error: err instanceof Error ? err.message : String(err) };
+        }
         return { ok: true as const };
       },
     },
@@ -4321,37 +4407,12 @@ function bootPrimaryInstance(): void {
       }
 
       // Fire-and-forget user-global Agent Skill reclaim. Runs on every launch
-      // — force-writes the bundled SKILL into the central store and per-host
-      // dirs. PATH-independent (no npx subprocess), so it survives the GUI
-      // launch context where /opt/homebrew/bin and ~/.nvm/… are off PATH and
-      // the prior `installUserSkill` path silently spawn-error'd. Never awaited
-      // so window rendering + menu are unblocked.
-      void reclaimUserSkillsOnLaunch({
-        home: osHomedir(),
-        isPackaged: app.isPackaged,
-        platform: process.platform,
-        executablePath: app.getPath('exe'),
-        forceEnv: process.env.OK_M6B_FORCE ?? null,
-        reclaimDisableEnv: process.env.OK_RECLAIM_DISABLE ?? null,
-        deps: {
-          // User-global reclaim installs every user-global built-in bundle
-          // (discovery + write-skill), wired from the single source.
-          // checkDesktop:false — the desktop resolves its own assets.
-          userGlobalBundles: USER_GLOBAL_BUNDLE_IDS.map((id) => ({
-            id,
-            name: BUNDLE_SKILL_NAME[id],
-          })),
-          resolveBundledSkillDir: (bundle) =>
-            resolveBundledSkillDir(bundle, { checkDesktop: false }),
-          readServerPackageVersion,
-          writeTargetVersion: (home, target, version, surface) =>
-            writeTargetVersion(home, target, version, surface),
-          // The reclaim module types `bundle` as `string` to stay import-free;
-          // the values come from `USER_GLOBAL_BUNDLE_IDS` so they're real ids.
-          recordSkillInstallEvent: (event) =>
-            recordSkillInstallEvent(event as Parameters<typeof recordSkillInstallEvent>[0]),
-        },
-      }).catch((err) => {
+      // — force-writes each ENABLED bundle's SKILL into the central store and
+      // per-host dirs (per-bundle opt-in gated; declined bundles are removed).
+      // PATH-independent (no npx subprocess), so it survives the GUI launch
+      // context where /opt/homebrew/bin and ~/.nvm/… are off PATH. Never
+      // awaited so window rendering + menu are unblocked.
+      void reclaimUserSkillsOnLaunch(buildReclaimUserSkillsOpts()).catch((err) => {
         console.warn('[main] user-skill reclaim failed', {
           err: err instanceof Error ? err.message : String(err),
         });

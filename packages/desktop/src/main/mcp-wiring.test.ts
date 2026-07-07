@@ -35,6 +35,7 @@ import {
   type McpWiringDispatchTarget,
   type McpWiringFsOps,
   type McpWiringPathInstallSurface,
+  type McpWiringSkillsSurface,
   readMcpStatusMarker,
   runMcpWiringOnFirstLaunch,
   writeMcpStatusMarker,
@@ -676,6 +677,25 @@ function stubPathInstall(
   };
 }
 
+/** Skills stub recording `applyConsent` calls. Defaults to NO skill rows so
+ *  existing payload/confirm assertions are unaffected; dedicated skills tests
+ *  pass descriptors. */
+function stubSkills(
+  descriptors: ReturnType<McpWiringSkillsSurface['computeDescriptors']> = [],
+  overrides: Partial<McpWiringSkillsSurface> = {},
+): McpWiringSkillsSurface & { consentCalls: string[][] } {
+  const consentCalls: string[][] = [];
+  return {
+    consentCalls,
+    computeDescriptors: () => descriptors,
+    applyConsent: async (enabledIds) => {
+      consentCalls.push([...enabledIds]);
+      return { ok: true as const };
+    },
+    ...overrides,
+  };
+}
+
 function buildWiringOpts(overrides: Partial<WiringOpts> = {}): WiringOpts {
   const { cli } = buildFirstLaunchCli();
   return {
@@ -686,11 +706,87 @@ function buildWiringOpts(overrides: Partial<WiringOpts> = {}): WiringOpts {
     ipcMain: stubIpcMain(),
     cli,
     pathInstall: stubPathInstall(),
+    skills: stubSkills(),
     fs: memoryFs(),
     logger: SILENT_LOGGER,
     ...overrides,
   };
 }
+
+describe('runMcpWiringOnFirstLaunch — skills consent leg', () => {
+  const TWO_SKILLS = [
+    {
+      id: 'discovery',
+      name: 'open-knowledge-discovery',
+      alreadyInstalled: false,
+    },
+    {
+      id: 'write-skill',
+      name: 'open-knowledge-write-skill',
+      alreadyInstalled: true,
+    },
+  ];
+
+  test('confirm applies the checked skill subset and emits per-bundle telemetry', async () => {
+    const ipcMain = stubIpcMain();
+    const wc = fakeWebContents(11);
+    const fs = memoryFs();
+    const { cli } = buildFirstLaunchCli();
+    const skills = stubSkills(TWO_SKILLS);
+    const events: Array<Record<string, unknown>> = [];
+    const logger = {
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+      event: (p: { event: string; [k: string]: unknown }) => events.push(p),
+    };
+    runMcpWiringOnFirstLaunch(
+      buildWiringOpts({ ipcMain, cli, fs, skills, logger, immediateDispatchTarget: wc }),
+    );
+
+    // Skill rows rode along in the show payload.
+    expect(wc.sent[0]?.payload).toMatchObject({ globalSkills: TWO_SKILLS });
+
+    const confirm = ipcMain.handlers.get('ok:mcp-wiring:confirm');
+    const result = await confirm?.(
+      { sender: { id: 11 } },
+      { editorIds: ['claude'], skills: ['discovery'] },
+    );
+    expect(result).toEqual({ ok: true });
+    // Only the checked bundle is enabled; write-skill declined.
+    expect(skills.consentCalls).toEqual([['discovery']]);
+    expect(events).toContainEqual({
+      event: 'mcp-wiring-skill-consent-granted',
+      bundle: 'discovery',
+    });
+    expect(events).toContainEqual({
+      event: 'mcp-wiring-skill-consent-declined',
+      bundle: 'write-skill',
+    });
+  });
+
+  test('a failed skills leg defers the marker so the dialog re-fires', async () => {
+    const ipcMain = stubIpcMain();
+    const wc = fakeWebContents(11);
+    const fs = memoryFs();
+    const { cli } = buildFirstLaunchCli();
+    const skills = stubSkills(TWO_SKILLS, {
+      applyConsent: async () => ({ ok: false as const, error: 'disk full' }),
+    });
+    runMcpWiringOnFirstLaunch(
+      buildWiringOpts({ ipcMain, cli, fs, skills, immediateDispatchTarget: wc }),
+    );
+
+    const confirm = ipcMain.handlers.get('ok:mcp-wiring:confirm');
+    const result = await confirm?.(
+      { sender: { id: 11 } },
+      { editorIds: ['claude'], skills: ['discovery'] },
+    );
+    expect(result?.ok).toBe(false);
+    // Deferred-marker: nothing recorded, so a next-boot re-fire recovers.
+    expect(readMcpStatusMarker('/home/u', fs)).toBeNull();
+  });
+});
 
 describe('runMcpWiringOnFirstLaunch — mid-session immediate dispatch', () => {
   test('show dispatches to the provided target and binds confirm to its sender', async () => {
@@ -713,6 +809,7 @@ describe('runMcpWiringOnFirstLaunch — mid-session immediate dispatch', () => {
             rcFilesToTouch: ['~/.zshrc'],
             alreadyInstalled: false,
           },
+          globalSkills: [],
         },
       },
     ]);

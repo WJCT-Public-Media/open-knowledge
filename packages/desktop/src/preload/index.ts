@@ -495,6 +495,7 @@ const bridge: OkDesktopBridge = {
       invoke('ok:mcp-wiring:confirm', {
         editorIds: request.editorIds,
         pathInstall: request.pathInstall,
+        skills: request.skills,
       }),
     skip: () => invoke('ok:mcp-wiring:skip'),
   },

@@ -13,6 +13,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { readBundleDecision } from '@inkeep/open-knowledge-server';
 import { loadConfig } from '../config/loader.ts';
 import { OK_DIR } from '../constants.ts';
 import { previewContent } from '../content/preview.ts';
@@ -50,6 +51,7 @@ import {
   LAUNCH_UI_CHAIN_SENTINEL,
   LAUNCH_UI_CHAIN_V1,
   readExistingMcpEntry,
+  resolveInitSkillEnablement,
   resolveMcpScope,
   resolveRequestedContentDir,
   resolveSharingMode,
@@ -1151,6 +1153,82 @@ describe('runInit', () => {
         },
       });
       expect(capturedHome).toBe(fakeHome);
+    });
+
+    it('FR6/D8: installs BOTH user-global bundles by default and records both enabled', async () => {
+      const installed: (string | undefined)[] = [];
+      await runInitForTest({
+        installUserSkill: async (opts) => {
+          installed.push(opts?.bundleId);
+          return 'installed';
+        },
+      });
+      expect(installed.sort()).toEqual(['discovery', 'write-skill']);
+      // Decisions persisted so the desktop / start reclaim gates agree.
+      expect(await readBundleDecision(fakeHome, 'open-knowledge-discovery')).toBe(true);
+      expect(await readBundleDecision(fakeHome, 'open-knowledge-write-skill')).toBe(true);
+    });
+
+    it('--no-skills installs nothing and records both declined', async () => {
+      const installed: (string | undefined)[] = [];
+      await runInitForTest({
+        skills: false,
+        installUserSkill: async (opts) => {
+          installed.push(opts?.bundleId);
+          return 'installed';
+        },
+      });
+      expect(installed).toEqual([]);
+      expect(await readBundleDecision(fakeHome, 'open-knowledge-discovery')).toBe(false);
+      expect(await readBundleDecision(fakeHome, 'open-knowledge-write-skill')).toBe(false);
+    });
+
+    it('--skills discovery installs only discovery', async () => {
+      const installed: (string | undefined)[] = [];
+      await runInitForTest({
+        skills: 'discovery',
+        installUserSkill: async (opts) => {
+          installed.push(opts?.bundleId);
+          return 'installed';
+        },
+      });
+      expect(installed).toEqual(['discovery']);
+      expect(await readBundleDecision(fakeHome, 'open-knowledge-discovery')).toBe(true);
+      expect(await readBundleDecision(fakeHome, 'open-knowledge-write-skill')).toBe(false);
+    });
+
+    it('installs every enabled bundle with force so the shared cli-hosts version key cannot skip the second', async () => {
+      const forced: (boolean | undefined)[] = [];
+      await runInitForTest({
+        installUserSkill: async (opts) => {
+          forced.push(opts?.force);
+          return 'installed';
+        },
+      });
+      // Both bundles must force-install; without force, bundle 1's version write
+      // would satisfy bundle 2's skip-current gate and freeze its content.
+      expect(forced).toEqual([true, true]);
+    });
+
+    it('--no-skills reports declined, not a false "already installed"', async () => {
+      const result = await runInitForTest({
+        skills: false,
+        installUserSkill: async () => 'installed',
+      });
+      expect(result.skillInstall).toBe('declined');
+      const output = formatInitResult(result, testDir);
+      expect(output).toContain('opted out');
+      expect(output).not.toContain('already installed at current version');
+    });
+
+    it('surfaces the manual-install hint when one bundle fails even if the other installs', async () => {
+      const result = await runInitForTest({
+        installUserSkill: async (opts) =>
+          opts?.bundleId === 'write-skill' ? 'failed' : 'installed',
+      });
+      expect(result.skillInstall).toBe('failed');
+      const output = formatInitResult(result, testDir);
+      expect(output).toContain('install failed');
     });
   });
 
@@ -3121,5 +3199,34 @@ describe('resolveSharingMode', () => {
     });
     expect(seed).toBe('shared');
     expect(mode).toBe('local-only');
+  });
+});
+
+describe('resolveInitSkillEnablement — --skills / --no-skills flag parsing', () => {
+  const sorted = (skills: string | boolean | undefined): string[] =>
+    [...resolveInitSkillEnablement(skills)].sort();
+
+  it('undefined (no flag) enables every user-global bundle', () => {
+    expect(sorted(undefined)).toEqual(['discovery', 'write-skill']);
+  });
+
+  it('true (bare --skills) enables every bundle', () => {
+    expect(sorted(true)).toEqual(['discovery', 'write-skill']);
+  });
+
+  it('false (--no-skills) enables none', () => {
+    expect(sorted(false)).toEqual([]);
+  });
+
+  it('a comma list enables only the named bundles', () => {
+    expect(sorted('discovery')).toEqual(['discovery']);
+    expect(sorted('write-skill')).toEqual(['write-skill']);
+    expect(sorted('discovery,write-skill')).toEqual(['discovery', 'write-skill']);
+  });
+
+  it('trims whitespace and drops unknown names', () => {
+    expect(sorted(' discovery , write-skill ')).toEqual(['discovery', 'write-skill']);
+    expect(sorted('discovery,bogus')).toEqual(['discovery']);
+    expect(sorted('bogus')).toEqual([]);
   });
 });

@@ -38,6 +38,7 @@ import { type McpConsentStore, mcpConsentStore } from '@/lib/mcp-consent-store';
 
 type EditorDetection = OkMcpWiringShowPayload['detectedEditors'][number];
 type PathInstallDescriptor = OkMcpWiringShowPayload['pathInstall'];
+type GlobalSkillDescriptor = OkMcpWiringShowPayload['globalSkills'][number];
 
 /**
  * Pure helper: whether the PATH row solicits a decision. Hidden rows
@@ -88,6 +89,33 @@ export function selectedIdsOrdered(
   const out: OkMcpWiringEditorId[] = [];
   for (const d of detectedEditors) if (selection.has(d.id)) out.push(d.id);
   return out;
+}
+
+/**
+ * Pure helper: initial skill checkbox state — every offered bundle starts
+ * checked (opt-out default: preserves today's install-everywhere behavior
+ * while making it one-click-off).
+ */
+export function computeInitialSkillSelection(
+  globalSkills: readonly GlobalSkillDescriptor[],
+): ReadonlySet<string> {
+  return new Set(globalSkills.map((s) => s.id));
+}
+
+/** Pure helper: toggle a skill checkbox; returns a new Set. */
+export function toggleSkillId(prev: ReadonlySet<string>, id: string): ReadonlySet<string> {
+  const next = new Set(prev);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
+/** Pure helper: project the checked skills back into payload order. */
+export function skillIdsOrdered(
+  selection: ReadonlySet<string>,
+  globalSkills: readonly GlobalSkillDescriptor[],
+): string[] {
+  return globalSkills.filter((s) => selection.has(s.id)).map((s) => s.id);
 }
 
 /**
@@ -146,6 +174,8 @@ function McpConsentDialogForm({ payload, store, toast }: McpConsentDialogFormPro
   const { t } = useLingui();
   const detectedEditors = payload.detectedEditors;
   const pathInstall = payload.pathInstall;
+  const globalSkills = payload.globalSkills;
+  const skillsOffered = globalSkills.length > 0;
   const pathActionable = isPathRowActionable(pathInstall);
   const [selection, setSelection] = useState<ReadonlySet<OkMcpWiringEditorId>>(() =>
     computeInitialSelection(detectedEditors),
@@ -153,6 +183,10 @@ function McpConsentDialogForm({ payload, store, toast }: McpConsentDialogFormPro
   // Pre-checked (opt-out) when the row solicits a decision; informational
   // rows render force-checked + disabled below and never read this state.
   const [pathChecked, setPathChecked] = useState(true);
+  // Pre-checked (opt-out) — every offered bundle starts on.
+  const [skillSelection, setSkillSelection] = useState<ReadonlySet<string>>(() =>
+    computeInitialSkillSelection(globalSkills),
+  );
   const [busy, setBusy] = useState(false);
   const idPrefix = useId();
 
@@ -165,6 +199,9 @@ function McpConsentDialogForm({ payload, store, toast }: McpConsentDialogFormPro
     const result = await store.confirm({
       editorIds: selectedIdsOrdered(selection, detectedEditors),
       pathInstall: pathActionable ? pathChecked : undefined,
+      // When skills are offered, always send the (possibly empty) selection so
+      // main records a decision for every bundle — an empty list declines both.
+      skills: skillsOffered ? skillIdsOrdered(skillSelection, globalSkills) : undefined,
     });
     // Success: the store clears `currentRequest` → useSyncExternalStore
     // unmounts this subtree, so there's nothing to reset. Failure
@@ -339,6 +376,78 @@ function McpConsentDialogForm({ payload, store, toast }: McpConsentDialogFormPro
           </ul>
         </DialogBody>
 
+        {/*
+         * User-global Agent Skills consent section — one pre-checked row per
+         * bundle. Distinct from the editor list because skills install to every
+         * detected host by design (not per-editor). Unchecking an already-
+         * installed bundle removes it; the decision is honored by every install
+         * actor (desktop reclaim, ok init, ok start).
+         */}
+        {skillsOffered && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">
+              <Trans comment="Section label above the skill checkboxes in the first-launch dialog">
+                Agent Skills
+              </Trans>
+            </span>
+            <ul className="rounded-md border border-border bg-card/50 divide-y divide-border overflow-hidden">
+              {globalSkills.map((skill) => {
+                const checked = skillSelection.has(skill.id);
+                const checkboxId = `${idPrefix}-skill-${skill.id}`;
+                return (
+                  <li key={skill.id}>
+                    <Label
+                      htmlFor={checkboxId}
+                      className="flex cursor-pointer items-start gap-2.5 px-3 py-2.5 font-normal hover:bg-accent"
+                    >
+                      <Checkbox
+                        id={checkboxId}
+                        checked={checked}
+                        disabled={busy}
+                        onCheckedChange={() =>
+                          setSkillSelection((prev) => toggleSkillId(prev, skill.id))
+                        }
+                        className="mt-0.5"
+                        data-testid={`mcp-consent-skill-checkbox-${skill.id}`}
+                      />
+                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="text-sm font-medium text-foreground">
+                          <code>{skill.name}</code>
+                        </span>
+                        <span
+                          className="text-xs text-muted-foreground"
+                          data-testid={`mcp-consent-skill-status-${skill.id}`}
+                        >
+                          {skill.id === 'discovery' ? (
+                            <Trans comment="Subtext for the open-knowledge-discovery skill row">
+                              Helps your coding agent recognize OpenKnowledge projects and route
+                              reads and writes through it.
+                            </Trans>
+                          ) : (
+                            <Trans comment="Subtext for the open-knowledge-write-skill skill row">
+                              Adds a guided workflow for authoring new Agent Skills.
+                            </Trans>
+                          )}
+                        </span>
+                        {skill.alreadyInstalled && !checked && (
+                          <span
+                            className="text-xs text-amber-600 dark:text-amber-400"
+                            data-testid={`mcp-consent-skill-warning-${skill.id}`}
+                          >
+                            <Trans comment="Warning shown when the user unchecks an already-installed skill">
+                              Removes this skill from your editors.
+                            </Trans>
+                          </span>
+                        )}
+                      </span>
+                    </Label>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
         <DialogFooter>
           <Button
             variant="outline"
@@ -353,7 +462,9 @@ function McpConsentDialogForm({ payload, store, toast }: McpConsentDialogFormPro
           </Button>
           <Button
             onClick={() => void onAdd()}
-            disabled={busy || (selection.size === 0 && !(pathActionable && pathChecked))}
+            disabled={
+              busy || (selection.size === 0 && !(pathActionable && pathChecked) && !skillsOffered)
+            }
             data-testid="mcp-consent-add"
           >
             {busy ? (

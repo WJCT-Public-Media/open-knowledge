@@ -20,14 +20,17 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { inspect } from 'node:util';
 import { atomicWriteFileSync, withFileLockSync } from '@inkeep/open-knowledge-core/server';
 import type {
+  BundleId,
   InstallUserSkillOptions,
   InstallUserSkillResult,
 } from '@inkeep/open-knowledge-server';
 import {
+  BUNDLE_SKILL_NAME,
   ensureProjectGit,
   GitNotAvailableError,
   GitTooOldError,
@@ -35,6 +38,8 @@ import {
   installUserSkill,
   MCP_SERVER_NAME,
   ProjectGitInitError,
+  USER_GLOBAL_BUNDLE_IDS,
+  writeBundleDecision,
   writeRootGitignoreForNewRepo,
 } from '@inkeep/open-knowledge-server';
 import checkbox from '@inquirer/checkbox';
@@ -52,6 +57,7 @@ import { stringify as stringifyToml } from 'smol-toml';
 import { CONFIG_FILENAME, OK_DIR } from '../constants.ts';
 import { formatPreviewBlock, type PreviewResult } from '../content/preview.ts';
 import { resolveProjectRoot } from '../integrations/resolve-project-root.ts';
+import { removeUserGlobalSkillBundle } from '../integrations/skill-teardown.ts';
 import {
   assertProjectPathSafe,
   type ProjectSkillResult,
@@ -73,7 +79,7 @@ import {
   type SharingMode,
   type TrackedRefusal,
 } from '../sharing/git-exclude.ts';
-import { accent, error, info, success, warning } from '../ui/colors.ts';
+import { accent, dim, error, info, success, warning } from '../ui/colors.ts';
 import { isObject } from '../utils/is-object.ts';
 import {
   ALL_EDITOR_IDS,
@@ -586,6 +592,13 @@ interface InitCommandOptions {
    * `@inkeep/open-knowledge-server`.
    */
   installUserSkill?: (opts?: InstallUserSkillOptions) => Promise<InstallUserSkillResult>;
+  /**
+   * User-global skill opt-in. `undefined` (default) enables every bundle;
+   * `false` (`--no-skills`) declines all; a comma list (`--skills discovery`)
+   * enables only the named bundles. The decision is recorded so the desktop /
+   * CLI reclaim gates never re-install a declined bundle.
+   */
+  skills?: string | boolean;
   /** MCP scope: user-level only, project-level only, or both. */
   scope?: McpScope;
   /** Test hook: override isTTY detection for the interactive scope prompt. */
@@ -625,6 +638,22 @@ export class ContentDirError extends Error {
     super(message);
     this.name = 'ContentDirError';
   }
+}
+
+/**
+ * Resolve which user-global bundles `ok init` should enable from the `--skills`
+ * / `--no-skills` flag: `undefined`/`true` → every bundle; `false`
+ * (`--no-skills`) → none; a comma list (`--skills discovery`) → only the named
+ * bundle ids (unknown tokens ignored — the known-id set wins).
+ */
+export function resolveInitSkillEnablement(skills: string | boolean | undefined): Set<BundleId> {
+  if (skills === undefined || skills === true) return new Set(USER_GLOBAL_BUNDLE_IDS);
+  if (skills === false) return new Set();
+  const requested = skills
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return new Set(USER_GLOBAL_BUNDLE_IDS.filter((id) => requested.includes(id)));
 }
 
 /**
@@ -706,7 +735,7 @@ interface InitCommandResult {
    * `undefined` only when `content` scaffolding failed before the install
    * step could run.
    */
-  skillInstall?: InstallUserSkillResult;
+  skillInstall?: InstallUserSkillResult | 'declined';
   /** Content preview result (undefined if preview failed or was not run). */
   preview?: PreviewResult;
   /** Claude launch.json result (undefined when Claude is not a selected editor). */
@@ -1664,11 +1693,48 @@ export async function runInit(options: InitCommandOptions = {}): Promise<InitCom
   // user-global Agent Skill installed via `installUserSkill` from
   // @inkeep/open-knowledge-server.
 
-  // 4. Install the user-global Agent Skill. Non-fatal — init exits 0 even
-  // on install failure; users see a warning + a manual-install hint in
-  // the summary.
+  // 4. Install the enabled user-global Agent Skills. Per-bundle opt-in
+  // (`--skills` / `--no-skills`); the decision is recorded so the desktop /
+  // CLI reclaim gates never re-install a declined bundle. Non-fatal — init
+  // exits 0 even on install failure; users see a warning + manual-install hint.
   const installSkill = options.installUserSkill ?? installUserSkill;
-  const skillInstall = await installSkill({ home: options.home });
+  const skillHome = options.home ?? homedir();
+  const enabledBundles = resolveInitSkillEnablement(options.skills);
+  let anyEnabled = false;
+  let anyInstalled = false;
+  let anyFailed = false;
+  let anySkipped = false;
+  for (const id of USER_GLOBAL_BUNDLE_IDS) {
+    const enabled = enabledBundles.has(id);
+    await writeBundleDecision(skillHome, BUNDLE_SKILL_NAME[id], enabled).catch(() => {});
+    if (enabled) {
+      anyEnabled = true;
+      // force: the loop shares the `cli-hosts` version key across bundles, so
+      // one bundle's version write must not satisfy another's skip-current gate.
+      const result = await installSkill({ home: options.home, bundleId: id, force: true });
+      if (result === 'installed') anyInstalled = true;
+      else if (result === 'failed') anyFailed = true;
+      else anySkipped = true;
+    } else {
+      try {
+        removeUserGlobalSkillBundle(skillHome, id);
+      } catch {
+        // Fail-soft — the decline is already recorded; teardown is best-effort.
+      }
+    }
+  }
+  // Honest summary: a failure (even partial) surfaces the manual-install hint;
+  // declining every skill reports declined, not a false "already installed".
+  // The `skip-current` arm can't be reached from a real `ok init` (force always
+  // reinstalls) but is retained so an injected `installUserSkill` that returns
+  // `skip-current` still renders honestly.
+  const skillInstall: InstallUserSkillResult | 'declined' = anyFailed
+    ? 'failed'
+    : anyInstalled
+      ? 'installed'
+      : anyEnabled && anySkipped
+        ? 'skip-current'
+        : 'declined';
 
   // Derive backward-compat fields from the Claude entry (preferred) or first result
   const defaultAction: EditorMcpResult['action'] = skipMcp ? 'skipped-flag' : 'skipped-missing';
@@ -2037,6 +2103,9 @@ export function formatInitResult(result: InitCommandResult, cwd: string): string
       case 'skip-current':
         lines.push(`  open-knowledge  ${success('already installed at current version')}`);
         break;
+      case 'declined':
+        lines.push(`  open-knowledge  ${dim('skipped (opted out via --no-skills)')}`);
+        break;
       case 'failed':
         lines.push(
           `  ${warning('open-knowledge  install failed — MCP still configured; run manually:')}`,
@@ -2279,6 +2348,11 @@ export function initCommand(): Command {
       `Limit content to <dir> instead of the whole project. <dir> is interpreted relative to your current directory (e.g. "." = the folder you run the command in), then saved to ${OK_DIR}/config.yml as content.dir.`,
     )
     .option('--json', 'Emit a structured JSON summary to stdout (diagnostics stay on stderr)')
+    .option(
+      '--skills <ids>',
+      'Install only the named user-global skill bundles (comma list: discovery,write-skill)',
+    )
+    .option('--no-skills', 'Do not install any user-global skill bundles')
     .addOption(
       new Option(
         '--scope <scope>',
@@ -2306,6 +2380,7 @@ export function initCommand(): Command {
         localOnly?: boolean;
         contentDir?: string;
         json?: boolean;
+        skills?: string | boolean;
       }) => {
         const cwd = process.cwd();
 
@@ -2327,6 +2402,7 @@ export function initCommand(): Command {
               scope: opts.scope,
               sharing,
               contentDir: opts.contentDir,
+              skills: opts.skills,
             });
           } catch (err) {
             // Invalid `--content-dir` (outside the project, missing, or a file):
