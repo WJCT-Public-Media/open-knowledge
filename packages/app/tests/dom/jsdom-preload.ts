@@ -29,6 +29,8 @@ Object.assign(globalThis, {
   navigator: win.navigator,
   location: win.location,
   history: win.history,
+  localStorage: win.localStorage,
+  sessionStorage: win.sessionStorage,
   HTMLElement: win.HTMLElement,
   HTMLDivElement: win.HTMLDivElement,
   HTMLSpanElement: win.HTMLSpanElement,

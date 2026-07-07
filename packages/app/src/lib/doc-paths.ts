@@ -1,14 +1,20 @@
-export function normalizeDocNameInput(value: string): string {
+const MARKDOWN_EXTENSION = /\.(md|mdx)$/i;
+
+function normalizeDocPathInput(value: string): string {
   return value
     .trim()
     .replace(/^\.\/+/, '')
-    .replace(/^\/+/, '')
-    .replace(/\.mdx?$/i, '');
+    .replace(/^\/+/, '');
+}
+
+export function normalizeDocNameInput(value: string): string {
+  return normalizeDocPathInput(value).replace(MARKDOWN_EXTENSION, '');
 }
 
 export function docNameToMarkdownPath(docName: string): string {
-  const normalized = normalizeDocNameInput(docName);
-  return normalized ? `${normalized}.md` : 'untitled.md';
+  const normalized = normalizeDocPathInput(docName);
+  if (!normalized) return 'untitled.md';
+  return MARKDOWN_EXTENSION.test(normalized) ? normalized : `${normalized}.md`;
 }
 
 export function docNameToDialogSeed(docName: string): {

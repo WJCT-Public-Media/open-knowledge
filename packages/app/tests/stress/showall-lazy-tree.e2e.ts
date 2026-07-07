@@ -18,7 +18,7 @@
  * top level.
  */
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { expect, test } from './_helpers';
@@ -39,15 +39,15 @@ function uniqueStamp(): string {
 }
 
 function fileRow(page: Page, filename: string) {
-  return page
-    .locator('[data-slot="sidebar-container"]')
-    .getByRole('treeitem', { name: filename, exact: true });
+  return page.getByRole('treeitem', {
+    name: new RegExp(`^${escapeRegExp(filename)}(?:\\s|$)`),
+  });
 }
 
 function folderRow(page: Page, folderName: string) {
-  return page
-    .locator('[data-slot="sidebar-container"]')
-    .getByRole('treeitem', { name: new RegExp(`^${escapeRegExp(folderName)}/?$`) });
+  return page.getByRole('treeitem', {
+    name: new RegExp(`^${escapeRegExp(folderName)}/?(?:\\s|$)`),
+  });
 }
 
 /**
@@ -151,6 +151,73 @@ test('Show All seeds the root lazily and loads folder children on expand', async
   for (const url of showAllListingUrls) {
     expect(url).toContain('depth=1');
   }
+});
+
+test('folder containing same-name .md and .mdx shows and opens both files', async ({
+  page,
+  workerServer,
+}) => {
+  const stamp = uniqueStamp();
+  const folder = `showall-dupe-${stamp}`;
+  const stem = `foo-${stamp}`;
+  const mdSentinel = `edited-md-${stamp}`;
+  const mdxSentinel = `edited-mdx-${stamp}`;
+  const mdPath = join(workerServer.contentDir, folder, `${stem}.md`);
+  const mdxPath = join(workerServer.contentDir, folder, `${stem}.mdx`);
+
+  mkdirSync(join(workerServer.contentDir, folder), { recursive: true });
+  writeFileSync(mdPath, '# Markdown shadow\n', 'utf-8');
+  writeFileSync(mdxPath, '# MDX winner\n', 'utf-8');
+
+  await page.goto('/');
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(folderRow(page, folder)).toBeVisible({ timeout: 15_000 });
+  await expandFolder(page, folder);
+
+  const mdRow = fileRow(page, `${stem}.md`);
+  const mdxRow = fileRow(page, `${stem}.mdx`);
+  await expect(mdRow).toHaveCount(1);
+  await expect(mdRow).toBeVisible();
+  await expect(mdxRow).toHaveCount(1);
+  await expect(mdxRow).toBeVisible();
+
+  await mdRow.click();
+  await expect
+    .poll(() => page.evaluate(() => window.__activeProvider?.configuration.name ?? null))
+    .toBe(`${folder}/${stem}.md`);
+  await expect(page.locator('.ProseMirror', { hasText: 'Markdown shadow' })).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect
+    .poll(() => decodeURIComponent(new URL(page.url()).hash))
+    .toBe(`#/${folder}/${stem}.md`);
+  const editor = page.locator('.ProseMirror').first();
+  await editor.click();
+  await page.keyboard.insertText(`\n${mdSentinel}`);
+  await expect(editor).toContainText(mdSentinel);
+  await expect.poll(() => readFileSync(mdPath, 'utf-8'), { timeout: 15_000 }).toContain(mdSentinel);
+  expect(readFileSync(mdxPath, 'utf-8')).not.toContain(mdSentinel);
+  await expect(page.locator('[data-slot="sidebar-container"]')).toBeVisible();
+
+  await mdxRow.click();
+  await expect
+    .poll(() => page.evaluate(() => window.__activeProvider?.configuration.name ?? null))
+    .toBe(`${folder}/${stem}.mdx`);
+  await expect(page.locator('.ProseMirror', { hasText: 'MDX winner' })).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect
+    .poll(() => decodeURIComponent(new URL(page.url()).hash))
+    .toBe(`#/${folder}/${stem}.mdx`);
+  await editor.click();
+  await page.keyboard.insertText(`\n${mdxSentinel}`);
+  await expect(editor).toContainText(mdxSentinel);
+  await expect
+    .poll(() => readFileSync(mdxPath, 'utf-8'), { timeout: 15_000 })
+    .toContain(mdxSentinel);
+  expect(readFileSync(mdPath, 'utf-8')).not.toContain(mdxSentinel);
+  await expect(page.locator('[data-slot="sidebar-container"]')).toBeVisible();
 });
 
 test('truncation banner appears for an overflowing level while every root entry stays visible', async ({

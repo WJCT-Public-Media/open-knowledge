@@ -415,8 +415,10 @@ test('sidebar folder: row click navigates to folder overview; treeitem toggles e
   await expect(folderRow).toHaveAttribute('aria-expanded', 'false');
   await expect(nestedFile).toHaveCount(0);
 
-  // Re-expand so we can navigate to the nested doc.
-  await folderRow.press('ArrowRight');
+  // Row click opens the folder too: it navigates to the folder's resolved
+  // target and expands the row so the child is visible.
+  await folderRow.click();
+  await expect(page).toHaveURL(/#\/sidebar-folder\/$/);
   await expect(folderRow).toHaveAttribute('aria-expanded', 'true');
   await expect(nestedFile).toBeVisible();
 
@@ -432,10 +434,13 @@ test('sidebar folder: row click navigates to folder overview; treeitem toggles e
   await expect(folderRow).toHaveAttribute('aria-expanded', 'true');
   await expect(nestedFile).toBeVisible();
 
-  // Row click navigates to the folder's resolved target. Folder routes keep a
-  // trailing slash so a folder and same-basename document remain distinct.
+  // Row click navigates back to the folder target. Folder routes keep a
+  // trailing slash so a folder and same-basename document remain distinct, and
+  // the navigation click must not also collapse the already-open folder.
   await folderRow.click();
   await expect(page).toHaveURL(/#\/sidebar-folder\/$/);
+  await expect(folderRow).toHaveAttribute('aria-expanded', 'true');
+  await expect(nestedFile).toBeVisible();
 });
 
 test('markdown link edit dialog preserves page mode while clearing and updates the href target', async ({

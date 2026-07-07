@@ -676,6 +676,19 @@ describe('buildHandoffInput — shared surface helper (US-011)', () => {
     });
   });
 
+  test('POSIX: preserves extension-qualified mdx relativePath + docPath', async () => {
+    const { buildHandoffInput } = await import('./useHandoffDispatch');
+    const input = buildHandoffInput({
+      docName: 'specs/foo/SPEC.mdx',
+      workspace: { contentDir: '/Users/andrew/repo', pathSeparator: '/' },
+    });
+    expect(input).toEqual({
+      docContext: { relativePath: 'specs/foo/SPEC.mdx' },
+      projectDir: '/Users/andrew/repo',
+      docPath: '/Users/andrew/repo/specs/foo/SPEC.mdx',
+    });
+  });
+
   test('Windows: rewrites relativePath slashes to backslash for docPath', async () => {
     const { buildHandoffInput } = await import('./useHandoffDispatch');
     const input = buildHandoffInput({
@@ -2162,6 +2175,24 @@ describe('buildComposerHandoffInput — compose-scoped helper (US-002)', () => {
       mentions: ['guides/style.md'],
     });
     expect(input?.docPath).toBe('/repo/specs/foo/SPEC.md');
+  });
+
+  test('docRelativePath overrides the fallback docName extension for compose input', async () => {
+    const { buildComposerHandoffInput } = await import('./useHandoffDispatch');
+    const input = buildComposerHandoffInput({
+      docName: 'specs/foo/SPEC',
+      docRelativePath: 'specs/foo/SPEC.mdx',
+      workspace: { contentDir: '/repo', pathSeparator: '/' },
+      instruction: 'tighten the intro',
+      mentions: [],
+    });
+    expect(input?.compose).toEqual({
+      scope: 'doc',
+      docRelativePath: 'specs/foo/SPEC.mdx',
+      instruction: 'tighten the intro',
+      mentions: [],
+    });
+    expect(input?.docPath).toBe('/repo/specs/foo/SPEC.mdx');
   });
 
   test('folderRelativePath with null docName builds a folder-scope compose input (folder lead, empty docPath)', async () => {

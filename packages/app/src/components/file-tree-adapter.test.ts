@@ -19,6 +19,7 @@ import {
   relativePathForTreeItem,
   treeDirectoryPathToFolderPath,
   treeFilePathToDocName,
+  treeFilePathToDocumentDocName,
   treeItemToTarget,
   treePathToAppPath,
   uploadedPathForSidebarDrop,
@@ -261,11 +262,93 @@ describe('file-tree-adapter', () => {
     expect(docNameToTreePath('README')).toBe('README.md');
     expect(docNameToTreePath('README', '.md')).toBe('README.md');
     expect(docNameToTreePath('docs/guide', '.mdx')).toBe('docs/guide.mdx');
+    expect(docNameToTreePath('docs/guide.mdx', '.mdx')).toBe('docs/guide.mdx');
   });
 
   test('treeFilePathToDocName strips both .md and .mdx suffixes', () => {
     expect(treeFilePathToDocName('docs/guide.md')).toBe('docs/guide');
     expect(treeFilePathToDocName('docs/guide.mdx')).toBe('docs/guide');
+  });
+
+  test('treeFilePathToDocumentDocName preserves exact document identities', () => {
+    const documents: FileEntry[] = [
+      {
+        kind: 'document',
+        docName: 'docs/guide.mdx',
+        docExt: '.mdx',
+        size: 0,
+        modified: '',
+      },
+    ];
+
+    expect(treeFilePathToDocumentDocName('docs/guide.mdx', documents)).toBe('docs/guide.mdx');
+    expect(treeFilePathToDocumentDocName('docs/missing.mdx', documents)).toBe('docs/missing');
+  });
+
+  test('treeFilePathToDocumentDocName preserves an extension row beside the opposite document extension', () => {
+    const documents: FileEntry[] = [
+      {
+        kind: 'document',
+        docName: 'docs/guide',
+        docExt: '.mdx',
+        size: 0,
+        modified: '',
+      },
+      {
+        kind: 'asset',
+        path: 'docs/guide.md',
+        assetExt: 'md',
+        mediaKind: null,
+        size: 0,
+        modified: '',
+      },
+    ];
+
+    expect(treeFilePathToDocumentDocName('docs/guide.md', documents)).toBe('docs/guide.md');
+  });
+
+  test('treeFilePathToDocumentDocName preserves extension rows when both variants are generic entries', () => {
+    const documents: FileEntry[] = [
+      {
+        kind: 'asset',
+        path: 'docs/guide.md',
+        assetExt: 'md',
+        mediaKind: null,
+        size: 0,
+        modified: '',
+      },
+      {
+        kind: 'asset',
+        path: 'docs/guide.mdx',
+        assetExt: 'mdx',
+        mediaKind: null,
+        size: 0,
+        modified: '',
+      },
+    ];
+
+    expect(treeFilePathToDocumentDocName('docs/guide.md', documents)).toBe('docs/guide.md');
+  });
+
+  test('treeItemToTarget preserves exact document identities when present', () => {
+    const mdxFile = menuItem('docs/guide.mdx', 'file');
+    const documents: FileEntry[] = [
+      {
+        kind: 'document',
+        docName: 'docs/guide.mdx',
+        docExt: '.mdx',
+        size: 0,
+        modified: '',
+      },
+    ];
+
+    expect(treeItemToTarget(mdxFile, documents)).toEqual({
+      kind: 'file',
+      name: 'guide',
+      path: 'docs/guide.mdx',
+      treePath: 'docs/guide.mdx',
+      docExt: '.mdx',
+    });
   });
 
   test('documentsToTreePaths uses each doc.docExt; absent docExt defaults to .md', () => {

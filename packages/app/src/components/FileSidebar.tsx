@@ -146,6 +146,21 @@ const ToolbarButton: FC<ToolbarButtonProps> = ({ icon: Icon, label, ...props }) 
   );
 };
 
+const ToolbarDropdownTrigger: FC<ToolbarButtonProps> = ({ icon: Icon, label, ...props }) => {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon-sm" aria-label={label} {...props}>
+            <Icon aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+};
+
 function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
   const { t } = useLingui();
   // Imperative handle to the FileTree — header buttons (Expand-All / Collapse-
@@ -240,6 +255,7 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
   // cycle: cleanup unsubscribes the old listener, then the body re-subscribes
   // through the new handle. No race, no stale closure.
   const [folderState, setFolderState] = useState(EMPTY_FOLDER_STATE);
+
   useEffect(() => {
     if (tree === null) return;
     const sync = () => {
@@ -504,7 +520,7 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
         }
         case 'reveal-in-finder': {
           if (!bridge || !workspace) return;
-          const absPath = resolveActiveTargetAbsPath(activeTarget, activeDocName, workspace);
+          const absPath = resolveActiveTargetAbsPath(activeTarget, workspace);
           void bridge.shell.showItemInFolder(absPath);
           return;
         }
@@ -534,7 +550,7 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
             toast.error(t`No AI agents installed`);
             return;
           }
-          const input = buildSendToAiInputForActiveTarget(activeTarget, activeDocName, workspace);
+          const input = buildSendToAiInputForActiveTarget(activeTarget, workspace);
           if (!input) return;
           const [defaultTarget] = installedTargets;
           if (!defaultTarget) return;
@@ -543,7 +559,7 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
         }
         case 'copy-full-path': {
           if (!workspace) return;
-          const absPath = resolveActiveTargetAbsPath(activeTarget, activeDocName, workspace);
+          const absPath = resolveActiveTargetAbsPath(activeTarget, workspace);
           void navigator.clipboard
             .writeText(absPath)
             .then(() => toast.success(t`Copied full path`, { description: absPath }))
@@ -554,7 +570,7 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
           return;
         }
         case 'copy-relative-path': {
-          const relPath = resolveActiveTargetRelativePath(activeTarget, activeDocName);
+          const relPath = resolveActiveTargetRelativePath(activeTarget);
           // `resolveActiveTargetRelativePath` returns `''` for null / missing
           // scopes (the project root has no project-relative path).
           // Don't pollute the clipboard with an empty string + a misleading
@@ -624,7 +640,6 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
     tree,
     workspace,
     activeTarget,
-    activeDocName,
     initialCreateDir,
     projectLocalBinding,
     showHiddenFiles,
@@ -793,9 +808,7 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
                  */}
                 {hasFolders ? (
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <ToolbarButton icon={ListCollapse} label={t`Tree view options`} />
-                    </DropdownMenuTrigger>
+                    <ToolbarDropdownTrigger icon={ListCollapse} label={t`Tree view options`} />
                     <DropdownMenuContent align="end" className="min-w-52">
                       {!allExpanded ? (
                         <DropdownMenuItem onSelect={() => tree?.expandAll()}>
@@ -823,9 +836,7 @@ function FileSidebarInner({ onOpenSearch }: FileSidebarProps) {
                   // Mirrors the Tree view options dropdown above. Picking a
                   // template runs the same inline-rename create flow as New file.
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <ToolbarButton icon={FilePlus} label={t`New from template`} />
-                    </DropdownMenuTrigger>
+                    <ToolbarDropdownTrigger icon={FilePlus} label={t`New from template`} />
                     <DropdownMenuContent align="end" className="min-w-52">
                       <TemplateMenuRows
                         parentDir={initialCreateDir}

@@ -49,6 +49,13 @@ describe('safeContentPath', () => {
     const result = safeContentPath('sub/nested', contentDir);
     expect(result).toBe(resolve(contentDir, 'sub/nested.md'));
   });
+
+  test('preserves document names that already include a supported extension', () => {
+    expect(safeContentPath('sub/nested.md', contentDir)).toBe(resolve(contentDir, 'sub/nested.md'));
+    expect(safeContentPath('sub/nested.mdx', contentDir)).toBe(
+      resolve(contentDir, 'sub/nested.mdx'),
+    );
+  });
 });
 
 describe('isWithinContentDir', () => {

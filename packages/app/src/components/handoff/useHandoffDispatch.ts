@@ -256,15 +256,15 @@ export interface HandoffDispatchInput {
 
 /**
  * Shared helper for the three surfaces (EditorHeader, CommandPalette, FileTree)
- * that all construct a `HandoffDispatchInput` the same way: from an extension-
- * less doc path (`activeDocName` or a right-clicked tree-node's `path`) plus
- * the workspace root / OS separator.
+ * that all construct a `HandoffDispatchInput` the same way: from a document
+ * identifier (`activeDocName` or a right-clicked tree-node's `path`) plus the
+ * workspace root / OS separator.
  *
  * Returns `null` when either input is missing — mirrors the
  * `OpenInAgentMenu.input` contract ("disabled trigger when nothing to dispatch").
  *
  * Centralizing the construction here guarantees that every surface:
- *   - Uses the same `.md`-suffix convention (via `docNameToRelativePath`).
+ *   - Uses the same markdown path convention (via `docNameToRelativePath`).
  *   - Joins with the advertised separator (via `joinWorkspacePath`).
  *   - Sets `docContext.relativePath` to the exact same POSIX form that the
  *     prompt composer and MCP server consume.
@@ -400,7 +400,7 @@ export function buildFolderHandoffInput(args: {
 /**
  * Selection-scoped variant — for the editor "Edit with AI" affordance (the
  * WYSIWYG bubble-menu button). Builds the input from the active doc's
- * extension-less name, the user's instruction, and the passage the user
+ * document identifier, the user's instruction, and the passage the user
  * selected, already serialized to markdown.
  *
  * `relativePath` and `docPath` are derived exactly as `buildHandoffInput`
@@ -465,8 +465,8 @@ export function buildSkillHandoffInput(args: {
 
 /**
  * Ask-scoped variant — for the persistent bottom "Ask AI" composer. Builds the
- * input from the active doc's extension-less name, the loaded workspace, and
- * the user's typed instruction. `relativePath` and `docPath` are derived
+ * input from the active doc's identifier, the loaded workspace, and the user's
+ * typed instruction. `relativePath` and `docPath` are derived
  * exactly as `buildHandoffInput` / `buildSelectionHandoffInput` do; ask scope
  * names a real doc, so `docPath` carries the doc's absolute path (informational
  * only — no URL builder threads `docPath`).
@@ -525,6 +525,7 @@ export function buildAskHandoffInput(args: {
  */
 export function buildComposerHandoffInput(args: {
   readonly docName: string | null;
+  readonly docRelativePath?: string;
   /** Workspace-relative folder path, forward-slash normalized, no trailing
    *  slash. When set and `docName` is null, selects folder scope. */
   readonly folderRelativePath?: string;
@@ -536,7 +537,7 @@ export function buildComposerHandoffInput(args: {
   if (!args.workspace?.contentDir) return null;
   const { contentDir, pathSeparator } = args.workspace;
   if (args.docName) {
-    const relativePath = docNameToRelativePath(args.docName);
+    const relativePath = args.docRelativePath ?? docNameToRelativePath(args.docName);
     const base = {
       scope: 'doc' as const,
       docRelativePath: relativePath,

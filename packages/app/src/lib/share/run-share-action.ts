@@ -11,7 +11,7 @@ const SHARE_CONSTRUCT_URL_PATH = '/api/share/construct-url';
 
 /**
  * Discriminated share target the button dispatches. `doc` carries the
- * extension-less `activeDocName` (transformed to a `.md` content-relative
+ * document identifier (transformed to a `.md` / `.mdx` content-relative
  * `docPath` here, mirroring the editor's `docNameToMarkdownPath` convention);
  * `folder` carries the content-relative `folderRelativePath` verbatim (it is
  * already the wire's `folderPath` — the empty string is the content-root
@@ -23,7 +23,7 @@ export type ShareTargetInput =
   | { kind: 'doc'; docName: string }
   | { kind: 'folder'; folderRelativePath: string };
 
-/** File-scope share input from an extension-less doc name. */
+/** File-scope share input from a document identifier. */
 export function buildDocShareInput(docName: string): ShareTargetInput {
   return { kind: 'doc', docName };
 }
@@ -116,9 +116,9 @@ export async function runShareAction(
     return { kind: 'opened-wizard' };
   }
 
-  // `docPath` is the `.md` content-relative path (extension-less docName →
-  // `foo.md`); `folderPath` is the content-relative folder path passed
-  // through unchanged (the empty string is the content-root sentinel).
+  // `docPath` is the `.md` / `.mdx` content-relative path; `folderPath` is the
+  // content-relative folder path passed through unchanged (the empty string is
+  // the content-root sentinel).
   const body: ShareConstructUrlRequest =
     input.kind === 'folder'
       ? { kind: 'folder', folderPath: input.folderRelativePath }

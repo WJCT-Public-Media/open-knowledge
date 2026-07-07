@@ -156,10 +156,15 @@ mock.module('@/lib/use-workspace', () => ({
 // is a no-op here (the publishing path is covered in use-selection-context tests).
 let liveSelection: unknown = null;
 let liveFrontmatterSelection: unknown = null;
+let pageMeta: ReadonlyMap<string, { docExt?: string }> = new Map();
 mock.module('@/hooks/use-selection-context', () => ({
   useSelectionContext: (_docName: string | null, surface: string) =>
     surface === 'frontmatter' ? liveFrontmatterSelection : liveSelection,
   usePublishFrontmatterSelection: () => {},
+}));
+
+mock.module('@/components/PageListContext', () => ({
+  usePageList: () => ({ pageMeta }),
 }));
 
 const recordAskedAiSpy = mock(() => {});
@@ -188,6 +193,7 @@ mock.module('@/components/handoff/useHandoffDispatch', () => ({
   }),
   buildComposerHandoffInput: (args: {
     docName: string | null;
+    docRelativePath?: string;
     folderRelativePath?: string;
     workspace: unknown;
     instruction: string;
@@ -337,6 +343,7 @@ beforeEach(() => {
   builderReturnsNull = false;
   liveSelection = null;
   liveFrontmatterSelection = null;
+  pageMeta = new Map();
   mockInlineMentions = [];
   emitMentions = null;
   dispatchCalls.length = 0;
@@ -912,6 +919,40 @@ describe('BottomComposer (top-row file-context chips lifecycle)', () => {
     expect(screen.getByRole('button', { name: /Remove SPEC\.md from context/i })).toBeTruthy();
   });
 
+  test('the first keystroke uses docExt metadata for an active .mdx document', async () => {
+    pageMeta = new Map([['foo', { docExt: '.mdx' }]]);
+    await renderComposer('foo');
+    fireEvent.change(getInput(), { target: { value: 'do a thing' } });
+
+    expect(await screen.findByTestId('composer-context-chip-file-foo.mdx')).toBeTruthy();
+    expect(screen.queryByTestId('composer-context-chip-file-foo.md')).toBeNull();
+  });
+
+  test('extension-qualified and extensionless routes for the same .mdx doc do not duplicate chips', async () => {
+    pageMeta = new Map([['foo', { docExt: '.mdx' }]]);
+    const { rerender } = await renderComposer('foo.mdx');
+    fireEvent.change(getInput(), { target: { value: 'drafting' } });
+    await screen.findByTestId('composer-context-chip-file-foo.mdx');
+
+    const { BottomComposer } = await import('./BottomComposer');
+    rerender(<BottomComposer docName="foo" surface="wysiwyg" />);
+
+    expect(screen.getByTestId('composer-context-chip-file-foo.mdx')).toBeTruthy();
+    expect(screen.queryByTestId('composer-context-chip-file-foo.md')).toBeNull();
+  });
+
+  test('switching same-stem md/mdx documents replaces the prior file chip', async () => {
+    const { rerender } = await renderComposer('foo.md');
+    fireEvent.change(getInput(), { target: { value: 'drafting' } });
+    await screen.findByTestId('composer-context-chip-file-foo.md');
+
+    const { BottomComposer } = await import('./BottomComposer');
+    rerender(<BottomComposer docName="foo.mdx" surface="wysiwyg" />);
+
+    await screen.findByTestId('composer-context-chip-file-foo.mdx');
+    expect(screen.queryByTestId('composer-context-chip-file-foo.md')).toBeNull();
+  });
+
   test('switching files while drafting accumulates a chip for each touched file', async () => {
     const { rerender } = await renderComposer('fileA');
     fireEvent.change(getInput(), { target: { value: 'drafting' } });
@@ -975,6 +1016,20 @@ describe('BottomComposer (top-row file-context chips lifecycle)', () => {
     expect(buildArgs[0]?.docName).toBe('fileB');
     expect(buildArgs[0]?.mentions).toContain('fileA.md');
     expect(buildArgs[0]?.mentions).not.toContain('fileB.md');
+  });
+
+  test('dispatch carries the .mdx relative path for an active .mdx lead', async () => {
+    pageMeta = new Map([['fileA', { docExt: '.mdx' }]]);
+    await renderComposer('fileA');
+    fireEvent.change(getInput(), { target: { value: 'drafting' } });
+    await screen.findByTestId('composer-context-chip-file-fileA.mdx');
+
+    fireEvent.click(screen.getByTestId('ask-ai-send'));
+    await waitFor(() => expect(dispatchCalls).toHaveLength(1));
+
+    expect(buildArgs[0]?.docName).toBe('fileA');
+    expect(buildArgs[0]?.docRelativePath).toBe('fileA.mdx');
+    expect(buildArgs[0]?.mentions).not.toContain('fileA.mdx');
   });
 
   test('dismissing all file chips with no inline mentions falls back to project scope', async () => {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import {
   _resetDocExtensionsForTests,
+  docNameToRelativePath,
   forgetDocExtension,
   getDocExtension,
   isSupportedDocFile,
@@ -60,6 +61,23 @@ describe('stripDocExtension', () => {
     expect(stripDocExtension('foo.txt')).toBe('foo.txt');
     expect(stripDocExtension('releases/v1.0')).toBe('releases/v1.0');
     expect(stripDocExtension('foo')).toBe('foo');
+  });
+});
+
+describe('docNameToRelativePath', () => {
+  test('passes through extension-qualified docNames unchanged', () => {
+    registerDocExtension('docs/guide', '.MDX');
+    expect(docNameToRelativePath('docs/guide.mdx')).toBe('docs/guide.mdx');
+    expect(docNameToRelativePath('docs/guide.md')).toBe('docs/guide.md');
+  });
+
+  test('appends the registered extension for extension-less docNames', () => {
+    registerDocExtension('docs/guide', '.MDX');
+    expect(docNameToRelativePath('docs/guide')).toBe('docs/guide.MDX');
+  });
+
+  test('defaults extension-less docNames to .md', () => {
+    expect(docNameToRelativePath('docs/new')).toBe('docs/new.md');
   });
 });
 

@@ -36,15 +36,13 @@ export function joinWorkspacePath(contentDir: string, relative: string, sep: '/'
   return `${trimmedDir}${sep}${normalizedRelative}`;
 }
 
+const MARKDOWN_EXTENSION = /\.(md|mdx)$/i;
+
 /**
- * Convert an extension-less docName (e.g. `specs/foo/SPEC`) to its `.md`-
- * suffixed relative-path form (e.g. `specs/foo/SPEC.md`).
- *
- * Assumes all docs use the `.md` extension. An `.mdx` document present in
- * the content directory would still report its docName without the extension;
- * callers that need true-extension resolution would need a new `/api/documents`
- * field.
+ * Convert a document identifier to its workspace-relative file path. Most
+ * docNames are extension-less, but Show All can pass extension-qualified names
+ * for same-stem `.md` / `.mdx` siblings.
  */
 export function docNameToRelativePath(docName: string): string {
-  return `${docName}.md`;
+  return MARKDOWN_EXTENSION.test(docName) ? docName : `${docName}.md`;
 }

@@ -17,6 +17,7 @@ import { McpConsentDialog } from '@/components/McpConsentDialog';
 import { isNewItemShortcut, NewItemDialog } from '@/components/NewItemDialog';
 import {
   downgradeFolderIndexForHashNav,
+  type ResolvedNavigationTarget,
   resolveNavigationTarget,
   withLargeFileOpenGuard,
 } from '@/components/navigation-targets';
@@ -28,6 +29,7 @@ import {
   useDocumentContext,
   useDocumentTransition,
 } from '@/editor/DocumentContext';
+import { parseEditorTabId } from '@/editor/editor-tabs';
 import { useReconcileSkillTabs } from '@/hooks/use-reconcile-skill-tabs';
 import { fetchApiConfig } from '@/lib/api-config';
 import { ConfigProvider } from '@/lib/config-provider';
@@ -72,16 +74,32 @@ const ShareReceiveMissDialog = lazy(() =>
  * trigger component to keep that locality.
  */
 const INSTALL_DIALOG_HASH = '#install-claude-desktop';
+const MARKDOWN_EXTENSION_QUALIFIED_DOC_PATTERN = /\.(md|mdx)$/i;
 function isAuxiliaryDialogHash(hash: string): boolean {
   return hash === SETTINGS_OPEN_HASH || hash === INSTALL_DIALOG_HASH;
+}
+
+function exactOpenMarkdownTabTarget(
+  docName: string,
+  openTabs: ReadonlyArray<string>,
+): ResolvedNavigationTarget | null {
+  if (!MARKDOWN_EXTENSION_QUALIFIED_DOC_PATTERN.test(docName)) return null;
+  for (const tabId of openTabs) {
+    const tab = parseEditorTabId(tabId);
+    if (tab.kind === 'doc' && tab.docName === docName) {
+      return { kind: 'doc', target: docName, docName };
+    }
+  }
+  return null;
 }
 
 function knownTargetsSignature(
   pages: ReadonlySet<string>,
   folderPaths: ReadonlySet<string>,
   assetPaths: ReadonlySet<string>,
+  filePaths: ReadonlySet<string>,
 ): string {
-  return [pages, folderPaths, assetPaths]
+  return [pages, folderPaths, assetPaths, filePaths]
     .map((values) => [...values].sort().join('\u0000'))
     .join('\u0001');
 }
@@ -97,16 +115,25 @@ function knownTargetsSignature(
  *  path. Target resolution (asset / doc / folder-index / folder / missing)
  *  lives here plus resolveNavigationTarget. */
 function NavigationHandler() {
-  const { clearTarget, syncOpenTabsWithKnownTargets, tabSessionLoaded } = useDocumentContext();
+  const { clearTarget, openTabs, syncOpenTabsWithKnownTargets, tabSessionLoaded } =
+    useDocumentContext();
   const { openTargetTransition } = useDocumentTransition();
   // Reconcile open skill tabs against the live skills list: an agent/MCP/server-
   // side scope move only broadcasts `files` (never retargets the client tab),
   // leaving an open skill tab pointing at a doc that no longer exists.
   useReconcileSkillTabs();
-  const { assetPaths, folderPaths, loading, pageMeta, pages, pagesBySlug, pagesByBasename } =
-    usePageList();
+  const {
+    assetPaths,
+    filePaths,
+    folderPaths,
+    loading,
+    pageMeta,
+    pages,
+    pagesBySlug,
+    pagesByBasename,
+  } = usePageList();
   const lastSyncedTargetsSignatureRef = useRef<string | null>(null);
-  const targetsSignature = knownTargetsSignature(pages, folderPaths, assetPaths);
+  const targetsSignature = knownTargetsSignature(pages, folderPaths, assetPaths, filePaths);
 
   useEffect(() => {
     if (
@@ -117,9 +144,10 @@ function NavigationHandler() {
       return;
     }
     lastSyncedTargetsSignatureRef.current = targetsSignature;
-    syncOpenTabsWithKnownTargets({ pages, folderPaths, assetPaths });
+    syncOpenTabsWithKnownTargets({ pages, folderPaths, assetPaths, filePaths });
   }, [
     assetPaths,
+    filePaths,
     folderPaths,
     loading,
     pages,
@@ -187,12 +215,14 @@ function NavigationHandler() {
         mark('ok/nav/hash-change', { docName, kind: 'deferred-loading' });
         return;
       }
-      const resolved = resolveNavigationTarget(docName, {
-        pages,
-        folderPaths,
-        pagesBySlug,
-        pagesByBasename,
-      });
+      const resolved =
+        exactOpenMarkdownTabTarget(docName, openTabs) ??
+        resolveNavigationTarget(docName, {
+          pages,
+          folderPaths,
+          pagesBySlug,
+          pagesByBasename,
+        });
       if (resolved.kind === 'missing' && /\/+$/.test(docName.trim())) {
         mark('ok/nav/hash-change', { docName, kind: 'deferred-missing-folder' });
         return;
@@ -208,6 +238,7 @@ function NavigationHandler() {
     folderPaths,
     loading,
     openTargetTransition,
+    openTabs,
     pageMeta,
     pages,
     pagesBySlug,

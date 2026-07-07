@@ -51,8 +51,22 @@ function fileEntryIconFieldsForPath(path: string): {
   return { kind: 'file', path, bodyIndexed: false };
 }
 
-export function FileEntryPathIcon({ path, className }: { path: string; className?: string }) {
-  return <FileEntryIcon {...fileEntryIconFieldsForPath(path)} className={className} />;
+export function FileEntryPathIcon({
+  path,
+  className,
+  showExtensionBadge,
+}: {
+  path: string;
+  className?: string;
+  showExtensionBadge?: boolean;
+}) {
+  return (
+    <FileEntryIcon
+      {...fileEntryIconFieldsForPath(path)}
+      className={className}
+      showExtensionBadge={showExtensionBadge}
+    />
+  );
 }
 
 export function fileEntryPathIconToSvgString(path: string): string {
@@ -77,12 +91,14 @@ export function FileEntryIcon({
   docExt,
   bodyIndexed,
   className,
+  showExtensionBadge = true,
 }: {
   kind: 'file' | 'folder';
   path: string;
   docExt?: string;
   bodyIndexed?: boolean;
   className?: string;
+  showExtensionBadge?: boolean;
 }) {
   if (kind === 'folder') {
     return (
@@ -98,7 +114,8 @@ export function FileEntryIcon({
     bodyIndexed === false ? getFileExtension(path) : (docExt ?? (getFileExtension(path) || '.md'));
   const normalizedExt = ext.toLowerCase();
   const mediaKind = mediaKindForSidebarAssetExtension(normalizedExt);
-  const badge = ext && normalizedExt !== '.md' ? ext.slice(1).toUpperCase() : null;
+  const badge =
+    showExtensionBadge && ext && normalizedExt !== '.md' ? ext.slice(1).toUpperCase() : null;
   const iconClassName = cn(className, mediaKind === 'image' && 'text-rose-500');
 
   return (

@@ -56,7 +56,7 @@ import {
   restoreContributors,
   swapContributors,
 } from './contributor-tracker.ts';
-import { getDocExtension } from './doc-extensions.ts';
+import { docNameToRelativePath } from './doc-extensions.ts';
 import { applyDiskContentToDoc, FILE_WATCHER_ORIGIN } from './external-change.ts';
 import { contentHash, registerWrite } from './file-watcher.ts';
 import { tracedMkdir, tracedRename, tracedUnlinkSync, tracedWriteFile } from './fs-traced.ts';
@@ -420,8 +420,8 @@ export function safeContentPath(documentName: string, contentDir: string): strin
   if (documentName.includes('\x00')) {
     throw new Error(`Invalid document name: ${documentName}`);
   }
-  const ext = getDocExtension(documentName);
-  const filePath = resolve(contentDir, `${documentName}${ext}`);
+  const relativePath = docNameToRelativePath(documentName);
+  const filePath = resolve(contentDir, relativePath);
   if (!isWithinDir(filePath, contentDir)) {
     throw new Error(`Invalid document name: ${documentName}`);
   }

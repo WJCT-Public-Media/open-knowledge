@@ -107,6 +107,32 @@ describe('resolveNavigationTarget', () => {
     });
   });
 
+  test('preserves extension-qualified document targets when the exact page exists', () => {
+    const resolved = resolveNavigationTarget('docs/guide.md', {
+      pages: new Set(['docs/guide.md', 'docs/guide.mdx', 'docs/guide']),
+      folderPaths: new Set(['docs']),
+    });
+
+    expect(resolved).toEqual({
+      kind: 'doc',
+      target: 'docs/guide.md',
+      docName: 'docs/guide.md',
+    });
+  });
+
+  test('falls back to extensionless document targets when no exact extension page exists', () => {
+    const resolved = resolveNavigationTarget('docs/guide.md', {
+      pages: new Set(['docs/guide']),
+      folderPaths: new Set(['docs']),
+    });
+
+    expect(resolved).toEqual({
+      kind: 'doc',
+      target: 'docs/guide',
+      docName: 'docs/guide',
+    });
+  });
+
   test('prefers an exact document over a folder with the same basename', () => {
     const resolved = resolveNavigationTarget('hello', {
       pages: new Set(['hello']),

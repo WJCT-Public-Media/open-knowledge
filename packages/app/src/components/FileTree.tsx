@@ -86,6 +86,7 @@ import {
   relativePathForTreeItem,
   treeDirectoryPathToFolderPath,
   treeFilePathToDocName,
+  treeFilePathToDocumentDocName,
   treeItemToTarget,
   treePathSignature,
   treePathToAppPath,
@@ -606,6 +607,23 @@ function treePathToTarget(treePath: string, documents: readonly FileEntry[]): Fi
   );
 }
 
+function alternateMarkdownTreePath(treePath: string): string | null {
+  const match = treePath.match(/\.(md|mdx)$/i);
+  if (!match) return null;
+  const ext = match[0].toLowerCase();
+  const alternateExt = ext === '.md' ? '.mdx' : '.md';
+  return `${treePath.slice(0, -match[0].length)}${alternateExt}`;
+}
+
+function hasSameStemMarkdownSiblingTreePath(
+  treePath: string,
+  treePaths: readonly string[],
+): boolean {
+  const alternate = alternateMarkdownTreePath(treePath);
+  if (!alternate) return false;
+  return treePaths.includes(alternate);
+}
+
 function isTreePathInsideFolder(treePath: string, folderTreePath: string): boolean {
   return treePath !== folderTreePath && treePath.startsWith(folderTreePath);
 }
@@ -751,7 +769,7 @@ function FileTreeMenu({
           workspace,
         })
       : buildHandoffInput({
-          docName: treeFilePathToDocName(item.path),
+          docName: treeFilePathToDocumentDocName(item.path, documents),
           workspace,
         });
 
@@ -767,7 +785,7 @@ function FileTreeMenu({
       ? null
       : isFolder
         ? buildFolderShareInput(treeDirectoryPathToFolderPath(item.path))
-        : buildDocShareInput(treeFilePathToDocName(item.path));
+        : buildDocShareInput(treeFilePathToDocumentDocName(item.path, documents));
   const canShare = hasRemote && shareInput !== null;
   const handleShare = () => {
     if (!shareInput) return;
@@ -1299,7 +1317,12 @@ export function FileTree({
       }
     );
   }
-  function navigateToWithPulse(targetPath: string, size?: number) {
+  function navigateToWithPulse(
+    targetPath: string,
+    size?: number,
+    options?: { registerPage?: boolean },
+  ) {
+    if (options?.registerPage) addPage(targetPath);
     openTarget(navigationTargetForDocument(targetPath, size), { tabBehavior: 'replace-active' });
     replaceHashWithoutNavigation(hashFromDocName(targetPath));
     notifySidebarFileSelected();
@@ -1368,6 +1391,7 @@ export function FileTree({
 
   const documentsRef = useRef(documents);
   const pageMetaRef = useRef(pageMeta);
+  const pendingExactFileSelectionRef = useRef<string | null>(null);
   function activateTreePath(treePath: string, entries: readonly FileEntry[] = documents) {
     const action = resolveFileTreeSelectionAction(treePath, entries);
     if (action.kind === 'none') {
@@ -1398,7 +1422,9 @@ export function FileTree({
     const docEntry = entries.find(
       (item): item is DocumentEntry => isDocumentEntry(item) && item.docName === action.path,
     );
-    navigateToWithPulse(action.path, docEntry?.size);
+    navigateToWithPulse(action.path, docEntry?.size, {
+      registerPage: hasSupportedDocumentExtension(action.path),
+    });
   }
   function navigateToAssetWithPulse(assetPath: string, entries?: readonly FileEntry[]) {
     const currentEntries = entries ?? documentsRef.current;
@@ -2689,7 +2715,7 @@ export function FileTree({
             }
           : {
               kind: 'file' as const,
-              fromPath: treeFilePathToDocName(sourceTreePath),
+              fromPath: treeFilePathToDocumentDocName(sourceTreePath, documentsRef.current),
               toPath: destinationTreePath,
             };
       const activeBeforeRename = {
@@ -2806,6 +2832,9 @@ export function FileTree({
       for (const operation of operations) {
         const isFolder = operation.sourcePath.endsWith('/');
         const sourceIsAsset = !isFolder && isAssetTreePath(operation.sourcePath);
+        const sourceDocName = sourceIsAsset
+          ? null
+          : treeFilePathToDocumentDocName(operation.sourcePath, documentsRef.current);
         const payload = isFolder
           ? {
               kind: 'folder' as const,
@@ -2820,8 +2849,11 @@ export function FileTree({
               }
             : {
                 kind: 'file' as const,
-                fromPath: treeFilePathToDocName(operation.sourcePath),
-                toPath: treeFilePathToDocName(operation.destinationTreePath),
+                fromPath: sourceDocName ?? treeFilePathToDocName(operation.sourcePath),
+                toPath:
+                  sourceDocName && hasSupportedDocumentExtension(sourceDocName)
+                    ? operation.destinationTreePath
+                    : treeFilePathToDocName(operation.destinationTreePath),
               };
 
         const res = await fetch('/api/rename-path', {
@@ -3191,6 +3223,14 @@ export function FileTree({
     });
   }
 
+  function selectedRenderedTreePath(): string | null {
+    const shadow = fileTreeHostRef.current?.querySelector(FILE_TREE_TAG_NAME)?.shadowRoot;
+    const selectedRow = shadow?.querySelector<HTMLElement>(
+      '[aria-selected="true"][data-item-path]',
+    );
+    return selectedRow?.dataset.itemPath ?? null;
+  }
+
   useLayoutEffect(() => {
     documentsRef.current = documents;
     pageMetaRef.current = pageMeta;
@@ -3217,7 +3257,25 @@ export function FileTree({
         // effect also catches this once activeTarget commits, but clearing
         // eagerly avoids a one-frame deselected flash on the clicked row).
         setCreationDirCleared(false);
-        activateTreePath(normalizeSelectionPath(selected), documents);
+        const selectedTreePath = normalizeSelectionPath(selected);
+        const pendingExactFileSelection = pendingExactFileSelectionRef.current;
+        // The click handler sets this ref and schedules hash navigation with
+        // setTimeout(0); this microtask consumes the exact row first.
+        const hasPendingExactFileSelection =
+          pendingExactFileSelection !== null &&
+          treeFilePathToDocName(pendingExactFileSelection) ===
+            treeFilePathToDocName(selectedTreePath);
+        const targetTreePath = hasPendingExactFileSelection
+          ? pendingExactFileSelection
+          : selectedTreePath;
+        pendingExactFileSelectionRef.current = null;
+        queueMicrotask(() => {
+          const renderedTreePath = hasPendingExactFileSelection ? null : selectedRenderedTreePath();
+          activateTreePath(
+            normalizeSelectionPath(renderedTreePath ?? targetTreePath),
+            documentsRef.current,
+          );
+        });
       }
     };
     handleRenameErrorRef.current = (message) => {
@@ -4012,18 +4070,32 @@ export function FileTree({
     hoveredPrewarmDocRef.current = null;
   }
 
+  function hasSameStemMarkdownSiblingRendered(treePath: string): boolean {
+    const alternate = alternateMarkdownTreePath(treePath);
+    if (!alternate) return false;
+    const shadow = fileTreeHostRef.current?.querySelector(FILE_TREE_TAG_NAME)?.shadowRoot;
+    if (!shadow) return false;
+    for (const row of shadow.querySelectorAll<HTMLElement>('[data-item-path]')) {
+      if (row.dataset.itemPath === alternate) return true;
+    }
+    return false;
+  }
+
   function handleTreeMouseMove(event: ReactMouseEvent<HTMLElement>) {
     const path = findTreeItemPath(event.nativeEvent);
     if (!path || path.endsWith('/')) {
       cancelCurrentHoverPrewarm();
       return;
     }
-    const docName = treeFilePathToDocName(path);
     const entry = documentsRef.current.find((item) => fileEntryToTreePath(item) === path);
     if (entry && isAssetEntry(entry)) {
       cancelCurrentHoverPrewarm();
       return;
     }
+    const docName =
+      entry && isDocumentEntry(entry)
+        ? entry.docName
+        : treeFilePathToDocumentDocName(path, documentsRef.current);
     if (entry && isDocumentEntry(entry) && isDocumentOverOpenByteLimit(entry.size)) {
       cancelCurrentHoverPrewarm();
       return;
@@ -4052,23 +4124,51 @@ export function FileTree({
       }
       return;
     }
-    if (item.getAttribute('aria-selected') !== 'true') return;
+    const wasSelected = item.getAttribute('aria-selected') === 'true';
 
     const rawPath = item.dataset.itemPath;
     if (!rawPath) return;
 
     const path =
       item.dataset.itemType === 'folder' ? folderPathToTreeDirectoryPath(rawPath) : rawPath;
-    if (model.getSelectedPaths().length !== 1) return;
 
     if (item.dataset.itemType === 'folder') {
       const folderPath = treeDirectoryPathToFolderPath(path);
+      const folderItem = asDirectoryHandle(model.getItem(path));
+      if (!wasSelected) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (folderItem && !folderItem.isExpanded()) folderItem.expand();
+        queueMicrotask(() => navigateToFolderWithPulse(folderPath));
+        return;
+      }
+      if (model.getSelectedPaths().length !== 1) return;
       if (window.location.hash === hashFromFolderPath(folderPath)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (folderItem && !folderItem.isExpanded()) folderItem.expand();
       queueMicrotask(() => navigateToFolderWithPulse(folderPath));
       return;
     }
 
-    const docName = treeFilePathToDocName(path);
+    if (!wasSelected) {
+      // Lazy/show-all model state can lag rows that already rendered, so the
+      // DOM query is the fallback for same-stem markdown sibling detection.
+      if (
+        hasSameStemMarkdownSiblingTreePath(path, treePathsRef.current) ||
+        hasSameStemMarkdownSiblingRendered(path)
+      ) {
+        pendingExactFileSelectionRef.current = path;
+        // Let handleSelectionChange's microtask consume the exact file selection
+        // before navigation commits the extension-qualified URL.
+        setTimeout(() => navigateToWithPulse(path, undefined, { registerPage: true }), 0);
+        return;
+      }
+      queueMicrotask(() => activateTreePath(path));
+      return;
+    }
+    const docName = treeFilePathToDocumentDocName(path, documentsRef.current);
+    if (model.getSelectedPaths().length !== 1) return;
     if (window.location.hash === hashFromDocName(docName)) return;
     queueMicrotask(() => activateTreePath(path));
   }

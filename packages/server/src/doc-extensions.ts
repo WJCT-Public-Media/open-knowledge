@@ -6,9 +6,13 @@
  * (Next.js, Astro, Fumadocs): `.mdx` is a strict superset of `.md`, so a
  * co-located `.mdx` is presumed to intentionally override the `.md`.
  *
- * The extension-less docName is what flows through the CRDT layer, MCP tools,
- * wiki-link resolution, and the backlink index. Persistence uses
- * `getDocExtension()` to decide which file extension to write to.
+ * The extension-less docName is what normally flows through the CRDT layer,
+ * MCP tools, wiki-link resolution, and the backlink index. When a Show All
+ * disk walk sees same-stem `.md` and `.mdx` files, it can surface an
+ * extension-qualified docName for those ambiguous rows so both files remain
+ * independently addressable. Persistence writes extension-qualified docNames
+ * to that exact file; otherwise it uses `getDocExtension()` to decide which
+ * file extension to write to.
  *
  * Casing preservation: extensions are matched case-insensitively (`.MD` and
  * `.md` both qualify), but the actual on-disk casing observed at registration
@@ -156,6 +160,14 @@ export function registerDocExtension(
  */
 export function getDocExtension(docName: string): string {
   return docExtensionByName.get(docName) ?? DEFAULT_EXTENSION;
+}
+
+/**
+ * Materialize the content-tree relative path for a docName. Callers still own
+ * traversal validation against their target root after resolving the result.
+ */
+export function docNameToRelativePath(docName: string): string {
+  return isSupportedDocFile(docName) ? docName : `${docName}${getDocExtension(docName)}`;
 }
 
 /** Clear the recorded extension for a docName (e.g. on file delete). */

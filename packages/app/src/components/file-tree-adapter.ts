@@ -27,11 +27,34 @@ export function docNameToTreePath(
   docName: string,
   docExt: string = DEFAULT_TREE_EXTENSION,
 ): string {
+  if (TREE_EXTENSION_PATTERN.test(docName)) return docName;
   return `${docName}${docExt}`;
 }
 
 export function treeFilePathToDocName(treePath: string): string {
   return stripTrailingSlash(treePath).replace(TREE_EXTENSION_PATTERN, '');
+}
+
+export function treeFilePathToDocumentDocName(
+  treePath: string,
+  documents: readonly FileEntry[],
+): string {
+  const normalized = stripTrailingSlash(treePath);
+  const exact = documents.find(
+    (entry): entry is DocumentEntry =>
+      isDocumentEntry(entry) && fileEntryToTreePath(entry) === normalized,
+  );
+  if (exact) return exact.docName;
+  const extensionless = treeFilePathToDocName(normalized);
+  const collidingEntry = documents.find((entry) => {
+    const entryTreePath = fileEntryToTreePath(entry);
+    return (
+      entryTreePath !== normalized &&
+      TREE_EXTENSION_PATTERN.test(entryTreePath) &&
+      treeFilePathToDocName(entryTreePath) === extensionless
+    );
+  });
+  return collidingEntry && TREE_EXTENSION_PATTERN.test(normalized) ? normalized : extensionless;
 }
 
 export function fileEntryToTreePath(entry: FileEntry): string {
@@ -191,7 +214,7 @@ export function treeItemToTarget(
   const isFolder = item.kind === 'directory';
   const appPath = isFolder
     ? treeDirectoryPathToFolderPath(item.path)
-    : treeFilePathToDocName(item.path);
+    : treeFilePathToDocumentDocName(item.path, documents);
   if (isFolder) {
     return {
       kind: 'folder',

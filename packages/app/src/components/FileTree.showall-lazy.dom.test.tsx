@@ -20,8 +20,8 @@
  */
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import { i18n } from '@lingui/core';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { MouseEventHandler, ReactNode } from 'react';
 import { emitDocumentsChanged } from '@/lib/documents-events';
 
 // Deterministic `Intl.NumberFormat` output for the truncation-notice smoke
@@ -67,6 +67,18 @@ function docEntry(docName: string) {
     docExt: '.md',
     size: 1,
     modified: '2026-06-12T00:00:00.000Z',
+  };
+}
+
+function assetEntry(path: string) {
+  return {
+    kind: 'asset',
+    path,
+    assetExt: path.split('.').pop() ?? 'file',
+    mediaKind: null,
+    size: 1,
+    modified: '2026-06-12T00:00:00.000Z',
+    referencedBy: [],
   };
 }
 
@@ -193,6 +205,7 @@ class StubModel {
 }
 
 const model = new StubModel();
+const openTargetMock = mock(() => {});
 
 mock.module('sonner', () => ({ toast: { success: mock(() => {}), error: mock(() => {}) } }));
 mock.module('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'light' }) }));
@@ -208,7 +221,7 @@ mock.module('@/editor/DocumentContext', () => ({
     getPoolActiveDocName: () => null,
     poolHas: () => false,
     isNewTabActive: false,
-    openTarget: mock(() => {}),
+    openTarget: openTargetMock,
     prewarm: () => {},
     remapTabsForRename: mock(() => {}),
   }),
@@ -279,11 +292,31 @@ mock.module('@pierre/trees', () => ({
 }));
 mock.module('@pierre/trees/react', () => ({
   useFileTree: () => ({ model }),
-  FileTree: ({ header }: { header?: ReactNode }) => (
-    <div data-testid="fake-pierre-tree" role="tree">
-      {header}
-    </div>
-  ),
+  FileTree: ({
+    header,
+    onClickCapture,
+  }: {
+    header?: ReactNode;
+    onClickCapture?: MouseEventHandler<HTMLDivElement>;
+  }) => {
+    return (
+      <div data-testid="fake-pierre-tree" role="tree" onClickCapture={onClickCapture}>
+        {header}
+        {[...model.items.values()].map((item) => (
+          <div
+            key={item.path}
+            role="treeitem"
+            data-item-path={item.path}
+            data-item-type={item.isDirectory() ? 'folder' : 'file'}
+            aria-selected={model.selectedPaths.includes(item.path) ? 'true' : 'false'}
+            tabIndex={-1}
+          >
+            {item.path}
+          </div>
+        ))}
+      </div>
+    );
+  },
 }));
 
 const { FileTree } = await import('./FileTree');
@@ -306,6 +339,8 @@ describe('FileTree showAll lazy root seed', () => {
     model.listeners.clear();
     model.focusedPath = null;
     model.selectedPaths = [];
+    openTargetMock.mockClear();
+    window.location.hash = '';
     globalThis.fetch = makeFetchMock() as unknown as typeof fetch;
     consoleWarnSpy = spyOn(console, 'warn').mockImplementation(() => {});
   });
@@ -404,6 +439,93 @@ describe('FileTree showAll lazy root seed', () => {
     expect(model.getItem('team/')?.isDirectory()).toBe(true);
     expect(model.getItem('empty/')?.isDirectory()).toBe(true);
     expect(model.getItem('README.md')?.isDirectory()).toBe(false);
+  });
+
+  test('first click on non-document file rows opens the asset tab', async () => {
+    showAllResponseFactory = () =>
+      jsonResponse({
+        documents: [assetEntry('LICENSE'), assetEntry('package.json')],
+        truncated: false,
+      });
+    const view = render(<FileTree />);
+
+    await waitFor(() => expect(model.items.has('package.json')).toBe(true));
+    view.rerender(<FileTree />);
+    for (const path of ['LICENSE', 'package.json']) {
+      const row = screen.getByRole('treeitem', { name: path });
+      fireEvent.click(row);
+
+      await waitFor(() =>
+        expect(openTargetMock).toHaveBeenCalledWith(
+          {
+            kind: 'asset',
+            target: path,
+            assetPath: path,
+            mediaKind: null,
+          },
+          { tabBehavior: 'replace-active' },
+        ),
+      );
+      expect(window.location.hash).toBe(`#/__asset__/${path}`);
+      openTargetMock.mockClear();
+      window.location.hash = '';
+    }
+  });
+
+  test('first click from one document row to README opens README', async () => {
+    showAllResponseFactory = () =>
+      jsonResponse({
+        documents: [docEntry('foo'), docEntry('README')],
+        truncated: false,
+      });
+    const view = render(<FileTree />);
+
+    await waitFor(() => expect(model.items.has('README.md')).toBe(true));
+    model.selectedPaths = ['foo.md'];
+    view.rerender(<FileTree />);
+    const row = screen.getByRole('treeitem', { name: 'README.md' });
+    fireEvent.click(row);
+
+    await waitFor(() =>
+      expect(openTargetMock).toHaveBeenCalledWith(
+        {
+          kind: 'doc',
+          target: 'README',
+          docName: 'README',
+        },
+        { tabBehavior: 'replace-active' },
+      ),
+    );
+    expect(window.location.hash).toBe('#/README');
+  });
+
+  test('first click from a document row to a folder opens the folder', async () => {
+    showAllResponseFactory = () =>
+      jsonResponse({
+        documents: [docEntry('foo'), folderEntry('docs', true), docEntry('docs/nested')],
+        truncated: false,
+      });
+    const view = render(<FileTree />);
+
+    await waitFor(() => expect(model.items.has('docs/')).toBe(true));
+    model.selectedPaths = ['foo.md'];
+    view.rerender(<FileTree />);
+    expect(model.getItem('docs/')?.isExpanded()).toBe(false);
+    const row = screen.getByRole('treeitem', { name: 'docs/' });
+    fireEvent.click(row);
+
+    await waitFor(() =>
+      expect(openTargetMock).toHaveBeenCalledWith(
+        {
+          kind: 'folder',
+          target: 'docs',
+          folderPath: 'docs',
+        },
+        { tabBehavior: 'replace-active' },
+      ),
+    );
+    expect(window.location.hash).toBe('#/docs/');
+    expect(model.getItem('docs/')?.isExpanded()).toBe(true);
   });
 
   test('a truncated depth-1 level still drives the truncation notice (QA-002 wiring)', async () => {

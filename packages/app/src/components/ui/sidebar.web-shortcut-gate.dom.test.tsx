@@ -17,6 +17,7 @@
  */
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { act, cleanup, render, screen } from '@testing-library/react';
+import { SIDEBAR_PINS_KEY } from '@/lib/sidebar-pin-store';
 import { SidebarProvider, useSidebar } from './sidebar';
 
 function StateProbe() {
@@ -40,11 +41,13 @@ describe('SidebarProvider web-mode ⌥⌘S shortcut — Electron gate', () => {
   beforeEach(() => {
     window.innerWidth = 1400;
     setOkDesktop(undefined);
+    window.localStorage.removeItem(SIDEBAR_PINS_KEY);
   });
 
   afterEach(() => {
     cleanup();
     setOkDesktop(undefined);
+    window.localStorage.removeItem(SIDEBAR_PINS_KEY);
   });
 
   test('web host (no window.okDesktop): ⌥⌘S toggles the sidebar', () => {

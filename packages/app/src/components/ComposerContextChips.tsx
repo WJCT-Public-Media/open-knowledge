@@ -70,7 +70,7 @@ function FileChip({ path, onRemove }: { path: string; onRemove: () => void }) {
         className="group/remove relative size-3.5 shrink-0 rounded-sm text-muted-foreground/80 hover:text-foreground"
       >
         <span className="absolute top-1/2 left-1/2 inline-flex size-3 -translate-x-1/2 -translate-y-1/2 opacity-100 transition-opacity duration-150 ease-out group-hover/chip:opacity-0 group-focus-within/chip:opacity-0 motion-reduce:transition-none">
-          <FileEntryPathIcon path={path} className="size-3" />
+          <FileEntryPathIcon path={path} className="size-3" showExtensionBadge={false} />
         </span>
         <X
           className="absolute top-1/2 left-1/2 size-3 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-150 ease-out group-hover/chip:opacity-100 group-focus-within/chip:opacity-100 motion-reduce:transition-none"

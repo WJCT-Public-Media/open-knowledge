@@ -1,6 +1,10 @@
 import type { InlineAssetMediaKind } from '@inkeep/open-knowledge-core';
 import { hashFromAssetPath } from '@/lib/doc-hash';
-import { fileEntryToTreePath, treePathToAppPath } from './file-tree-adapter';
+import {
+  fileEntryToTreePath,
+  treeFilePathToDocumentDocName,
+  treePathToAppPath,
+} from './file-tree-adapter';
 import type { FileEntry } from './file-tree-utils';
 import { isAssetEntry, isDocumentEntry, isFolderEntry } from './file-tree-utils';
 import { docNameForNavigationTarget, type ResolvedNavigationTarget } from './navigation-targets';
@@ -83,6 +87,13 @@ export function resolveFileTreeSelectionAction(
   if (!selectedPath) return { kind: 'none' };
 
   const entry = entries.find((item) => fileEntryToTreePath(item) === selectedPath);
+  const appPath = treePathToAppPath(selectedPath);
+  const documentDocName = selectedPath.endsWith('/')
+    ? appPath
+    : treeFilePathToDocumentDocName(selectedPath, entries);
+  if (documentDocName !== appPath) {
+    return { kind: 'document', path: documentDocName };
+  }
   if (entry && isAssetEntry(entry)) {
     return {
       kind: 'asset',
@@ -91,8 +102,10 @@ export function resolveFileTreeSelectionAction(
       mediaKind: entry.mediaKind,
     };
   }
+  if (entry && isDocumentEntry(entry)) {
+    return { kind: 'document', path: entry.docName };
+  }
 
-  const appPath = treePathToAppPath(selectedPath);
   if (selectedPath.endsWith('/')) {
     const hasFolderEntry = entries.some((item) => {
       if (isFolderEntry(item)) return item.path === appPath || item.path.startsWith(`${appPath}/`);

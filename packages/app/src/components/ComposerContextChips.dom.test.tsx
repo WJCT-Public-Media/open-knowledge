@@ -84,6 +84,15 @@ describe('ComposerContextChips', () => {
     expect(new Set([folderIcon, pageIcon, videoIcon, audioIcon]).size).toBe(4);
   });
 
+  test('keeps extension badges out of the compact leading icon cell', async () => {
+    await renderChips(['foo.mdx']);
+    const chip = screen.getByTestId('composer-context-chip-file-foo.mdx');
+
+    expect(chip.textContent).toContain('foo.mdx');
+    expect(chip.querySelector('[data-testid="file-entry-icon-markdown"]')).not.toBeNull();
+    expect(chip.querySelector('[data-testid="file-entry-extension-badge"]')).toBeNull();
+  });
+
   test('renders nothing when the file set is empty', async () => {
     const { container } = await renderChips([]);
     expect(container.querySelector('[data-testid="composer-context-chips"]')).toBeNull();

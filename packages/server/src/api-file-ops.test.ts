@@ -118,6 +118,7 @@ type CallApiOptions = {
   sessionManager?: Parameters<typeof createApiExtension>[0]['sessionManager'];
   getFileIndex?: () => ReadonlyMap<string, FileIndexEntry>;
   getFolderIndex?: () => ReadonlyMap<string, FolderIndexEntry>;
+  mutateFileIndex?: Parameters<typeof createApiExtension>[0]['mutateFileIndex'];
   onReferencedAssetsCacheInvalidator?: Parameters<
     typeof createApiExtension
   >[0]['onReferencedAssetsCacheInvalidator'];
@@ -148,6 +149,7 @@ async function createTestApiExtension(contentDir: string, options?: CallApiOptio
     contentDir,
     getFileIndex: options?.getFileIndex ?? (() => buildFileIndex(contentDir)),
     getFolderIndex: options?.getFolderIndex ?? (() => buildFolderIndex(contentDir)),
+    mutateFileIndex: options?.mutateFileIndex,
     onReferencedAssetsCacheInvalidator: options?.onReferencedAssetsCacheInvalidator,
     backlinkIndex: resolvedBacklinkIndex,
     signalChannel: options?.signalChannel,
@@ -256,6 +258,124 @@ describe('file operation API routes', () => {
       { docName: 'journal', rewrites: 2 },
       { docName: 'nested/child', rewrites: 1 },
     ]);
+  });
+
+  test('renames the selected .md sibling when .md and .mdx share a stem', async () => {
+    const dir = setupTmpDir();
+    writeFileSync(join(dir, 'foo.md'), '# Markdown sibling\n', 'utf-8');
+    writeFileSync(join(dir, 'foo.mdx'), '# MDX sibling\n', 'utf-8');
+
+    const result = await callApi(
+      dir,
+      '/api/rename-path',
+      'POST',
+      {
+        kind: 'file',
+        fromPath: 'foo.md',
+        toPath: 'renamed.md',
+      },
+      { backlinkIndex: buildBacklinkIndex(dir) },
+    );
+
+    expect(result.status).toBe(200);
+    expect(existsSync(join(dir, 'foo.md'))).toBe(false);
+    expect(readFileSync(join(dir, 'renamed.md'), 'utf-8')).toBe('# Markdown sibling\n');
+    expect(readFileSync(join(dir, 'foo.mdx'), 'utf-8')).toBe('# MDX sibling\n');
+    const body = JSON.parse(result.body) as {
+      renamed: Array<{ fromDocName: string; toDocName: string }>;
+    };
+    expect(body.renamed).toEqual([{ fromDocName: 'foo.md', toDocName: 'renamed' }]);
+  });
+
+  test('renames a folder containing same-stem .md and .mdx siblings', async () => {
+    const dir = setupTmpDir();
+    mkdirSync(join(dir, 'docs'), { recursive: true });
+    writeFileSync(join(dir, 'docs/foo.md'), '# Markdown sibling\n', 'utf-8');
+    writeFileSync(join(dir, 'docs/foo.mdx'), '# MDX sibling\n', 'utf-8');
+
+    const result = await callApi(
+      dir,
+      '/api/rename-path',
+      'POST',
+      {
+        kind: 'folder',
+        fromPath: 'docs',
+        toPath: 'archive',
+      },
+      { backlinkIndex: buildBacklinkIndex(dir) },
+    );
+
+    expect(result.status).toBe(200);
+    expect(existsSync(join(dir, 'docs'))).toBe(false);
+    expect(readFileSync(join(dir, 'archive/foo.md'), 'utf-8')).toBe('# Markdown sibling\n');
+    expect(readFileSync(join(dir, 'archive/foo.mdx'), 'utf-8')).toBe('# MDX sibling\n');
+    const body = JSON.parse(result.body) as {
+      renamed: Array<{ fromDocName: string; toDocName: string }>;
+    };
+    expect(body.renamed).toEqual([
+      { fromDocName: 'docs/foo.md', toDocName: 'archive/foo.md' },
+      { fromDocName: 'docs/foo.mdx', toDocName: 'archive/foo.mdx' },
+    ]);
+  });
+
+  test('renames into an explicit destination sibling stem without collapsing identity', async () => {
+    const dir = setupTmpDir();
+    writeFileSync(join(dir, 'foo.md'), '# Source\n', 'utf-8');
+    writeFileSync(join(dir, 'bar.mdx'), '# Existing MDX sibling\n', 'utf-8');
+
+    const result = await callApi(
+      dir,
+      '/api/rename-path',
+      'POST',
+      {
+        kind: 'file',
+        fromPath: 'foo.md',
+        toPath: 'bar.md',
+      },
+      { backlinkIndex: buildBacklinkIndex(dir) },
+    );
+
+    expect(result.status).toBe(200);
+    expect(existsSync(join(dir, 'foo.md'))).toBe(false);
+    expect(readFileSync(join(dir, 'bar.md'), 'utf-8')).toBe('# Source\n');
+    expect(readFileSync(join(dir, 'bar.mdx'), 'utf-8')).toBe('# Existing MDX sibling\n');
+    const body = JSON.parse(result.body) as {
+      renamed: Array<{ fromDocName: string; toDocName: string }>;
+    };
+    expect(body.renamed).toEqual([{ fromDocName: 'foo', toDocName: 'bar.md' }]);
+  });
+
+  test('deletes the selected .md sibling without purging the .mdx sibling identity', async () => {
+    const dir = setupTmpDir();
+    writeFileSync(join(dir, 'foo.md'), '# Markdown sibling\n', 'utf-8');
+    writeFileSync(join(dir, 'foo.mdx'), '# MDX sibling\n', 'utf-8');
+    const indexEvents: Array<{ kind: string; path?: string; docName?: string }> = [];
+
+    const result = await callApi(
+      dir,
+      '/api/delete-path',
+      'POST',
+      {
+        kind: 'file',
+        path: 'foo.md',
+      },
+      {
+        mutateFileIndex: (event) => {
+          indexEvents.push(event as (typeof indexEvents)[number]);
+        },
+      },
+    );
+
+    expect(result.status).toBe(200);
+    expect(existsSync(join(dir, 'foo.md'))).toBe(false);
+    expect(readFileSync(join(dir, 'foo.mdx'), 'utf-8')).toBe('# MDX sibling\n');
+    const body = JSON.parse(result.body) as { deletedDocNames: string[] };
+    expect(body.deletedDocNames).toEqual(['foo.md']);
+    expect(indexEvents).toContainEqual({
+      kind: 'delete',
+      path: join(dir, 'foo.md'),
+      docName: 'foo.md',
+    });
   });
 
   test('managed rename updates an already-loaded referring document', async () => {
@@ -2158,6 +2278,57 @@ describe('file operation API routes', () => {
       kind: 'file',
       path: 'notes copy 2',
       duplicatedDocNames: ['notes copy 2'],
+    });
+  });
+
+  test('duplicates the selected .md sibling when .md and .mdx share a stem', async () => {
+    const dir = setupTmpDir();
+    writeFileSync(join(dir, 'foo.md'), '# Markdown sibling\n', 'utf-8');
+    writeFileSync(join(dir, 'foo.mdx'), '# MDX sibling\n', 'utf-8');
+
+    const result = await callApi(dir, '/api/duplicate-path', 'POST', {
+      kind: 'file',
+      path: 'foo.md',
+    });
+
+    expect(result.status).toBe(200);
+    expect(readFileSync(join(dir, 'foo copy.md'), 'utf-8')).toBe('# Markdown sibling\n');
+    expect(readFileSync(join(dir, 'foo.mdx'), 'utf-8')).toBe('# MDX sibling\n');
+    const body = JSON.parse(result.body) as {
+      kind: string;
+      path: string;
+      duplicatedDocNames: string[];
+    };
+    expect(body).toMatchObject({
+      kind: 'file',
+      path: 'foo copy',
+      duplicatedDocNames: ['foo copy'],
+    });
+  });
+
+  test('duplicates a folder containing same-stem .md and .mdx siblings', async () => {
+    const dir = setupTmpDir();
+    mkdirSync(join(dir, 'docs'), { recursive: true });
+    writeFileSync(join(dir, 'docs/foo.md'), '# Markdown sibling\n', 'utf-8');
+    writeFileSync(join(dir, 'docs/foo.mdx'), '# MDX sibling\n', 'utf-8');
+
+    const result = await callApi(dir, '/api/duplicate-path', 'POST', {
+      kind: 'folder',
+      path: 'docs',
+    });
+
+    expect(result.status).toBe(200);
+    expect(readFileSync(join(dir, 'docs copy/foo.md'), 'utf-8')).toBe('# Markdown sibling\n');
+    expect(readFileSync(join(dir, 'docs copy/foo.mdx'), 'utf-8')).toBe('# MDX sibling\n');
+    const body = JSON.parse(result.body) as {
+      kind: string;
+      path: string;
+      duplicatedDocNames: string[];
+    };
+    expect(body).toMatchObject({
+      kind: 'folder',
+      path: 'docs copy',
+      duplicatedDocNames: ['docs copy/foo.md', 'docs copy/foo.mdx'],
     });
   });
 

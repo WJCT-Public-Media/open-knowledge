@@ -10,7 +10,12 @@ describe('normalizeDocNameInput', () => {
 
 describe('docNameToMarkdownPath', () => {
   test('appends .md to normalized doc names', () => {
-    expect(docNameToMarkdownPath('./guides/install.mdx')).toBe('guides/install.md');
+    expect(docNameToMarkdownPath('guides/install')).toBe('guides/install.md');
+  });
+
+  test('preserves extension-qualified markdown paths', () => {
+    expect(docNameToMarkdownPath('./guides/install.md')).toBe('guides/install.md');
+    expect(docNameToMarkdownPath('./guides/install.mdx')).toBe('guides/install.mdx');
   });
 
   test('falls back to untitled.md for empty input', () => {

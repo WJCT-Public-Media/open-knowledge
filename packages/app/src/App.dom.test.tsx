@@ -17,6 +17,8 @@ let pagesBySlug = new Map<string, unknown>();
 let pagesByBasename = new Map<string, unknown>();
 let folderPaths = new Set<string>();
 let assetPaths = new Set<string>();
+let filePaths = new Set<string>();
+let openTabs: string[] = [];
 let loading = false;
 let singleFileMode = false;
 let tabSessionLoaded = true;
@@ -58,7 +60,7 @@ mock.module('@/editor/DocumentContext', () => ({
     tabSessionLoaded,
     // The skill-tab reconciler reads these at render (no open skill tab here,
     // so it issues no `/api/skills` fetch); the real context always supplies them.
-    openTabs: [],
+    openTabs,
     closeDocument: () => {},
   }),
   useDocumentTransition: () => ({
@@ -72,6 +74,7 @@ mock.module('@/components/PageListContext', () => ({
   ),
   usePageList: () => ({
     assetPaths,
+    filePaths,
     folderPaths,
     loading,
     pageMeta,
@@ -246,6 +249,8 @@ describe('App runtime wiring', () => {
     pagesByBasename = new Map();
     folderPaths = new Set(['reports']);
     assetPaths = new Set();
+    filePaths = new Set();
+    openTabs = [];
     loading = false;
     singleFileMode = false;
     tabSessionLoaded = true;
@@ -287,6 +292,21 @@ describe('App runtime wiring', () => {
     expect(screen.getByTestId('editor-pane')).not.toBeNull();
   });
 
+  test('passes tracked non-markdown files to tab reconciliation', async () => {
+    filePaths = new Set(['LICENSE', 'pnpm-workspace.yaml']);
+
+    renderApp();
+
+    await waitFor(() => {
+      expect(syncOpenTabsWithKnownTargetsMock).toHaveBeenCalledWith({
+        pages,
+        folderPaths,
+        assetPaths,
+        filePaths,
+      });
+    });
+  });
+
   test('Cmd/Ctrl-comma opens settings via the canonical hash and ignores text inputs', () => {
     renderApp();
 
@@ -322,6 +342,27 @@ describe('App runtime wiring', () => {
       expect(openTargetTransitionMock).toHaveBeenCalledWith(downgraded);
     });
     expect(openTargetTransitionMock).not.toHaveBeenCalledWith(resolved);
+  });
+
+  test('hash navigation keeps an open extension-qualified markdown tab exact', async () => {
+    openTabs = ['docs/guide.mdx'];
+    resolveNavigationTargetMock = mock(() => ({
+      kind: 'doc',
+      target: 'docs/guide',
+      docName: 'docs/guide',
+    }));
+    setHash('#/docs/guide.mdx');
+
+    renderApp();
+
+    await waitFor(() => {
+      expect(openTargetTransitionMock).toHaveBeenCalledWith({
+        kind: 'doc',
+        target: 'docs/guide.mdx',
+        docName: 'docs/guide.mdx',
+      });
+    });
+    expect(resolveNavigationTargetMock).not.toHaveBeenCalled();
   });
 
   test('base-open pane target applies a well-formed config route once and consumes it', async () => {

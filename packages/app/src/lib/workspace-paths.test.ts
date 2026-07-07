@@ -44,4 +44,9 @@ describe('docNameToRelativePath', () => {
   test('preserves nested forward slashes', () => {
     expect(docNameToRelativePath('a/b/c/d')).toBe('a/b/c/d.md');
   });
+
+  test('preserves extension-qualified markdown paths', () => {
+    expect(docNameToRelativePath('specs/foo/SPEC.md')).toBe('specs/foo/SPEC.md');
+    expect(docNameToRelativePath('specs/foo/SPEC.mdx')).toBe('specs/foo/SPEC.mdx');
+  });
 });

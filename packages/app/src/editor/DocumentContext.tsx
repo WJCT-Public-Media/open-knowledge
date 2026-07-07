@@ -193,6 +193,7 @@ interface DocumentContextValue {
     pages: ReadonlySet<string>;
     folderPaths: ReadonlySet<string>;
     assetPaths: ReadonlySet<string>;
+    filePaths?: ReadonlySet<string>;
   }) => void;
   /** Rename visible tabs after a file/folder/asset rename without changing their order. */
   remapTabsForRename: (
@@ -400,6 +401,7 @@ function warnPrincipalFetchOnce(err: unknown): void {
 }
 
 const DocumentContext = createContext<DocumentContextValue | null>(null);
+const MARKDOWN_EXTENSION_QUALIFIED_DOC_PATTERN = /\.(md|mdx)$/i;
 
 // Module-level singleton — survives React re-renders and StrictMode double-mount.
 // Same pattern the old singleton HocuspocusProvider used. Instantiated lazily
@@ -512,6 +514,18 @@ function tabIdFromHash(hash: string): string | null {
     return folderPath ? folderTabId(folderPath) : null;
   }
   return docTabId(docName);
+}
+
+function isBareHashForExtensionQualifiedActiveDoc(
+  hashDocName: string | null,
+  hash: string,
+  activeDocName: string | null,
+): boolean {
+  if (!hashDocName || !activeDocName) return false;
+  if (hash !== hashFromDocName(hashDocName)) return false;
+  if (MARKDOWN_EXTENSION_QUALIFIED_DOC_PATTERN.test(hashDocName)) return false;
+  if (!MARKDOWN_EXTENSION_QUALIFIED_DOC_PATTERN.test(activeDocName)) return false;
+  return activeDocName.replace(MARKDOWN_EXTENSION_QUALIFIED_DOC_PATTERN, '') === hashDocName;
 }
 
 function assetTargetForPath(
@@ -781,8 +795,12 @@ export function DocumentProvider({ children }: { children: ReactNode }) {
         setPinnedTabIds((current) =>
           sameTabIds(current, normalizedPinnedTabIds) ? current : normalizedPinnedTabIds,
         );
+        // A hash target can open before async session restore resolves. When a
+        // saved session exists, keep the restored tab order authoritative so the
+        // hash-opened tab does not jump to the front of the strip on reload.
+        const visibleOrderSeed = state.openTabs.length > 0 ? nextTabs : visibleTabIdsRef.current;
         const nextVisibleTabIds = reconcileVisibleTabOrder(
-          visibleTabIdsRef.current,
+          visibleOrderSeed,
           nextTabs,
           newTabIdsRef.current,
         );
@@ -797,9 +815,15 @@ export function DocumentProvider({ children }: { children: ReactNode }) {
           state.openTabs[0] ??
           null;
         const restoredActiveHash = restoredActive ? hashFromTabId(restoredActive) : null;
+        const restoredActiveDocName = restoredActive ? docNameForTabId(restoredActive) : null;
         const shouldRestoreActive =
           (currentHashDoc === null && window.location.hash.length === 0) ||
-          (restoredActiveHash !== null && restoredActiveHash === window.location.hash);
+          (restoredActiveHash !== null && restoredActiveHash === window.location.hash) ||
+          isBareHashForExtensionQualifiedActiveDoc(
+            currentHashDoc,
+            window.location.hash,
+            restoredActiveDocName,
+          );
         if (shouldRestoreActive && restoredActive) {
           activeTabIdRef.current = restoredActive;
           setActiveTabId(restoredActive);
@@ -1648,7 +1672,7 @@ export function DocumentProvider({ children }: { children: ReactNode }) {
       commitActiveTabId(null);
       window.location.hash = '';
     },
-    syncOpenTabsWithKnownTargets: ({ pages, folderPaths, assetPaths }) => {
+    syncOpenTabsWithKnownTargets: ({ pages, folderPaths, assetPaths, filePaths }) => {
       const keepMissingDocName = activeTarget?.kind === 'missing' ? activeTarget.target : null;
       // Never evict the doc the hash currently points at: on cold start the page
       // list arrives empty-then-populated, and a sync firing in that window would
@@ -1662,6 +1686,7 @@ export function DocumentProvider({ children }: { children: ReactNode }) {
         pages,
         folderPaths,
         assetPaths,
+        filePaths,
         keepMissingDocName,
         keepHashDocName,
       });

@@ -51,7 +51,6 @@ function streamOptsFor(dir: string, maxEntries: number): StreamShowAllOpts {
     contentDir: dir,
     contentFilter: createContentFilter({ projectDir: dir, contentDir: dir }),
     dirFilter: null,
-    getDocExtension: () => '.md',
     maxEntries,
   };
 }
@@ -271,6 +270,57 @@ describe('streamShowAllEntries — level-order emission (PRD-6858)', () => {
     const hollow = entries.find((e) => e.kind === 'folder' && e.path === 'hollow');
     expect(full?.kind === 'folder' && full.hasChildren).toBe(true);
     expect(hollow?.kind === 'folder' && hollow.hasChildren).toBe(false);
+  });
+
+  test('co-located .md and .mdx emit separate extension-qualified document rows', async () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'ok-showall-doc-ext-collision-')));
+    writeFileSync(join(dir, 'foo.md'), '# Markdown\n');
+    writeFileSync(join(dir, 'foo.mdx'), '# MDX\n');
+    writeFileSync(join(dir, 'bar.mdx'), '# Bar\n');
+    mkdirSync(join(dir, 'folder.mdx'));
+
+    const { entries, truncated } = await drain(
+      streamShowAllEntries({
+        ...streamOptsFor(dir, 50_000),
+        maxDepth: 1,
+      }),
+    );
+    expect(truncated).toBe(false);
+
+    const docs = entries.filter((e) => e.kind === 'document');
+    expect(
+      docs
+        .map((doc) => ({ docName: doc.docName, docExt: doc.docExt, size: doc.size }))
+        .toSorted((a, b) => a.docName.localeCompare(b.docName)),
+    ).toEqual([
+      { docName: 'bar', docExt: '.mdx', size: Buffer.byteLength('# Bar\n') },
+      { docName: 'foo.md', docExt: '.md', size: Buffer.byteLength('# Markdown\n') },
+      { docName: 'foo.mdx', docExt: '.mdx', size: Buffer.byteLength('# MDX\n') },
+    ]);
+    expect(entries.some((entry) => entry.kind === 'folder' && entry.path === 'folder.mdx')).toBe(
+      true,
+    );
+  });
+
+  test('escaping same-stem symlink does not force admitted document to extension-qualified row', async () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'ok-showall-doc-ext-symesc-')));
+    const outside = realpathSync(mkdtempSync(join(tmpdir(), 'ok-showall-doc-ext-outside-')));
+    writeFileSync(join(dir, 'foo.md'), '# Markdown\n');
+    writeFileSync(join(outside, 'foo.mdx'), '# Escaped MDX\n');
+    symlinkSync(join(outside, 'foo.mdx'), join(dir, 'foo.mdx'));
+
+    const { entries, truncated } = await drain(
+      streamShowAllEntries({
+        ...streamOptsFor(dir, 50_000),
+        maxDepth: 1,
+      }),
+    );
+    expect(truncated).toBe(false);
+
+    const docs = entries.filter((e) => e.kind === 'document');
+    expect(docs.map((doc) => ({ docName: doc.docName, docExt: doc.docExt }))).toEqual([
+      { docName: 'foo', docExt: '.md' },
+    ]);
   });
 });
 

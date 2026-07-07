@@ -105,11 +105,8 @@ beforeEach(() => {
   originalInnerWidth = window.innerWidth;
   originalMatchMedia = window.matchMedia;
   originalUserAgent = window.navigator.userAgent;
-  // jsdom-preload exposes window.localStorage but does not also install the
-  // bare globalThis.localStorage that production source paths use directly.
-  // Install it for the duration of the test so the SidebarProvider's
-  // readPins()/applyToggle() (no-arg storage default) exercise the real
-  // jsdom storage instead of falling through readPins's try/catch.
+  // Keep the production global and window storage references aligned so the
+  // no-arg storage default exercises the real jsdom storage.
   (globalThis as { localStorage?: Storage }).localStorage = window.localStorage;
   window.localStorage.clear();
 });

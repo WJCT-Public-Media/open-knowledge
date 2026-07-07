@@ -17,6 +17,7 @@ import {
   __resetShowAllWalkStatsForTesting,
   DEFAULT_SHOWALL_MAX_ENTRIES,
   getShowAllMaxEntries,
+  streamShowAllEntries,
   walkContentDirForShowAll,
 } from './api-extension.ts';
 import { createContentFilter } from './content-filter.ts';
@@ -39,7 +40,6 @@ async function walkFixture(dir: string, maxEntries: number) {
     contentFilter: createContentFilter({ projectDir: dir, contentDir: dir }),
     dirFilter: null,
     documents,
-    getDocExtension: () => '.md',
     maxEntries,
   });
   return { documents, truncated };
@@ -148,18 +148,13 @@ describe('walkContentDirForShowAll — entry-cap boundary honesty', () => {
 });
 
 describe('walkContentDirForShowAll — abort-on-disconnect (PRD-6854)', () => {
-  async function walkWithSignal(
-    dir: string,
-    signal: AbortSignal,
-    getDocExtension: (docName: string) => string = () => '.md',
-  ) {
+  async function walkWithSignal(dir: string, signal: AbortSignal) {
     const documents: DocumentListEntry[] = [];
     const { truncated } = await walkContentDirForShowAll({
       contentDir: dir,
       contentFilter: createContentFilter({ projectDir: dir, contentDir: dir }),
       dirFilter: null,
       documents,
-      getDocExtension,
       maxEntries: DEFAULT_SHOWALL_MAX_ENTRIES,
       signal,
     });
@@ -182,13 +177,20 @@ describe('walkContentDirForShowAll — abort-on-disconnect (PRD-6854)', () => {
     __resetShowAllWalkStatsForTesting();
     const TOTAL = 20;
     const controller = new AbortController();
-    // Fire the abort from inside the per-file getDocExtension callback after the
-    // first push; the next per-entry boundary check then bails. Proves the
-    // loop-boundary guard halts an in-progress walk, not only a pre-aborted one.
-    const { documents } = await walkWithSignal(makeFlatFixture(TOTAL), controller.signal, () => {
-      controller.abort();
-      return '.md';
+    const dir = makeFlatFixture(TOTAL);
+    const documents: DocumentListEntry[] = [];
+    const generator = streamShowAllEntries({
+      contentDir: dir,
+      contentFilter: createContentFilter({ projectDir: dir, contentDir: dir }),
+      dirFilter: null,
+      maxEntries: DEFAULT_SHOWALL_MAX_ENTRIES,
+      signal: controller.signal,
     });
+    const first = await generator.next();
+    if (!first.done) documents.push(first.value);
+    controller.abort();
+    const final = await generator.next();
+    expect(final.done).toBe(true);
     expect(documents.length).toBeGreaterThan(0);
     expect(documents.length).toBeLessThan(TOTAL);
     const stats = __getShowAllWalkStatsForTesting();

@@ -76,10 +76,23 @@ import { cn } from '@/lib/utils';
 import { docNameToRelativePath } from '@/lib/workspace-paths';
 import { emitOpenAskAiComposer, subscribeToOpenAskAiComposer } from './ask-ai-composer-events';
 import { clearComposerDraft, getComposerDraft, setComposerDraftDoc } from './composer-draft-store';
+import { usePageList } from './PageListContext';
 
 // Each suggestion holds long enough to read, then cross-fades to the next.
 const SUGGESTION_HOLD_MS = 5200; // fully-visible dwell per suggestion
 const SUGGESTION_FADE_MS = 500; // cross-fade duration (matches the CSS duration)
+const MARKDOWN_RELATIVE_PATH_EXTENSION = /\.(md|mdx)$/i;
+
+function docNameToComposerRelativePath(docName: string, docExt?: string): string {
+  if (MARKDOWN_RELATIVE_PATH_EXTENSION.test(docName)) return docName;
+  return docExt ? `${docName}${docExt}` : docNameToRelativePath(docName);
+}
+
+function markdownRelativePathStem(path: string): string | null {
+  return MARKDOWN_RELATIVE_PATH_EXTENSION.test(path)
+    ? path.replace(MARKDOWN_RELATIVE_PATH_EXTENSION, '')
+    : null;
+}
 
 /**
  * Whether a keydown originated inside a native form field. ⌘L should still fire
@@ -191,6 +204,7 @@ export function BottomComposer({
   const effectiveSurface: EditorSurface = surface ?? 'wysiwyg';
   const reduced = useReducedMotion();
   const workspace = useWorkspace();
+  const { pageMeta } = usePageList();
   const { states } = useInstalledAgents();
   const { dispatch } = useHandoffDispatch();
   // Desktop-only docked-terminal launcher (null on web). Its presence is what
@@ -397,14 +411,25 @@ export function BottomComposer({
   // and again whenever the active doc changes while still drafting (accumulate on
   // switch). Sticky-dismissed paths are never re-added. Keyed on `isEmpty` +
   // `docName` so a file-switch mid-draft fires it.
-  const activeFilePath = folderMode || docName == null ? '' : docNameToRelativePath(docName);
+  const activeFilePath =
+    folderMode || docName == null
+      ? ''
+      : docNameToComposerRelativePath(docName, pageMeta.get(docName)?.docExt);
   useEffect(() => {
     // Folder mode has no active doc to "touch" — its single top-row chip is the
     // folder itself, derived below, not the touched-file set.
     if (folderMode || isEmpty) return;
     setTouchedFiles((prev) => {
-      if (prev.includes(activeFilePath) || dismissedFiles.has(activeFilePath)) return prev;
-      return [...prev, activeFilePath];
+      if (dismissedFiles.has(activeFilePath)) return prev;
+      const activeStem = markdownRelativePathStem(activeFilePath);
+      const next =
+        activeStem === null
+          ? prev
+          : prev.filter(
+              (path) => path === activeFilePath || markdownRelativePathStem(path) !== activeStem,
+            );
+      if (next.includes(activeFilePath)) return next.length === prev.length ? prev : next;
+      return [...next, activeFilePath];
     });
   }, [folderMode, isEmpty, activeFilePath, dismissedFiles]);
 
@@ -628,13 +653,17 @@ export function BottomComposer({
       : fileChips.includes(activeFilePath)
         ? (docName ?? null)
         : null;
-    const leadPath = leadDocName !== null ? docNameToRelativePath(leadDocName) : null;
+    const leadPath =
+      leadDocName !== null
+        ? docNameToComposerRelativePath(leadDocName, pageMeta.get(leadDocName)?.docExt)
+        : null;
     const dispatchMentions = [...new Set([...fileChips, ...mentions])].filter(
       (path) => path !== leadPath,
     );
     dispatchComposed(
       buildComposerHandoffInput({
         docName: leadDocName,
+        ...(leadPath !== null ? { docRelativePath: leadPath } : {}),
         workspace,
         instruction,
         mentions: dispatchMentions,
@@ -656,7 +685,13 @@ export function BottomComposer({
   let pinnedLabel = '';
   let pinnedPreview = '';
   if (pinnedSelection) {
-    const basename = docNameToRelativePath(pinnedSelection.docName).split('/').pop() ?? '';
+    const basename =
+      docNameToComposerRelativePath(
+        pinnedSelection.docName,
+        pageMeta.get(pinnedSelection.docName)?.docExt,
+      )
+        .split('/')
+        .pop() ?? '';
     pinnedLabel = selectionChipLabel(pinnedSelection, basename);
     pinnedPreview = lightRenderMarkdownPreview(pinnedSelection.markdown);
   }

@@ -426,6 +426,7 @@ import { isConfigDoc, isSystemDoc } from './cc1-broadcast.ts';
 import type { ResolveStrategy } from './conflict-storage.ts';
 import type { ContentFilter } from './content-filter.ts';
 import {
+  docNameToRelativePath,
   forgetDocExtension,
   getDocExtension,
   isSupportedAssetFile,
@@ -1351,8 +1352,6 @@ export interface StreamShowAllOpts {
   contentFilter: ContentFilter;
   /** Optional dir filter (contentDir-relative subtree to walk; null = whole tree). */
   dirFilter: string | null;
-  /** Pulls the registered on-disk extension for a markdown docName (or `.md` default). */
-  getDocExtension: (docName: string) => string;
   /** Hard ceiling on emitted entries; the walk stops once reached. */
   maxEntries: number;
   /**
@@ -1415,7 +1414,7 @@ export interface WalkShowAllOpts extends StreamShowAllOpts {
 export async function* streamShowAllEntries(
   opts: StreamShowAllOpts,
 ): AsyncGenerator<DocumentListEntry, { truncated: boolean }, void> {
-  const { contentDir, contentFilter, dirFilter, getDocExtension, maxEntries, signal } = opts;
+  const { contentDir, contentFilter, dirFilter, maxEntries, signal } = opts;
   const maxDepth = opts.maxDepth ?? Number.POSITIVE_INFINITY;
   showAllWalkInvocations += 1;
   // Running count of yielded entries — the streaming analogue of the buffered
@@ -1447,6 +1446,71 @@ export async function* streamShowAllEntries(
   }
   const isInsideContentDir = (resolved: string): boolean =>
     isWithinDir(resolved, contentDirCanonical);
+
+  const docVariantCounts = async (
+    entries: readonly import('node:fs').Dirent[],
+    absDir: string,
+    relDir: string,
+  ): Promise<ReadonlyMap<string, number>> => {
+    const candidateCounts = new Map<string, number>();
+    for (const entry of entries) {
+      if (!entry.isFile() && !entry.isSymbolicLink()) continue;
+      if (!isSupportedDocFile(entry.name)) continue;
+      const relPath = relDir ? `${relDir}/${entry.name}` : entry.name;
+      const docName = stripDocExtension(relPath);
+      candidateCounts.set(docName, (candidateCounts.get(docName) ?? 0) + 1);
+    }
+    const collidingDocNames = new Set(
+      [...candidateCounts].filter(([, count]) => count > 1).map(([docName]) => docName),
+    );
+    if (collidingDocNames.size === 0) return new Map();
+
+    const counts = new Map<string, number>();
+    for (const entry of entries) {
+      if (!entry.isFile() && !entry.isSymbolicLink()) continue;
+      if (!isSupportedDocFile(entry.name)) continue;
+      const relPath = relDir ? `${relDir}/${entry.name}` : entry.name;
+      const docName = stripDocExtension(relPath);
+      if (!collidingDocNames.has(docName)) continue;
+      if (contentFilter.isExcluded(relPath, { bypassFilters: true })) continue;
+      if (!passesDirFilter(relPath)) continue;
+
+      if (entry.isSymbolicLink()) {
+        const linkAbs = join(absDir, entry.name);
+        let canonical: string;
+        try {
+          canonical = await realpath(linkAbs);
+        } catch {
+          continue;
+        }
+        if (!isInsideContentDir(canonical)) continue;
+        let canonStat: import('node:fs').Stats;
+        try {
+          canonStat = await stat(canonical);
+        } catch {
+          continue;
+        }
+        if (!canonStat.isFile()) continue;
+      } else {
+        try {
+          await stat(join(absDir, entry.name));
+        } catch {
+          continue;
+        }
+      }
+
+      counts.set(docName, (counts.get(docName) ?? 0) + 1);
+    }
+    return counts;
+  };
+
+  const showAllDocName = (
+    relPath: string,
+    countsByExtensionlessDocName: ReadonlyMap<string, number>,
+  ): string => {
+    const extensionless = stripDocExtension(relPath);
+    return (countsByExtensionlessDocName.get(extensionless) ?? 0) > 1 ? relPath : extensionless;
+  };
 
   // Cheap bounded probe for `hasChildren` on a leaf-depth folder (depth-1
   // contract): readdir the folder and stop at the first admitted child, so the
@@ -1532,6 +1596,7 @@ export async function* streamShowAllEntries(
         console.warn(`[document-list][showAll] readdir failed for ${absDir}:`, err);
         continue;
       }
+      const variantCountsByDocName = await docVariantCounts(entries, absDir, relDir);
 
       for (const entry of entries) {
         // Abort-on-disconnect: stop walking once the request's last waiter has
@@ -1680,11 +1745,11 @@ export async function* streamShowAllEntries(
           if (!passesDirFilter(relPath)) continue;
           emitted += 1;
           if (isSupportedDocFile(entry.name)) {
-            const docName = relPath.replace(/\.(md|mdx)$/i, '');
+            const docName = showAllDocName(relPath, variantCountsByDocName);
             yield {
               kind: 'document',
               docName,
-              docExt: getDocExtension(docName),
+              docExt: extname(entry.name),
               size: canonStat.size,
               modified: canonStat.mtime.toISOString(),
               isSymlink: true,
@@ -1728,11 +1793,10 @@ export async function* streamShowAllEntries(
         }
 
         if (isSupportedDocFile(entry.name)) {
-          // Markdown — classify as 'document'. `getDocExtension` reads the
-          // registered on-disk extension if the docName has been seen by the
-          // watcher; for files surfaced only via showAll it falls back to .md.
-          const docName = relPath.replace(/\.(md|mdx)$/i, '');
-          const docExt = getDocExtension(docName);
+          // Markdown — classify as 'document'. The directory entry is the
+          // show-all source of truth for the file extension.
+          const docName = showAllDocName(relPath, variantCountsByDocName);
+          const docExt = extname(entry.name);
           emitted += 1;
           yield {
             kind: 'document',
@@ -1978,10 +2042,9 @@ function resolveContentEntryPath(contentDir: string, kind: ContentEntryKind, pat
   // When kind is 'file': if the caller passed an explicit supported extension,
   // use the path verbatim — this is how rename callers signal an extension
   // change (toPath: "foo.mdx" renames foo.md → foo.mdx). Extension-less paths
-  // fall through to getDocExtension() + the registered extension map so legacy
-  // callers keep the source's existing extension.
-  const relativePath =
-    kind === 'file' ? (isSupportedDocFile(path) ? path : `${path}${getDocExtension(path)}`) : path;
+  // route through `docNameToRelativePath`, which consults the registered
+  // extension map so legacy callers keep the source's existing extension.
+  const relativePath = kind === 'file' ? docNameToRelativePath(path) : path;
   const fullPath = resolve(resolvedContentDir, relativePath);
 
   if (fullPath !== resolvedContentDir && !fullPath.startsWith(`${resolvedContentDir}${sep}`)) {
@@ -2050,9 +2113,29 @@ function classifyDuplicatePathFilesystemProblem(
 }
 
 function docNameExistsWithAnySupportedExtension(contentDir: string, docName: string): boolean {
+  if (isSupportedDocFile(docName)) {
+    return existsSync(resolve(contentDir, docName));
+  }
   return SUPPORTED_DOC_EXTENSIONS.some((ext) =>
     existsSync(resolve(contentDir, `${docName}${ext}`)),
   );
+}
+
+function hasSameStemDocumentSibling(contentDir: string, relPath: string): boolean {
+  if (!isSupportedDocFile(relPath)) return false;
+  const extensionless = stripDocExtension(relPath);
+  const currentExt = extname(relPath).toLowerCase();
+  return SUPPORTED_DOC_EXTENSIONS.some((ext) => {
+    if (ext.toLowerCase() === currentExt) return false;
+    return existsSync(resolve(contentDir, `${extensionless}${ext}`));
+  });
+}
+
+function docNameForFileOperationPath(contentDir: string, relPath: string): string {
+  const extensionless = stripDocExtension(relPath);
+  return isSupportedDocFile(relPath) && hasSameStemDocumentSibling(contentDir, relPath)
+    ? relPath
+    : extensionless;
 }
 
 function resolveDuplicateDocPath(contentDir: string, docName: string, extension: string): string {
@@ -2112,7 +2195,7 @@ function collectMarkdownCopies(
       }
       if (!entry.isFile() || !isSupportedDocFile(childRel)) continue;
       docs.push({
-        docName: stripDocExtension(childRel),
+        docName: docNameForFileOperationPath(contentDir, childRel),
         fullPath: childAbs,
         content: readFileSync(childAbs, 'utf-8'),
       });
@@ -2158,13 +2241,26 @@ function probeAndRegisterSourceFileExtension(contentDir: string, fromPath: strin
   if (!isValidRelativeContentPath(fromPath)) return;
   const resolvedContentDir = resolve(contentDir);
   if (isSupportedDocFile(fromPath)) {
-    const candidate = resolve(resolvedContentDir, fromPath);
+    const extensionless = stripDocExtension(fromPath);
+    for (const ext of SUPPORTED_DOC_EXTENSIONS) {
+      const candidate = resolve(resolvedContentDir, `${extensionless}${ext}`);
+      if (
+        candidate !== resolvedContentDir &&
+        !candidate.startsWith(`${resolvedContentDir}${sep}`)
+      ) {
+        continue;
+      }
+      if (existsSync(candidate)) {
+        registerDocExtension(extensionless, ext);
+      }
+    }
+    const explicitCandidate = resolve(resolvedContentDir, fromPath);
     if (
-      candidate !== resolvedContentDir &&
-      candidate.startsWith(`${resolvedContentDir}${sep}`) &&
-      existsSync(candidate)
+      explicitCandidate !== resolvedContentDir &&
+      explicitCandidate.startsWith(`${resolvedContentDir}${sep}`) &&
+      existsSync(explicitCandidate)
     ) {
-      registerDocExtension(stripDocExtension(fromPath), extname(fromPath));
+      registerDocExtension(extensionless, extname(fromPath));
     }
     return;
   }
@@ -2865,7 +2961,8 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
     }
     if (!isSafeDocName(docName)) return null;
     const resolvedContentDir = resolve(contentDir);
-    const filePath = resolve(resolvedContentDir, `${docName}${getDocExtension(docName)}`);
+    const relPath = docNameToRelativePath(docName);
+    const filePath = resolve(resolvedContentDir, relPath);
     if (!isWithinDir(filePath, resolvedContentDir)) {
       return null;
     }
@@ -3174,12 +3271,13 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
   // the admitted set by another door, or its on-disk title/frontmatter leaks
   // through the link/title endpoints. String-only (no realpath/symlink syscalls
   // — this runs per forward-key on a hot path); the extension mirrors
-  // `resolveContentEntryPath`'s `getDocExtension` default so `.md`/`.mdx` ignore
-  // patterns match. A managed-artifact docName lives outside contentDir and is
-  // admitted separately, so a wrong relPath here only ever fails open (admit).
+  // `resolveContentEntryPath`'s `docNameToRelativePath` default so `.md`/`.mdx`
+  // ignore patterns match. A managed-artifact docName lives outside contentDir
+  // and is admitted separately, so a wrong relPath here only ever fails open
+  // (admit).
   function isDocNameContentExcluded(docName: string): boolean {
     if (!contentFilter) return false;
-    const relPath = isSupportedDocFile(docName) ? docName : `${docName}${getDocExtension(docName)}`;
+    const relPath = docNameToRelativePath(docName);
     return contentFilter.isExcluded(relPath);
   }
 
@@ -3572,7 +3670,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
     );
     for (const docName of docNames) {
       const doc = hocuspocus.documents.get(docName);
-      const filePath = `${docName}${getDocExtension(docName)}`;
+      const filePath = docNameToRelativePath(docName);
       const conflictedByLifecycle = doc !== undefined && isDocInConflict(doc);
       const conflictedByStore = renameTrackedFiles.has(filePath);
       if (conflictedByLifecycle || conflictedByStore) {
@@ -3680,8 +3778,8 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
         if (!entry.isFile() || !isSupportedDocFile(relPath) || contentFilter?.isExcluded(relPath)) {
           continue;
         }
-        const docName = stripDocExtension(relPath);
-        registerDocExtension(docName, extname(relPath));
+        const docName = docNameForFileOperationPath(contentDir, relPath);
+        registerDocExtension(stripDocExtension(relPath), extname(relPath));
         docNames.push(docName);
       }
     }
@@ -4040,25 +4138,25 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
               : [];
           span.setAttribute('rename.affected_assets', renamedAssets.length);
 
-          // Downstream code (safeContentPath, setReconciledBase,
-          // backlinkIndex, file index, applyRenameMap) keys on extension-less
-          // docNames; file rename receives `fromPath`/`toPath` with the
-          // user-supplied extension, so strip here. Folder rename enumerates
-          // descendant docs from DISK rather than the in-memory file index:
+          // Downstream code keys on extension-less docNames for ordinary
+          // files, but same-stem `.md` / `.mdx` siblings stay
+          // extension-qualified so the operation targets the selected file.
+          // Folder rename enumerates descendant docs from DISK rather than
+          // the in-memory file index:
           // the index lags on-disk truth after a fresh `write`, which
           // made folder rename report `renamed: []` and skip link rewriting
           // while still moving the directory. Disk is the authoritative set of
           // what the move carries.
           const affectedDocNames =
             kind === 'file'
-              ? [stripDocExtension(fromPath)]
+              ? [docNameForFileOperationPath(contentDir, fromPath)]
               : listManagedDocNamesUnderFolderFromDisk(sourcePathRoot);
           const affectedDocs: Array<{ from: string; to: string }> = affectedDocNames.map(
             (docName) => ({
               from: docName,
               to:
                 kind === 'file'
-                  ? stripDocExtension(toPath)
+                  ? docNameForFileOperationPath(contentDir, toPath)
                   : remapDocNameForRename(docName, kind, fromPath, toPath),
             }),
           );
@@ -4427,7 +4525,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
             const explicitDestExt: string | null =
               kind === 'file' && isSupportedDocFile(toPath) ? extname(toPath) : null;
             for (const { from, to } of affectedDocs) {
-              const sourceExt = getDocExtension(from);
+              const sourceExt = isSupportedDocFile(from) ? extname(from) : getDocExtension(from);
               forgetDocExtension(from);
               registerDocExtension(to, explicitDestExt ?? sourceExt);
             }
@@ -5771,7 +5869,6 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
               contentDir,
               contentFilter,
               dirFilter: dir,
-              getDocExtension,
               maxEntries,
               maxDepth: showAllMaxDepth,
               signal: controller.signal,
@@ -5849,7 +5946,6 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
                 contentFilter,
                 dirFilter: dir,
                 documents,
-                getDocExtension,
                 maxEntries,
                 maxDepth: showAllMaxDepth,
                 signal: controller.signal,
@@ -7999,7 +8095,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
       if (targetDoc && isDocInConflict(targetDoc)) {
         respondDocInConflict(
           res,
-          new DocInConflictError({ file: `${body.docName}${getDocExtension(body.docName)}` }),
+          new DocInConflictError({ file: docNameToRelativePath(body.docName) }),
           'rollback',
         );
         return;
@@ -9308,7 +9404,8 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
         }
 
         const { kind } = body;
-        const requestedPath = kind === 'file' ? stripDocExtension(body.path) : body.path;
+        const requestedPath = body.path;
+        const requestedDocName = kind === 'file' ? stripDocExtension(requestedPath) : requestedPath;
         if (!isValidRelativeContentPath(requestedPath)) {
           errorResponse(
             res,
@@ -9322,7 +9419,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
         if (
           requestedPath === '.ok' ||
           requestedPath.startsWith('.ok/') ||
-          (kind === 'file' && (isSystemDoc(requestedPath) || isConfigDoc(requestedPath))) ||
+          (kind === 'file' && (isSystemDoc(requestedDocName) || isConfigDoc(requestedDocName))) ||
           (kind === 'folder' && isReservedSyntheticFolderPath(requestedPath))
         ) {
           errorResponse(
@@ -9382,10 +9479,10 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
         // `write` create the index lags and a conflicted child would
         // be silently skipped, copying its marker bytes intact. Same root
         // cause and fix as handleRenamePath's pre-check. Also registers
-        // each child's on-disk extension, which `getDocExtension` relies on.
+        // each child's on-disk extension for extension-less legacy docNames.
         const duplicateSourceDocNames =
           kind === 'file'
-            ? [requestedPath]
+            ? [docNameForFileOperationPath(contentDir, requestedPath)]
             : listManagedDocNamesUnderFolderFromDisk(
                 resolveContentEntryPath(contentDir, 'folder', requestedPath),
               );
@@ -9394,9 +9491,9 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
           duplicateEngine ? duplicateEngine.getConflicts().map((c) => c.file) : [],
         );
         for (const affected of duplicateSourceDocNames) {
-          const affectedDocName = stripDocExtension(affected);
+          const affectedDocName = affected;
           const doc = hocuspocus.documents.get(affectedDocName);
-          const filePath = `${affectedDocName}${getDocExtension(affectedDocName)}`;
+          const filePath = docNameToRelativePath(affectedDocName);
           const conflictedByLifecycle = doc !== undefined && isDocInConflict(doc);
           const conflictedByStore = duplicateTrackedFiles.has(filePath);
           if (conflictedByLifecycle || conflictedByStore) {
@@ -9410,7 +9507,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
 
         if (kind === 'file') {
           const sourceExtension = extname(sourcePath);
-          const next = nextAvailableDuplicateDocName(contentDir, requestedPath);
+          const next = nextAvailableDuplicateDocName(contentDir, requestedDocName);
           duplicatedPath = next.docName;
           if (
             isSystemDoc(duplicatedPath) ||
@@ -9541,7 +9638,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
             duplicatedDocNames = copiedDocs.map((doc) => doc.docName);
             for (const doc of copiedDocs) {
               const sourceExtension = extname(doc.fullPath);
-              registerDocExtension(doc.docName, sourceExtension);
+              registerDocExtension(stripDocExtension(doc.docName), sourceExtension);
               recentlyRemovedDocs?.delete(doc.docName);
               if (contentFilter) {
                 contentFilter.incrementMdDir(dirname(doc.docName));
@@ -9849,6 +9946,13 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
           );
           return;
         }
+        // Register the source's actual on-disk extension before downstream
+        // checks so admission, conflict checks, and existsSync probes all see
+        // the right value when the file watcher hasn't yet observed the source
+        // (boot race).
+        if (operationKind === 'file') {
+          probeAndRegisterSourceFileExtension(contentDir, fromPath);
+        }
         // Conflict-aware refusal. Renaming a conflicted source doc would
         // shift the file path while the merge stages still live at the
         // old path — the disk-watcher → reconcile loop would then see two
@@ -9867,11 +9971,10 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
         // 404 gate.
         // Enumerate from disk (not the lagging file index) so the conflict
         // pre-check sees every on-disk child of the folder — same root cause
-        // as the spine's `affectedDocNames`. Also registers each child's
-        // on-disk extension, which `getDocExtension(affected)` relies on.
+        // as the spine's `affectedDocNames`.
         const renameAffectedDocNames =
           operationKind === 'file'
-            ? [stripDocExtension(fromPath)]
+            ? [docNameForFileOperationPath(contentDir, fromPath)]
             : listManagedDocNamesUnderFolderFromDisk(
                 resolveContentEntryPath(contentDir, 'folder', fromPath),
               );
@@ -9880,10 +9983,9 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
           renameEngine ? renameEngine.getConflicts().map((c) => c.file) : [],
         );
         for (const affected of renameAffectedDocNames) {
-          const affectedDocName = stripDocExtension(affected);
+          const affectedDocName = affected;
           const doc = hocuspocus.documents.get(affectedDocName);
-          const filePath =
-            operationKind === 'file' ? fromPath : `${affectedDocName}${getDocExtension(affected)}`;
+          const filePath = docNameToRelativePath(affectedDocName);
           const conflictedByLifecycle = doc !== undefined && isDocInConflict(doc);
           const conflictedByStore = renameTrackedFiles.has(filePath);
           if (conflictedByLifecycle || conflictedByStore) {
@@ -9891,21 +9993,18 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
             return;
           }
         }
-        // Register the source's actual on-disk extension before downstream
-        // checks so admission and existsSync probes both see the right value
-        // when the file watcher hasn't yet observed the source (boot race).
-        if (operationKind === 'file') {
-          probeAndRegisterSourceFileExtension(contentDir, fromPath);
-        }
 
         if (contentFilter) {
           // Mirror `resolveContentEntryPath`'s explicit-extension detection so
           // a destination like `bar.mdx` is checked verbatim instead of as
           // `bar.mdx.md` (which would miss `*.mdx` exclusion patterns).
+          const sourceExt = isSupportedDocFile(fromPath)
+            ? extname(fromPath)
+            : getDocExtension(fromPath);
           const excluded =
             operationKind === 'file'
               ? contentFilter.isExcluded(
-                  isSupportedDocFile(toPath) ? toPath : `${toPath}${getDocExtension(fromPath)}`,
+                  isSupportedDocFile(toPath) ? toPath : `${toPath}${sourceExt}`,
                 )
               : contentFilter.isDirExcluded(toPath);
           if (excluded) {
@@ -10128,12 +10227,12 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
         // Y.Docs (silent data loss). Same root cause and fix as
         // handleRenamePath's affected-docs scan. The walk runs before the disk
         // delete, so disk is authoritative here; it also registers each
-        // child's on-disk extension, which `getDocExtension` relies on below.
+        // child's on-disk extension for extension-less legacy docNames.
         const deletedDocNames =
           operationKind === 'asset'
             ? []
             : operationKind === 'file'
-              ? [stripDocExtension(operationPath)]
+              ? [docNameForFileOperationPath(contentDir, operationPath)]
               : listManagedDocNamesUnderFolderFromDisk(
                   resolveContentEntryPath(contentDir, 'folder', operationPath),
                 );
@@ -10152,24 +10251,9 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
           deleteEngine ? deleteEngine.getConflicts().map((c) => c.file) : [],
         );
         for (const affected of deletedDocNames) {
-          const affectedDocName = stripDocExtension(affected);
+          const affectedDocName = affected;
           const doc = hocuspocus.documents.get(affectedDocName);
-          // For `kind === 'file'` `affected` already carries the extension
-          // (= the request body's `path`); for `kind === 'folder'` the disk
-          // walk returns extension-LESS docNames, so reconstruct the extension
-          // for the ConflictStore has-check (its entries are extension-ful
-          // `git ls-files`-style paths). The walk's `registerDocExtension`
-          // side effect is what makes `getDocExtension` resolve a `.mdx` child
-          // correctly here rather than falling back to the `.md` default — a
-          // mismatch would silently let a conflicted `.mdx` child through.
-          // Without this the folder branch silently falls through whenever the
-          // conflicted doc's Y.Doc has been evicted from memory.
-          const filePath =
-            operationKind === 'file'
-              ? isSupportedDocFile(operationPath)
-                ? operationPath
-                : `${affectedDocName}${getDocExtension(affectedDocName)}`
-              : `${affectedDocName}${getDocExtension(affectedDocName)}`;
+          const filePath = docNameToRelativePath(affectedDocName);
           const conflictedByLifecycle = doc !== undefined && isDocInConflict(doc);
           const conflictedByStore = deleteTrackedFiles.has(filePath);
           if (conflictedByLifecycle || conflictedByStore) {
@@ -10219,7 +10303,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
         for (const docName of deletedDocNames) {
           mutateFileIndex?.({
             kind: 'delete',
-            path: resolve(contentDir, `${docName}${getDocExtension(docName)}`),
+            path: resolve(contentDir, docNameToRelativePath(docName)),
             docName,
           });
         }
@@ -10385,7 +10469,7 @@ export function createApiExtension(options: ApiExtensionOptions): Extension {
             for (const docName of deletedDocNames) {
               mutateFileIndex?.({
                 kind: 'delete',
-                path: resolve(contentDir, `${docName}${getDocExtension(docName)}`),
+                path: resolve(contentDir, docNameToRelativePath(docName)),
                 docName,
               });
             }

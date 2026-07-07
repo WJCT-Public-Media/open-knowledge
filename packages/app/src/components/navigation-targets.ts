@@ -71,9 +71,16 @@ export function normalizeTargetPath(target: string): {
 } {
   const trimmed = target.trim();
   return {
-    normalizedTarget: normalizeDocNameInput(trimmed).replace(/\/+$/g, ''),
+    normalizedTarget: trimmed
+      .replace(/^\.\/+/, '')
+      .replace(/^\/+/, '')
+      .replace(/\/+$/g, ''),
     expectsFolder: /\/+$/.test(trimmed),
   };
+}
+
+function extensionlessTargetPath(target: string): string {
+  return normalizeDocNameInput(target).replace(/\/+$/g, '');
 }
 
 export function deriveKnownFolderPaths(docNames: Iterable<string>): Set<string> {
@@ -184,6 +191,7 @@ export function resolveNavigationTarget(
   if (!normalizedTarget) {
     return { kind: 'missing', target: normalizedTarget };
   }
+  const extensionlessTarget = extensionlessTargetPath(target);
 
   if (!expectsFolder && options.pages.has(normalizedTarget)) {
     return {
@@ -193,8 +201,20 @@ export function resolveNavigationTarget(
     };
   }
 
+  if (
+    !expectsFolder &&
+    extensionlessTarget !== normalizedTarget &&
+    options.pages.has(extensionlessTarget)
+  ) {
+    return {
+      kind: 'doc',
+      target: extensionlessTarget,
+      docName: extensionlessTarget,
+    };
+  }
+
   if (!expectsFolder) {
-    const slugMatchDocName = slugResolve(normalizedTarget, options.pagesBySlug);
+    const slugMatchDocName = slugResolve(extensionlessTarget, options.pagesBySlug);
     if (slugMatchDocName) {
       return {
         kind: 'doc',
@@ -204,31 +224,31 @@ export function resolveNavigationTarget(
     }
   }
 
-  const canonicalIndexDocName = `${normalizedTarget}/index`;
+  const canonicalIndexDocName = `${extensionlessTarget}/index`;
   if (options.pages.has(canonicalIndexDocName)) {
     return {
       kind: 'folder-index',
-      target: normalizedTarget,
-      folderPath: normalizedTarget,
+      target: extensionlessTarget,
+      folderPath: extensionlessTarget,
       docName: canonicalIndexDocName,
       noteKind: 'canonical-index',
     };
   }
 
-  const leaf = normalizedTarget.split('/').pop();
-  const legacyFolderNoteDocName = leaf ? `${normalizedTarget}/${leaf}` : null;
+  const leaf = extensionlessTarget.split('/').pop();
+  const legacyFolderNoteDocName = leaf ? `${extensionlessTarget}/${leaf}` : null;
   if (legacyFolderNoteDocName && options.pages.has(legacyFolderNoteDocName)) {
     return {
       kind: 'folder-index',
-      target: normalizedTarget,
-      folderPath: normalizedTarget,
+      target: extensionlessTarget,
+      folderPath: extensionlessTarget,
       docName: legacyFolderNoteDocName,
       noteKind: 'legacy-folder-note',
     };
   }
 
   if (!expectsFolder) {
-    const basenameMatchDocName = basenameResolve(normalizedTarget, options.pagesByBasename);
+    const basenameMatchDocName = basenameResolve(extensionlessTarget, options.pagesByBasename);
     if (basenameMatchDocName) {
       return {
         kind: 'doc',
@@ -239,17 +259,17 @@ export function resolveNavigationTarget(
   }
 
   const knownFolderPaths = options.folderPaths ?? deriveKnownFolderPaths(options.pages);
-  if (knownFolderPaths.has(normalizedTarget)) {
+  if (knownFolderPaths.has(extensionlessTarget)) {
     return {
       kind: 'folder',
-      target: normalizedTarget,
-      folderPath: normalizedTarget,
+      target: extensionlessTarget,
+      folderPath: extensionlessTarget,
     };
   }
 
   return {
     kind: 'missing',
-    target: normalizedTarget,
+    target: extensionlessTarget || normalizedTarget,
   };
 }
 

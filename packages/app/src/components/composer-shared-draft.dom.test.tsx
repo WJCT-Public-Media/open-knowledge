@@ -37,6 +37,10 @@ mock.module('@/lib/config-context', () => ({
   useConfigContext: () => ({ merged: { appearance: { preview: { autoOpen: true } } } }),
 }));
 
+mock.module('@/components/PageListContext', () => ({
+  usePageList: () => ({ pageMeta: new Map() }),
+}));
+
 mock.module('@/components/handoff/OpenInAgentMenuItem', () => ({
   TargetIcon: ({ id }: { id: string }) => <span data-testid={`target-icon-${id}`} />,
 }));

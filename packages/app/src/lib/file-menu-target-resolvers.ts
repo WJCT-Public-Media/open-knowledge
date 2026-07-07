@@ -42,20 +42,19 @@ import { docNameToRelativePath, joinWorkspacePath, type Workspace } from './work
  */
 export function resolveActiveTargetAbsPath(
   activeTarget: ResolvedNavigationTarget | null,
-  activeDocName: string | null,
   workspace: Workspace,
 ): string {
-  if (activeTarget?.kind === 'doc' && activeDocName) {
+  if (activeTarget?.kind === 'doc') {
     return joinWorkspacePath(
       workspace.contentDir,
-      docNameToRelativePath(activeDocName),
+      docNameToRelativePath(activeTarget.docName),
       workspace.pathSeparator,
     );
   }
-  if (activeTarget?.kind === 'folder-index' && activeDocName) {
+  if (activeTarget?.kind === 'folder-index') {
     return joinWorkspacePath(
       workspace.contentDir,
-      docNameToRelativePath(activeDocName),
+      docNameToRelativePath(activeTarget.docName),
       workspace.pathSeparator,
     );
   }
@@ -74,17 +73,15 @@ export function resolveActiveTargetAbsPath(
 
 /**
  * Project-relative path string for Copy Relative Path. Doc / folder-index
- * scopes return the `.md`-suffixed relative path; folder scope returns the
- * folder path with no trailing slash; asset scope returns the asset path;
- * everything else (null / missing) returns `''` matching the contentDir-
- * itself convention.
+ * scopes return the markdown relative path; folder scope returns the folder
+ * path with no trailing slash; asset scope returns the asset path; everything
+ * else (null / missing) returns `''` matching the contentDir-itself convention.
  */
 export function resolveActiveTargetRelativePath(
   activeTarget: ResolvedNavigationTarget | null,
-  activeDocName: string | null,
 ): string {
-  if ((activeTarget?.kind === 'doc' || activeTarget?.kind === 'folder-index') && activeDocName) {
-    return docNameToRelativePath(activeDocName);
+  if (activeTarget?.kind === 'doc' || activeTarget?.kind === 'folder-index') {
+    return docNameToRelativePath(activeTarget.docName);
   }
   if (activeTarget?.kind === 'folder') {
     return activeTarget.folderPath;
@@ -103,7 +100,6 @@ export function resolveActiveTargetRelativePath(
  */
 export function buildSendToAiInputForActiveTarget(
   activeTarget: ResolvedNavigationTarget | null,
-  activeDocName: string | null,
   workspace: Workspace | null,
 ): HandoffDispatchInput | null {
   if (activeTarget === null) {
@@ -117,7 +113,7 @@ export function buildSendToAiInputForActiveTarget(
     });
   }
   if (activeTarget.kind === 'doc' || activeTarget.kind === 'folder-index') {
-    return buildHandoffInput({ docName: activeDocName, workspace });
+    return buildHandoffInput({ docName: activeTarget.docName, workspace });
   }
   return null;
 }

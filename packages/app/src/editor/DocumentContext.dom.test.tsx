@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ReactNode, useLayoutEffect, useState } from 'react';
 import type { OkDesktopBridge } from '@/lib/desktop-bridge-types';
-import { docTabId, localTabSessionStorageKey } from './editor-tabs';
+import { hashFromAssetPath } from '@/lib/doc-hash';
+import { assetTabId, docTabId, localTabSessionStorageKey } from './editor-tabs';
 
 let mockCollabUrl: string | null = null;
 
@@ -22,6 +23,7 @@ const { DocumentProvider, useDocumentContext } = await import('./DocumentContext
 const PINNED_TAB_ID = docTabId('Pinned.md');
 const OTHER_TAB_ID = docTabId('Other.md');
 const THIRD_TAB_ID = docTabId('Third.md');
+const LICENSE_TAB_ID = assetTabId('LICENSE');
 const originalFetch = globalThis.fetch;
 
 function seedTabSession() {
@@ -83,6 +85,11 @@ interface EditorBridgeStub {
   fire(action: MenuActionLike): void;
 }
 
+interface DeferredSessionBridgeStub {
+  bridge: OkDesktopBridge;
+  resolveSession(): void;
+}
+
 function makeEditorBridgeStub(): EditorBridgeStub {
   let captured: ((action: MenuActionLike) => void) | null = null;
   const bridge = {
@@ -115,6 +122,40 @@ function makeEditorBridgeStub(): EditorBridgeStub {
     bridge,
     fire: (action) => {
       act(() => captured?.(action));
+    },
+  };
+}
+
+function makeDeferredSessionBridgeStub(state: {
+  openTabs: string[];
+  pinnedTabIds: string[];
+  activeDocName: string | null;
+  activeTabId: string | null;
+  updatedAt: string | null;
+}): DeferredSessionBridgeStub {
+  let resolveSession: (() => void) | null = null;
+  const sessionLoaded = new Promise<typeof state>((resolve) => {
+    resolveSession = () => resolve(state);
+  });
+  const bridge = {
+    config: {
+      mode: 'editor',
+      collabUrl: '',
+      apiOrigin: '',
+      projectPath: '',
+      projectName: 'Test Project',
+    },
+    onMenuAction: () => () => {},
+    project: {
+      getSessionState: async () => sessionLoaded,
+      setSessionState: async () => undefined,
+    },
+  } as unknown as OkDesktopBridge;
+
+  return {
+    bridge,
+    resolveSession: () => {
+      resolveSession?.();
     },
   };
 }
@@ -175,6 +216,30 @@ function BridgeCloseActiveHarness({ bridge }: { bridge: OkDesktopBridge }) {
     };
   }, [bridge]);
   return <CloseActiveHarness />;
+}
+
+function OpenLicenseDuringRestoreHarness() {
+  const ctx = useDocumentContext();
+  return (
+    <>
+      <span data-testid="open-tabs">{ctx.openTabs.join('|')}</span>
+      <span data-testid="visible-tabs">{ctx.visibleTabIds.join('|')}</span>
+      <span data-testid="active-tab">{ctx.activeTabId ?? ''}</span>
+      <button
+        type="button"
+        onClick={() =>
+          ctx.openTarget({
+            kind: 'asset',
+            target: 'LICENSE',
+            assetPath: 'LICENSE',
+            mediaKind: null,
+          })
+        }
+      >
+        Open license
+      </button>
+    </>
+  );
 }
 
 function ProviderHarness({ children }: { children: ReactNode }) {
@@ -546,6 +611,8 @@ describe('DocumentContext reorderTabs — order + drag-mutable pin', () => {
 });
 
 const COLD_START_DOC = docTabId('event_watcher');
+const SAME_STEM_MD_TAB = docTabId('foo.md');
+const SAME_STEM_MDX_TAB = docTabId('foo.mdx');
 
 function seedColdStartSession() {
   // The state a cold single-file window reaches mid-startup: the seeded doc tab
@@ -557,6 +624,19 @@ function seedColdStartSession() {
       pinnedTabIds: [],
       activeDocName: 'event_watcher',
       activeTabId: COLD_START_DOC,
+      updatedAt: new Date('2026-06-07T00:00:00.000Z').toISOString(),
+    }),
+  );
+}
+
+function seedSameStemActiveMdxSession() {
+  window.localStorage.setItem(
+    localTabSessionStorageKey(window.location.origin),
+    JSON.stringify({
+      openTabs: [SAME_STEM_MD_TAB, SAME_STEM_MDX_TAB],
+      pinnedTabIds: [],
+      activeDocName: 'foo.mdx',
+      activeTabId: SAME_STEM_MDX_TAB,
       updatedAt: new Date('2026-06-07T00:00:00.000Z').toISOString(),
     }),
   );
@@ -585,9 +665,33 @@ function ColdStartSyncHarness() {
   );
 }
 
+function SameStemSyncHarness() {
+  const ctx = useDocumentContext();
+  return (
+    <>
+      <span data-testid="open-tabs">{ctx.openTabs.join('|')}</span>
+      <span data-testid="active-tab">{ctx.activeTabId ?? ''}</span>
+      <button
+        type="button"
+        onClick={() =>
+          ctx.syncOpenTabsWithKnownTargets({
+            pages: new Set(['foo']),
+            folderPaths: new Set(),
+            assetPaths: new Set(),
+          })
+        }
+      >
+        Sync canonical page
+      </button>
+    </>
+  );
+}
+
 describe('DocumentContext syncOpenTabsWithKnownTargets — cold-start hash preservation', () => {
   afterEach(() => {
     cleanup();
+    mockCollabUrl = null;
+    globalThis.fetch = originalFetch;
     window.localStorage.clear();
     window.location.hash = '';
   });
@@ -611,6 +715,89 @@ describe('DocumentContext syncOpenTabsWithKnownTargets — cold-start hash prese
 
     expect(screen.getByTestId('open-tabs').textContent).toBe(COLD_START_DOC);
     expect(window.location.hash).toBe('#/event_watcher');
+  });
+
+  test('same-stem md and mdx tabs survive canonical extensionless page sync', async () => {
+    mockCollabUrl = 'ws://localhost:1/collab';
+    globalThis.fetch = mock(() => Promise.reject(new Error('unexpected fetch'))) as never;
+    seedSameStemActiveMdxSession();
+    window.location.hash = '#/foo.mdx';
+    render(<SameStemSyncHarness />, { wrapper: ProviderHarness });
+
+    expect(screen.getByTestId('open-tabs').textContent).toBe(
+      `${SAME_STEM_MD_TAB}|${SAME_STEM_MDX_TAB}`,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('active-tab').textContent).toBe(SAME_STEM_MDX_TAB);
+    });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Sync canonical page' }));
+
+    expect(screen.getByTestId('open-tabs').textContent).toBe(
+      `${SAME_STEM_MD_TAB}|${SAME_STEM_MDX_TAB}`,
+    );
+    expect(screen.getByTestId('active-tab').textContent).toBe(SAME_STEM_MDX_TAB);
+    expect(window.location.hash).toBe('#/foo.mdx');
+  });
+});
+
+describe('DocumentContext tab restore', () => {
+  afterEach(() => {
+    cleanup();
+    delete window.okDesktop;
+    mockCollabUrl = null;
+    globalThis.fetch = originalFetch;
+    window.localStorage.clear();
+    window.location.hash = '';
+  });
+
+  test('restores an extension-qualified mdx tab over an ambiguous extensionless hash', async () => {
+    mockCollabUrl = 'ws://localhost:1/collab';
+    globalThis.fetch = mock(() => Promise.reject(new Error('unexpected fetch'))) as never;
+    seedSameStemActiveMdxSession();
+    window.location.hash = '#/foo';
+
+    render(<CloseActiveHarness />, { wrapper: ProviderHarness });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('active-tab').textContent).toBe(SAME_STEM_MDX_TAB);
+    });
+    expect(window.location.hash).toBe('#/foo.mdx');
+  });
+
+  test('keeps saved tab order when an active asset hash opens before session restore resolves', async () => {
+    mockCollabUrl = 'ws://localhost:1/collab';
+    globalThis.fetch = mock(() => Promise.reject(new Error('unexpected fetch'))) as never;
+    const stub = makeDeferredSessionBridgeStub({
+      openTabs: [OTHER_TAB_ID, LICENSE_TAB_ID],
+      pinnedTabIds: [],
+      activeDocName: null,
+      activeTabId: LICENSE_TAB_ID,
+      updatedAt: new Date('2026-06-07T00:00:00.000Z').toISOString(),
+    });
+    window.okDesktop = stub.bridge;
+    window.location.hash = hashFromAssetPath('LICENSE');
+
+    render(<OpenLicenseDuringRestoreHarness />, { wrapper: ProviderHarness });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Open license' }));
+
+    expect(screen.getByTestId('visible-tabs').textContent).toBe(LICENSE_TAB_ID);
+
+    act(() => {
+      stub.resolveSession();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('open-tabs').textContent).toBe(`${OTHER_TAB_ID}|${LICENSE_TAB_ID}`);
+      expect(screen.getByTestId('visible-tabs').textContent).toBe(
+        `${OTHER_TAB_ID}|${LICENSE_TAB_ID}`,
+      );
+      expect(screen.getByTestId('active-tab').textContent).toBe(LICENSE_TAB_ID);
+    });
+    expect(window.location.hash).toBe(hashFromAssetPath('LICENSE'));
   });
 });
 

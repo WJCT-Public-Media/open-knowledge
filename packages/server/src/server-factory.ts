@@ -61,7 +61,7 @@ import { createConflictLifecycleSeedExtension } from './conflict-lifecycle-seed.
 import { resolveProjectTemplates } from './content/templates-resolver.ts';
 import { type ContentFilter, createContentFilter } from './content-filter.ts';
 import { dropPendingDocs, recordContributor } from './contributor-tracker.ts';
-import { getDocExtension, stripDocExtension } from './doc-extensions.ts';
+import { docNameToRelativePath, stripDocExtension } from './doc-extensions.ts';
 import { runDocLineageGuard } from './doc-lineage-guard.ts';
 import {
   DEFAULT_EMBEDDINGS_DIMENSIONS,
@@ -1376,7 +1376,8 @@ export function createServer(options: ServerOptions): ServerInstance {
       // The traversal-character set lives in `isSafeDocName` (api-extension.ts)
       // so the security-relevant validation only exists in one place.
       if (!isSafeDocName(docName)) return null;
-      const filePath = resolve(resolvedContentDir, `${docName}${getDocExtension(docName)}`);
+      const relativePath = docNameToRelativePath(docName);
+      const filePath = resolve(resolvedContentDir, relativePath);
       if (!isWithinDir(filePath, resolvedContentDir)) {
         return null;
       }
@@ -1576,7 +1577,8 @@ export function createServer(options: ServerOptions): ServerInstance {
   /** Resolve a safe rescue buffer path, returning null if traversal is detected. */
   function safeRescuePath(shadowGitDir: string, docName: string): string | null {
     const rescueBase = resolve(shadowGitDir, 'rescue');
-    const filePath = resolve(rescueBase, `${docName}${getDocExtension(docName)}`);
+    const relativePath = docNameToRelativePath(docName);
+    const filePath = resolve(rescueBase, relativePath);
     if (!isWithinDir(filePath, rescueBase)) return null;
     return filePath;
   }

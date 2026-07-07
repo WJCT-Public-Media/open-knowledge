@@ -29,6 +29,7 @@ interface KnownTabTargets {
   pages: ReadonlySet<string>;
   folderPaths: ReadonlySet<string>;
   assetPaths: ReadonlySet<string>;
+  filePaths?: ReadonlySet<string>;
   keepMissingDocName?: string | null;
   /**
    * Doc the location hash currently points at — kept even when absent from
@@ -142,11 +143,15 @@ export function tabParts(
   }
   const slash = docName.lastIndexOf('/');
   const baseName = slash < 0 ? docName : docName.slice(slash + 1);
-  const label = `${baseName}${docExt}`;
-  if (slash < 0) return { baseName, extension: docExt, label, prefix: '' };
+  const extension =
+    MARKDOWN_TAB_EXTENSION_PATTERN.test(docExt) && MARKDOWN_TAB_EXTENSION_PATTERN.test(baseName)
+      ? ''
+      : docExt;
+  const label = `${baseName}${extension}`;
+  if (slash < 0) return { baseName, extension, label, prefix: '' };
   return {
     baseName,
-    extension: docExt,
+    extension,
     label,
     prefix: `${docName.slice(0, slash)}/`,
   };
@@ -429,6 +434,7 @@ export function filterOpenTabsForKnownTargets(
     pages,
     folderPaths,
     assetPaths,
+    filePaths,
     keepMissingDocName = null,
     keepHashDocName = null,
   }: KnownTabTargets,
@@ -436,13 +442,17 @@ export function filterOpenTabsForKnownTargets(
   return normalizeOpenTabs(tabs, Number.MAX_SAFE_INTEGER).filter((tabId) => {
     const tab = parseEditorTabId(tabId);
     if (tab.kind === 'folder') return folderPaths.has(tab.folderPath);
-    if (tab.kind === 'asset') return assetPaths.has(tab.assetPath);
+    if (tab.kind === 'asset') {
+      return assetPaths.has(tab.assetPath) || filePaths?.has(tab.assetPath) === true;
+    }
     // Skill bundle files are addressed outside the content tree (scope/name/
     // path), so they never appear in `pages`/`assetPaths` — keep their tabs so
     // a page-list sync doesn't prune the open viewer.
     if (tab.kind === 'skill-file') return true;
+    const markdownStem = stripMarkdownTabExtension(tab.docName);
     return (
       pages.has(tab.docName) ||
+      (markdownStem !== null && pages.has(markdownStem)) ||
       // Managed-artifact docs (skills/templates) are tree-excluded by design, so
       // they never appear in `pages` — keep their tabs regardless, otherwise the
       // page-list sync would prune the active skill/template tab the moment a

@@ -291,6 +291,23 @@ describe('runShareAction — happy path', () => {
     expect(deps.fetchCalls[0].body).toEqual({ kind: 'doc', docPath: 'docs/sub/page.md' });
   });
 
+  test('extension-qualified mdx docName maps to matching docPath', async () => {
+    const okResponse: ShareConstructUrlResponse = {
+      ok: true,
+      shareUrl: 'https://openknowledge.ai/d/Aaa',
+      sharedUrl: 'https://github.com/o/r/blob/main/docs/page.mdx',
+      branch: 'main',
+    };
+    const deps = makeDeps({ fetchResponse: okResponse });
+
+    await runShareAction(
+      { kind: 'doc', docName: 'docs/page.mdx', hasRemote: true, onClickWhenNoRemote: () => {} },
+      deps,
+    );
+
+    expect(deps.fetchCalls[0].body).toEqual({ kind: 'doc', docPath: 'docs/page.mdx' });
+  });
+
   test('folder input POSTs {kind:folder, folderPath} verbatim + folder-specific success toast', async () => {
     const okResponse: ShareConstructUrlResponse = {
       ok: true,

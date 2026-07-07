@@ -164,6 +164,74 @@ describe('resolveFileTreeSelectionAction', () => {
     });
   });
 
+  test('routes extension-qualified document rows to their exact document identity', () => {
+    expect(
+      resolveFileTreeSelectionAction('docs/guide.mdx', [
+        {
+          kind: 'document',
+          docName: 'docs/guide.mdx',
+          docExt: '.mdx',
+          size: 0,
+          modified: '',
+        },
+      ]),
+    ).toEqual({
+      kind: 'document',
+      path: 'docs/guide.mdx',
+    });
+  });
+
+  test('routes an extension row beside the opposite document extension as an exact document', () => {
+    expect(
+      resolveFileTreeSelectionAction('docs/guide.md', [
+        {
+          kind: 'document',
+          docName: 'docs/guide',
+          docExt: '.mdx',
+          size: 0,
+          modified: '',
+        },
+        {
+          kind: 'asset',
+          path: 'docs/guide.md',
+          assetExt: 'md',
+          mediaKind: null,
+          size: 0,
+          modified: '',
+        },
+      ]),
+    ).toEqual({
+      kind: 'document',
+      path: 'docs/guide.md',
+    });
+  });
+
+  test('routes same-stem markdown generic rows as exact document identities', () => {
+    expect(
+      resolveFileTreeSelectionAction('docs/guide.md', [
+        {
+          kind: 'asset',
+          path: 'docs/guide.md',
+          assetExt: 'md',
+          mediaKind: null,
+          size: 0,
+          modified: '',
+        },
+        {
+          kind: 'asset',
+          path: 'docs/guide.mdx',
+          assetExt: 'mdx',
+          mediaKind: null,
+          size: 0,
+          modified: '',
+        },
+      ]),
+    ).toEqual({
+      kind: 'document',
+      path: 'docs/guide.md',
+    });
+  });
+
   test('drops transient unknown document and folder selections', () => {
     expect(resolveFileTreeSelectionAction('docs/missing.md', [])).toEqual({ kind: 'none' });
     expect(resolveFileTreeSelectionAction('docs/', [])).toEqual({ kind: 'none' });

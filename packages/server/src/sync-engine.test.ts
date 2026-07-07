@@ -551,6 +551,7 @@ describe('SyncEngine ConflictStore admission (content-only)', () => {
     await sister.commit('base');
     await sister.addRemote('origin', bareDir);
     await sister.push('origin', 'main');
+    await simpleGit(bareDir).raw('symbolic-ref', 'HEAD', 'refs/heads/main');
 
     // beforeEach pre-creates projectDir + .ok/local/. `git clone` refuses
     // a non-empty destination, so wipe and let clone recreate it, then
