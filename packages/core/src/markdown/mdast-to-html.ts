@@ -1,6 +1,6 @@
-
-import type { Element, Root as HastRoot } from 'hast';
-import type { Root as MdastRoot } from 'mdast';
+import type { Element, Root as HastRoot, Text as HastText } from 'hast';
+import type { Root as MdastRoot, Text as MdastText } from 'mdast';
+import type { Handler } from 'mdast-util-to-hast';
 import { normalizeUri } from 'micromark-util-sanitize-uri';
 import rehypeStringify from 'rehype-stringify';
 import remarkFrontmatter from 'remark-frontmatter';
@@ -9,10 +9,13 @@ import remarkParse from 'remark-parse';
 import remarkRehype from 'remark-rehype';
 import { type Plugin, unified } from 'unified';
 import { visit } from 'unist-util-visit';
+import { protectFromMdx, restoreFromMdx } from './autolink-void-html-guard.ts';
+import { encodeBackslashEscapes, restoreBackslashEscapesPlugin } from './backslash-escape-guard.ts';
 import { decodeEntityRefs } from './entity-ref-guard.ts';
 import { customNodeHandlers } from './mdast-to-hast-handlers.ts';
 import { remarkMdxAgnostic } from './remark-mdx-agnostic.ts';
 import { isSafeUrl } from './safe-url.ts';
+import { voidBrPromoterPlugin } from './void-br-promoter.ts';
 import { remarkWikiLink } from './wiki-link-micromark.ts';
 
 const DANGEROUS_STYLE_URL_RE = /url\s*\(\s*['"]?\s*(?:javascript|vbscript|data)\s*:/i;
@@ -150,6 +153,47 @@ export function mdastToHtml(tree: MdastRoot): string {
   return String(processor.stringify(hast));
 }
 
+function trimLinesInline(value: string): string {
+  const search = /\r?\n|\r/g;
+  const segments: string[] = [];
+  let last = 0;
+  let match = search.exec(value);
+  while (match !== null) {
+    segments.push(trimLineEdges(value.slice(last, match.index), last > 0, true), match[0]);
+    last = match.index + match[0].length;
+    match = search.exec(value);
+  }
+  segments.push(trimLineEdges(value.slice(last), last > 0, false));
+  return segments.join('');
+}
+
+function trimLineEdges(line: string, trimStart: boolean, trimEnd: boolean): string {
+  let start = 0;
+  let end = line.length;
+  const isSpaceOrTab = (code: number): boolean => code === 9 || code === 32;
+  while (trimStart && start < end && isSpaceOrTab(line.charCodeAt(start))) start++;
+  while (trimEnd && end > start && isSpaceOrTab(line.charCodeAt(end - 1))) end--;
+  return end > start ? line.slice(start, end) : '';
+}
+
+const LINE_BREAK_RE = /\r?\n|\r/;
+
+const softBreakTextHandler: Handler = (state, node) => {
+  const value = trimLinesInline(String((node as MdastText).value));
+  if (!LINE_BREAK_RE.test(value)) {
+    const result: HastText = { type: 'text', value };
+    state.patch(node, result);
+    return state.applyData(node, result);
+  }
+  const parts = value.split(LINE_BREAK_RE);
+  const out: Array<Element | HastText> = [];
+  for (let i = 0; i < parts.length; i++) {
+    if (i > 0) out.push({ type: 'element', tagName: 'br', properties: {}, children: [] });
+    if (parts[i].length > 0) out.push({ type: 'text', value: parts[i] });
+  }
+  return out;
+};
+
 export function markdownToHtml(md: string): string {
   const processor = unified()
     .use(remarkParse)
@@ -157,9 +201,12 @@ export function markdownToHtml(md: string): string {
     .use(remarkMdxAgnostic)
     .use(remarkGfm)
     .use(remarkWikiLink)
-    .use(remarkRehype, { handlers: customNodeHandlers })
+    .use(restoreFromMdx)
+    .use(voidBrPromoterPlugin)
+    .use(restoreBackslashEscapesPlugin)
+    .use(remarkRehype, { handlers: { ...customNodeHandlers, text: softBreakTextHandler } })
     .use(rehypeDecodeSourcePreservedAttrs)
     .use(rehypeSanitizeUrls)
     .use(rehypeStringify);
-  return String(processor.processSync(md));
+  return String(processor.processSync(protectFromMdx(encodeBackslashEscapes(md))));
 }

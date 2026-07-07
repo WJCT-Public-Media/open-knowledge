@@ -24,10 +24,14 @@
  * on its React render root. The walker drops that subtree from the output.
  *
  * Cardinality discipline: the style allowlist is hand-curated to email-safe
- * properties (Notion / Slack / Gmail rich-paste profiles all preserve them).
- * The class blocklist strips selection halo / drag chrome / ProseMirror
- * internals. The attribute blocklist strips `contenteditable` and PM-internal
- * markers so destinations don't see editor-only state.
+ * properties that survive at least one mainstream rich-paste profile (Notion /
+ * Slack / Gmail / GitHub). Not every property survives every destination —
+ * `white-space` in particular is dropped by Slack (stock Quill) and Gmail-class
+ * sanitizers, so line structure is NOT left to ride on it: soft breaks are
+ * promoted to structural `<br>` elements (`promoteSoftBreaksToBr`) before
+ * emission. The class blocklist strips selection halo / drag chrome /
+ * ProseMirror internals. The attribute blocklist strips `contenteditable` and
+ * PM-internal markers so destinations don't see editor-only state.
  */
 
 import { normalizeNullableString, wikiLinkHref } from '@inkeep/open-knowledge-core';
@@ -63,9 +67,12 @@ import { nonPortableRenderSourceFallback } from './non-portable-render-source-fa
 /**
  * CSS properties copied inline from the live element to the clone. Curated for
  * the Slack / Notion / Gmail / GitHub rich-paste profiles — everything in this
- * list survives at least one of the four. Layout / transform / animation
- * properties are intentionally excluded: destinations rebuild layout, and
- * inlining them across an arbitrary snippet would yield broken visuals.
+ * list survives at least one of the four. `white-space` is kept for visual
+ * fidelity but is NOT relied on for line structure (several destinations drop
+ * it — see header); soft breaks are carried structurally by `<br>` instead
+ * (`promoteSoftBreaksToBr`). Layout / transform / animation properties are
+ * intentionally excluded: destinations rebuild layout, and inlining them across
+ * an arbitrary snippet would yield broken visuals.
  */
 export const STYLE_ALLOWLIST = [
   'color',
@@ -378,7 +385,49 @@ function cloneAndStyle(live: Element, env: WalkerEnv): Element {
   // every SVG above, so defense-in-depth on stray `lucide-` SVGs is
   // preserved regardless of the lucide-replace position.
   replaceLucideIconsWithGlyphs(clone);
+  // Structuralize soft line breaks LAST, after every source-fallback pass has
+  // synthesized its `mdx-inline` spans (single-line source text) and `<pre>`
+  // source blocks — running last means those already exist, the `<pre>`/`<code>`
+  // guard skips the source blocks, and a just-inserted `<br>` can't be flattened
+  // by the earlier wiki-link `textContent` copy.
+  promoteSoftBreaksToBr(clone);
   return clone;
+}
+
+/**
+ * Promote soft line breaks (a literal `\n` inside a cloned text node) to real
+ * `<br>` elements. PM renders these `\n`-carried breaks visually only via the
+ * editor's `white-space` CSS, which mainstream destinations drop (see header) —
+ * folding the `\n` to a space and merging the two lines. A `<br>` is
+ * destination-robust. `<pre>` / `<code>` subtrees are skipped: there the `\n`
+ * is significant whitespace the destination preserves verbatim (a PM code block
+ * renders it directly), so converting would double the break. Hard breaks are
+ * already real `<br>` elements in the live DOM, so they pass through untouched —
+ * only `\n`-in-text is rewritten, never an existing `<br>`.
+ */
+function promoteSoftBreaksToBr(root: Element): void {
+  const doc = root.ownerDocument;
+  const visit = (el: Element): void => {
+    const tag = el.tagName.toUpperCase();
+    if (tag === 'PRE' || tag === 'CODE') return;
+    // Snapshot children — the loop mutates `el`'s child list via `replaceWith`.
+    for (const child of Array.from(el.childNodes)) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const value = child.nodeValue ?? '';
+        if (!value.includes('\n')) continue;
+        const parts = value.split('\n');
+        const replacement = doc.createDocumentFragment();
+        for (let i = 0; i < parts.length; i++) {
+          if (i > 0) replacement.appendChild(doc.createElement('br'));
+          if (parts[i].length > 0) replacement.appendChild(doc.createTextNode(parts[i]));
+        }
+        child.replaceWith(replacement);
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        visit(child as Element);
+      }
+    }
+  };
+  visit(root);
 }
 
 /**
@@ -566,6 +615,28 @@ function replaceLucideIconsWithGlyphs(root: Element): void {
   }
 }
 
+/**
+ * Reflect a checkbox's live `checked` DOM PROPERTY onto the clone as the
+ * `checked` ATTRIBUTE. Task-list items carry their checkbox state as a
+ * property (the taskItem NodeView sets `input.checked`, never the attribute),
+ * and `cloneNode(true)` copies only attributes — so without this the cloned
+ * `<input>` loses its state and a CHECKED task item pastes UNCHECKED.
+ *
+ * Payoff is bounded: most paste destinations (Gmail / Slack / Notion / Google
+ * Docs) strip `<input>` outright, so this only helps destinations that keep
+ * form controls (Outlook web / roosterjs). Emitting a destination-surviving
+ * `[x]` / glyph convention instead is a separate, larger change.
+ *
+ * Exported for unit-test reach; the production caller is `walkPair`.
+ */
+export function reflectCheckboxCheckedState(live: Element, clone: Element): void {
+  if (live.tagName.toUpperCase() !== 'INPUT') return;
+  const input = live as HTMLInputElement;
+  if (input.type !== 'checkbox') return;
+  if (input.checked) clone.setAttribute('checked', '');
+  else clone.removeAttribute('checked');
+}
+
 function walkPair(live: Element, clone: Element, env: WalkerEnv): void {
   // Inline computed styles via the allowlist.
   const styleStr = buildInlineStyleFrom(env.getComputedStyle(live));
@@ -643,6 +714,10 @@ function walkPair(live: Element, clone: Element, env: WalkerEnv): void {
       }
     }
   }
+
+  // Recover the checkbox `checked` state that cloneNode(true) drops (it lives
+  // as a live DOM property, not an attribute) — see reflectCheckboxCheckedState.
+  reflectCheckboxCheckedState(live, clone);
 
   // Recurse pairwise.
   const liveKids = Array.from(live.children);

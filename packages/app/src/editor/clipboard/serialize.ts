@@ -116,10 +116,46 @@ export function serializeCellSelectionAsText(selection: CellSelection): string {
       currentRow = [];
       currentRowTop = rowTop;
     }
-    currentRow.push(cell.textContent);
+    currentRow.push(encodeTsvField(cellText(cell)));
   });
   if (currentRow.length > 0) rows.push(currentRow);
   return rows.map((r) => r.join('\t')).join('\n');
+}
+
+/**
+ * A cell's text with its internal line breaks preserved. PM's `textContent`
+ * renders a `hardBreak` leaf as the empty string, so `line1<br>line2` would
+ * flush-concatenate to `"line1line2"`. `textBetween` with a block separator of
+ * `\n` (between paragraphs) and a `hardBreak` leafText of `\n` keeps every
+ * in-cell break as a real newline.
+ */
+function cellText(cell: Node): string {
+  return cell.textBetween(0, cell.content.size, '\n', (leaf) =>
+    leaf.type.name === 'hardBreak' ? '\n' : '',
+  );
+}
+
+/**
+ * Encode one TSV field per the Excel / Google Sheets clipboard convention
+ * (RFC 4180 §2.5-2.7 with a tab delimiter): a field containing a newline, a
+ * tab, or a double quote is wrapped in double quotes with internal quotes
+ * doubled, so its embedded newline is not confused with the row separator.
+ * Single-line cells with no special character stay unquoted — byte-identical to
+ * the prior `textContent` output.
+ *
+ * Spreadsheet formula injection (a cell starting with `=` / `+` / `-` / `@`)
+ * is deliberately NOT neutralized here — an accepted risk, not an oversight.
+ * This is clipboard copy-out consumed by every destination, not a CSV file
+ * export: the classic `'`-prefix mitigation would visibly corrupt legitimate
+ * cells (negative numbers, `+3%` deltas, list-style text) pasted into
+ * editors, chat, or OK itself, and RFC 4180 quoting alone never disarms a
+ * formula (`"=1+1"` still evaluates after unquoting). OWASP's CSV-injection
+ * guidance concedes no producer-side encoding is safe for every consumer, so
+ * the pasting spreadsheet is the enforcement point; cell bytes ship verbatim.
+ */
+function encodeTsvField(value: string): string {
+  if (!/["\t\n]/.test(value)) return value;
+  return `"${value.replaceAll('"', '""')}"`;
 }
 
 /**

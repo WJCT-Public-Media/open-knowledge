@@ -24,6 +24,9 @@
 
 let shiftHeldLatch = false;
 let listenersAttached = false;
+// The window the listeners were attached to, so a test reset can detach from
+// the exact window it wired (windows are swapped in/out across test files).
+let attachedWindow: Window | null = null;
 
 function onKeyDown(e: KeyboardEvent): void {
   shiftHeldLatch = e.shiftKey;
@@ -50,7 +53,26 @@ function ensureAttached(): void {
   window.addEventListener('keydown', onKeyDown, true);
   window.addEventListener('keyup', onKeyUp, true);
   window.addEventListener('blur', onBlur, true);
+  attachedWindow = window;
   listenersAttached = true;
+}
+
+/**
+ * Detach the listeners and clear the latch. Test-only: the attach state is a
+ * module singleton, so a test file that wires the tracker to one `window` (e.g.
+ * a jsdom instance) would otherwise leave the guard set and block a sibling
+ * test file from re-attaching to its own window. Production never swaps
+ * `window`, so it never calls this.
+ */
+export function __resetShiftTrackerForTests(): void {
+  if (attachedWindow) {
+    attachedWindow.removeEventListener('keydown', onKeyDown, true);
+    attachedWindow.removeEventListener('keyup', onKeyUp, true);
+    attachedWindow.removeEventListener('blur', onBlur, true);
+    attachedWindow = null;
+  }
+  listenersAttached = false;
+  shiftHeldLatch = false;
 }
 
 /**
