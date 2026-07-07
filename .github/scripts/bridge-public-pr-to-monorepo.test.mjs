@@ -11,7 +11,6 @@ import {
   checkOrgMembership,
   commitIndicatesConflicts,
   createClaGateGh,
-  listPublicPrCommitAuthors,
   listPublicPrCommits,
   normalizeGitHubUserAuthor,
   postCommitStatus,
@@ -33,7 +32,7 @@ const fakeRequest = (response) => {
 };
 
 describe('buildCommitAttribution', () => {
-  test('credits every unique human author with native coauthor trailers', () => {
+  test('credits every unique contributor with native coauthor trailers', () => {
     const attribution = buildCommitAttribution({
       commitAuthors: [
         { name: 'Sarah Inkeep', email: 'sarah@inkeep.com' },
@@ -44,77 +43,65 @@ describe('buildCommitAttribution', () => {
         { name: 'Sarah Inkeep', email: 'sarah@inkeep.com' },
         { name: 'Robert Inkeep', email: 'robert@inkeep.com' },
       ],
-      fallbackAuthor: { name: 'octocat', email: '1+octocat@users.noreply.github.com' },
     });
 
     expect(attribution.trailers).toEqual([
       'Co-authored-by: Sarah Inkeep <sarah@inkeep.com>',
+      'Co-authored-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>',
       'Co-authored-by: Robert Inkeep <robert@inkeep.com>',
     ]);
   });
 
-  test('preserves original public commit messages before coauthor trailers', () => {
+  test('lists commits for readability and builds a deduped GitHub attribution block', () => {
     const attribution = buildCommitAttribution({
-      commitAuthors: [{ name: 'Sarah Inkeep', email: 'sarah@inkeep.com' }],
+      commitAuthors: [{ name: 'octocat', email: '1+octocat@users.noreply.github.com' }],
       commitMessages: [
-        { sha: '1234567890abcdef', message: 'Add search\n\nExplain the indexing path.' },
+        {
+          sha: '1234567890abcdef',
+          author: { name: 'Sarah Inkeep', email: 'sarah@inkeep.com' },
+          message: 'Add search\n\nExplain the indexing path.',
+        },
         {
           sha: 'fedcba9876543210',
+          author: { name: 'Robert Inkeep', email: 'robert@inkeep.com' },
           message: 'Fix empty query\r\n\r\nCo-authored-by: A <a@example.com>',
         },
       ],
-      fallbackAuthor: { name: 'octocat', email: '1+octocat@users.noreply.github.com' },
+      publicRepo: 'inkeep/open-knowledge',
     });
 
     expect(attribution.originalCommitMessages).toBe(
       [
-        'Original public commit messages:',
+        'Commits:',
         '',
-        '1. 1234567 Add search',
+        '1. [1234567](https://github.com/inkeep/open-knowledge/commit/1234567890abcdef) Add search',
+        '   Author: Sarah Inkeep <sarah@inkeep.com>',
         '',
         '   ',
         '   Explain the indexing path.',
-        '2. fedcba9 Fix empty query',
+        '2. [fedcba9](https://github.com/inkeep/open-knowledge/commit/fedcba9876543210) Fix empty query',
+        '   Author: Robert Inkeep <robert@inkeep.com>',
         '',
         '   ',
         '   Co-authored-by: A <a@example.com>',
       ].join('\n'),
     );
-    expect(attribution.body).toContain('Original public commit messages:');
-    expect(
-      attribution.body.trim().endsWith('Co-authored-by: Sarah Inkeep <sarah@inkeep.com>'),
-    ).toBe(true);
-  });
-
-  test('falls back to the public PR author when commits only have invalid authors', () => {
-    const attribution = buildCommitAttribution({
-      commitAuthors: [
-        {
-          name: 'github-actions[bot]',
-          email: '41898282+github-actions[bot]@users.noreply.github.com',
-        },
-        { name: 'Bad\nName', email: 'bad@example.com' },
-      ],
-      fallbackAuthor: { name: 'octocat', email: '1+octocat@users.noreply.github.com' },
-    });
-
     expect(attribution.trailers).toEqual([
       'Co-authored-by: octocat <1+octocat@users.noreply.github.com>',
+      'Co-authored-by: Sarah Inkeep <sarah@inkeep.com>',
+      'Co-authored-by: Robert Inkeep <robert@inkeep.com>',
+      'Co-authored-by: A <a@example.com>',
     ]);
   });
 
-  test('does not credit sync automation as coauthors', () => {
+  test('allows an empty attribution block when no author normalizes', () => {
     const attribution = buildCommitAttribution({
-      commitAuthors: [
-        { name: 'Inkeep OSS Sync', email: 'oss-sync@inkeep.com' },
-        { name: 'Inkeep Public PR Bridge', email: 'public-pr-bridge@inkeep.com' },
-      ],
-      fallbackAuthor: { name: 'octocat', email: '1+octocat@users.noreply.github.com' },
+      commitAuthors: [{ name: 'Bad\nName', email: 'bad@x.com' }],
+      commitMessages: [],
     });
 
-    expect(attribution.trailers).toEqual([
-      'Co-authored-by: octocat <1+octocat@users.noreply.github.com>',
-    ]);
+    expect(attribution.trailers).toEqual([]);
+    expect(attribution.body).toBe('');
   });
 });
 
@@ -170,6 +157,55 @@ describe('listPublicPrCommits', () => {
       },
     ]);
   });
+
+  test('paginates until a page returns fewer than 100 commits', async () => {
+    const calls = [];
+    const pageOne = Array.from({ length: 100 }, (_, index) => ({
+      sha: `${index.toString(16).padStart(7, '0')}abcdef`,
+      author: { login: `author-${index}`, id: index + 1 },
+      commit: {
+        author: { name: `Raw Author ${index}`, email: `raw-${index}@example.com` },
+        message: `Commit ${index}`,
+      },
+    }));
+    const pageTwo = [
+      {
+        sha: 'feedbee',
+        author: { login: 'last-author', id: 101 },
+        commit: {
+          author: { name: 'Raw Last', email: 'raw-last@example.com' },
+          message: 'Commit 100',
+        },
+      },
+    ];
+    const request = async (args) => {
+      calls.push(args);
+      return calls.length === 1 ? pageOne : pageTwo;
+    };
+
+    const commits = await listPublicPrCommits({
+      token: 't',
+      repo: 'owner/repo',
+      prNumber: 123,
+      request,
+    });
+
+    expect(commits).toHaveLength(101);
+    expect(commits[0]).toEqual({
+      sha: '0000000abcdef',
+      author: { name: 'author-0', email: '1+author-0@users.noreply.github.com' },
+      message: 'Commit 0',
+    });
+    expect(commits.at(-1)).toEqual({
+      sha: 'feedbee',
+      author: { name: 'last-author', email: '101+last-author@users.noreply.github.com' },
+      message: 'Commit 100',
+    });
+    expect(calls.map((call) => call.path)).toEqual([
+      '/repos/owner/repo/pulls/123/commits?per_page=100&page=1',
+      '/repos/owner/repo/pulls/123/commits?per_page=100&page=2',
+    ]);
+  });
 });
 
 describe('normalizeGitHubUserAuthor', () => {
@@ -180,64 +216,12 @@ describe('normalizeGitHubUserAuthor', () => {
     });
   });
 
-  test('ignores unresolved and bot users so callers can fall back', () => {
+  test('ignores unresolved users but preserves bots as valid contributors', () => {
     expect(normalizeGitHubUserAuthor(null)).toBeNull();
-    expect(normalizeGitHubUserAuthor({ login: 'github-actions[bot]', id: 41898282 })).toBeNull();
-  });
-});
-
-describe('listPublicPrCommitAuthors', () => {
-  test('paginates through every public PR commit author', async () => {
-    const pageOne = Array.from({ length: 100 }, (_, index) => ({
-      author: { login: `author-${index}`, id: index + 1 },
-      commit: { author: { name: `Commit ${index}`, email: `commit-${index}@example.com` } },
-    }));
-    const pageTwo = [
-      {
-        author: { login: 'final-author', id: 101 },
-        commit: { author: { name: 'Final Commit', email: 'final@example.com' } },
-      },
-    ];
-    const calls = [];
-    const request = async (args) => {
-      calls.push(args);
-      return calls.length === 1 ? pageOne : pageTwo;
-    };
-
-    const authors = await listPublicPrCommitAuthors({
-      token: 't',
-      repo: 'owner/repo',
-      prNumber: 123,
-      request,
+    expect(normalizeGitHubUserAuthor({ login: 'github-actions[bot]', id: 41898282 })).toEqual({
+      name: 'github-actions[bot]',
+      email: '41898282+github-actions[bot]@users.noreply.github.com',
     });
-
-    expect(authors).toHaveLength(101);
-    expect(authors.at(-1)).toEqual({
-      name: 'final-author',
-      email: '101+final-author@users.noreply.github.com',
-    });
-    expect(calls.map((call) => call.path)).toEqual([
-      '/repos/owner/repo/pulls/123/commits?per_page=100&page=1',
-      '/repos/owner/repo/pulls/123/commits?per_page=100&page=2',
-    ]);
-  });
-
-  test('falls back to raw commit author when GitHub has no linked user', async () => {
-    const { request } = fakeRequest([
-      {
-        author: null,
-        commit: { author: { name: 'Patch Author', email: 'patch-author@example.com' } },
-      },
-    ]);
-
-    await expect(
-      listPublicPrCommitAuthors({
-        token: 't',
-        repo: 'owner/repo',
-        prNumber: 123,
-        request,
-      }),
-    ).resolves.toEqual([{ name: 'Patch Author', email: 'patch-author@example.com' }]);
   });
 });
 
