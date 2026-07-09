@@ -63,6 +63,7 @@ import { stopCommand } from './commands/stop.ts';
 import { syncCommand } from './commands/sync.ts';
 import { uiCommand } from './commands/ui.ts';
 import { uninstallCommand } from './commands/uninstall.ts';
+import { webCommand } from './commands/web.ts';
 import { PACKAGE_VERSION } from './constants.ts';
 import { loadConfig } from './index.ts';
 import { recordInvocationCwd, resolveProjectAnchor } from './project-anchor.ts';
@@ -225,6 +226,9 @@ program.addCommand(preview);
 // ui command — serves the React editor (sibling of `start`).
 const ui = uiCommand(() => resolvedConfig);
 program.addCommand(ui);
+
+// web command — public/intranet-facing gateway with Google Workspace sign-in.
+program.addCommand(webCommand(() => resolvedConfig));
 
 // open command — open a doc in the OK Desktop app (folders open in the
 // browser). The action for the no-preview-browser rung of the skill's
