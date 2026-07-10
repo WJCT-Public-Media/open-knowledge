@@ -415,6 +415,11 @@ function loginUrl(auth: WebAuthConfig, state: string): string {
   return url.toString();
 }
 
+function upstreamProxyHeaders(headers: IncomingMessage['headers'], upstreamPort: number): IncomingMessage['headers'] {
+  const { origin: _origin, referer: _referer, ...rest } = headers;
+  return { ...rest, host: `${LOOPBACK_HOST}:${upstreamPort}` };
+}
+
 function proxyHttp(req: IncomingMessage, res: ServerResponse, upstreamPort: number): void {
   const upstream = httpRequest(
     {
@@ -422,7 +427,7 @@ function proxyHttp(req: IncomingMessage, res: ServerResponse, upstreamPort: numb
       port: upstreamPort,
       method: req.method,
       path: req.url,
-      headers: { ...req.headers, host: `${LOOPBACK_HOST}:${upstreamPort}` },
+      headers: upstreamProxyHeaders(req.headers, upstreamPort),
     },
     (upstreamRes) => {
       res.writeHead(upstreamRes.statusCode ?? 502, upstreamRes.headers);
@@ -609,4 +614,5 @@ export const __webAuthForTests = {
   serializeWebSettings,
   defaultWorkspaceDomain,
   sameOriginCollabUrl,
+  upstreamProxyHeaders,
 };

@@ -16,6 +16,7 @@ const {
   parseCsvSet,
   serializeWebSettings,
   sameOriginCollabUrl,
+  upstreamProxyHeaders,
 } = __webAuthForTests;
 
 describe('web gateway auth helpers', () => {
@@ -86,6 +87,22 @@ describe('web gateway auth helpers', () => {
   test('publishes a same-origin collaboration URL for the gateway', () => {
     expect(sameOriginCollabUrl('http://wiki.example.org')).toBe('ws://wiki.example.org/collab');
     expect(sameOriginCollabUrl('https://wiki.example.org/base')).toBe('wss://wiki.example.org/collab');
+  });
+
+  test('scrubs browser origin before proxying authenticated gateway requests to loopback API', () => {
+    const headers = upstreamProxyHeaders(
+      {
+        host: 'wiki.example.org',
+        origin: 'http://wiki.example.org',
+        referer: 'http://wiki.example.org/file',
+        cookie: 'ok_web_session=test',
+      },
+      41234,
+    );
+    expect(headers.host).toBe('127.0.0.1:41234');
+    expect(headers.origin).toBeUndefined();
+    expect(headers.referer).toBeUndefined();
+    expect(headers.cookie).toBe('ok_web_session=test');
   });
 
   test('loads and serializes first-run web gateway settings', () => {
