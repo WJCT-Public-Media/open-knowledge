@@ -73,6 +73,11 @@ describe('web gateway auth helpers', () => {
     expect(help).toStartWith('Welcome to OpenKnowledge web setup.');
     expect(help).toContain('First-time Google Workspace setup');
     expect(help).toContain('\u001b]8;;https://console.cloud.google.com/apis/credentials\u001b\\Google Cloud Console\u001b]8;;\u001b\\');
+    expect(help).toContain('Name it "OpenKnowledge Web Server".');
+    expect(help).toContain('Authorized JavaScript origins: none required.');
+    expect(help.indexOf('Authorized JavaScript origins: none required.')).toBeLessThan(
+      help.indexOf('Add this authorized redirect URI:'),
+    );
     expect(help).toContain('http://localhost:39849/auth/callback');
     expect(help).not.toContain('[web]');
   });
