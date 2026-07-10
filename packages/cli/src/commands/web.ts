@@ -45,6 +45,7 @@ interface WebGatewayOptions {
   publicUrl: string;
   auth: WebAuthConfig;
   uiPort: number;
+  collabPort: number;
 }
 
 interface WebSettings {
@@ -341,6 +342,41 @@ function sendJson(res: ServerResponse, statusCode: number, body: unknown): void 
   res.end(JSON.stringify(body));
 }
 
+function sameOriginCollabUrl(publicUrl: string): string {
+  const url = new URL(publicUrl);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  url.pathname = '/collab';
+  url.search = '';
+  url.hash = '';
+  return url.toString();
+}
+
+function publicPort(publicUrl: string): number {
+  const url = new URL(publicUrl);
+  if (url.port) return Number(url.port);
+  return url.protocol === 'https:' ? 443 : 80;
+}
+
+function handleGatewayConfig(req: IncomingMessage, res: ServerResponse, publicUrl: string): boolean {
+  const method = (req.method ?? 'GET').toUpperCase();
+  if (method !== 'GET' && method !== 'HEAD') return false;
+  const url = new URL(req.url ?? '/', publicUrl);
+  if (url.pathname !== '/api/config') return false;
+  if (method === 'HEAD') {
+    res.statusCode = 204;
+    res.end();
+    return true;
+  }
+  sendJson(res, 200, {
+    collabUrl: sameOriginCollabUrl(publicUrl),
+    previewUrl: null,
+    port: publicPort(publicUrl),
+    paneTarget: null,
+    singleFile: null,
+  });
+  return true;
+}
+
 async function exchangeCodeForUser(code: string, auth: WebAuthConfig): Promise<GoogleUserInfo> {
   const body = new URLSearchParams({
     code,
@@ -482,13 +518,14 @@ async function startWebGateway(opts: WebGatewayOptions): Promise<{ close: () => 
     if (isMutatingRequest(req) && !canEdit(session, opts.auth)) {
       return sendJson(res, 403, { error: 'edit_access_required' });
     }
-    proxyHttp(req, res, opts.uiPort);
+    if (handleGatewayConfig(req, res, opts.publicUrl)) return;
+    proxyHttp(req, res, url.pathname.startsWith('/api/') ? opts.collabPort : opts.uiPort);
   });
 
   server.on('upgrade', (req, socket, head) => {
     const session = decodeSession(parseCookies(req.headers.cookie)[SESSION_COOKIE], opts.auth.sessionSecret);
     if (!session || !canEdit(session, opts.auth)) return socket.destroy();
-    proxyUpgrade(req, socket, head, opts.uiPort);
+    proxyUpgrade(req, socket, head, opts.collabPort);
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -538,7 +575,7 @@ export function webCommand(getConfig: () => Config): Command {
         port: 0,
         host: LOOPBACK_HOST,
       });
-      const gateway = await startWebGateway({ host, port, publicUrl, auth, uiPort: ui.port });
+      const gateway = await startWebGateway({ host, port, publicUrl, auth, uiPort: ui.port, collabPort: collab.port });
       console.log(`[web] OpenKnowledge gateway listening on ${publicUrl}`);
       console.log(`[web] Google Workspace domain: ${auth.workspaceDomain ?? '(not restricted by domain)'}`);
 
@@ -571,4 +608,5 @@ export const __webAuthForTests = {
   loadWebSettings,
   serializeWebSettings,
   defaultWorkspaceDomain,
+  sameOriginCollabUrl,
 };

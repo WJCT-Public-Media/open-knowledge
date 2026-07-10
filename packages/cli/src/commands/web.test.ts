@@ -15,6 +15,7 @@ const {
   loadEnvFile,
   parseCsvSet,
   serializeWebSettings,
+  sameOriginCollabUrl,
 } = __webAuthForTests;
 
 describe('web gateway auth helpers', () => {
@@ -80,6 +81,11 @@ describe('web gateway auth helpers', () => {
     );
     expect(help).toContain('http://localhost:39849/auth/callback');
     expect(help).not.toContain('[web]');
+  });
+
+  test('publishes a same-origin collaboration URL for the gateway', () => {
+    expect(sameOriginCollabUrl('http://wiki.example.org')).toBe('ws://wiki.example.org/collab');
+    expect(sameOriginCollabUrl('https://wiki.example.org/base')).toBe('wss://wiki.example.org/collab');
   });
 
   test('loads and serializes first-run web gateway settings', () => {
