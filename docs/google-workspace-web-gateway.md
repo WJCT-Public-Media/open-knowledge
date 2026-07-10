@@ -93,7 +93,25 @@ export GOOGLE_REDIRECT_URI="https://wiki.example.org/auth/callback"
 
 ## Running the gateway
 
-Example launch:
+For a first-time interactive setup, run:
+
+```bash
+ok web
+```
+
+If required Google Workspace settings are missing, `ok web` explains how to create the Google OAuth client, shows the exact redirect URI to register, prompts for the client ID and client secret, generates a session secret, and saves the settings to:
+
+```text
+.ok/web.env
+```
+
+After that first run, the same command is enough:
+
+```bash
+ok web
+```
+
+For scripted or production launches, environment variables and flags still work:
 
 ```bash
 cd /path/to/open-knowledge
@@ -107,7 +125,8 @@ export OK_WEB_PUBLIC_URL="https://wiki.example.org"
 ok web \
   --host 0.0.0.0 \
   --port 39849 \
-  --public-url "$OK_WEB_PUBLIC_URL"
+  --public-url "$OK_WEB_PUBLIC_URL" \
+  --no-interactive
 ```
 
 For production use, run the command under a process manager such as systemd, Docker, or the platform's service supervisor.

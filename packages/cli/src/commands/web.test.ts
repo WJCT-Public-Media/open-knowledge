@@ -1,8 +1,20 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, test } from 'bun:test';
 import { __webAuthForTests } from './web.ts';
 
-const { decodeSession, encodeSession, isMutatingRequest, isWorkspaceMember, canEdit, parseCsvSet } =
-  __webAuthForTests;
+const {
+  decodeSession,
+  defaultWorkspaceDomain,
+  encodeSession,
+  isMutatingRequest,
+  isWorkspaceMember,
+  canEdit,
+  loadEnvFile,
+  parseCsvSet,
+  serializeWebSettings,
+} = __webAuthForTests;
 
 describe('web gateway auth helpers', () => {
   test('round-trips signed sessions and rejects tampering', () => {
@@ -53,5 +65,28 @@ describe('web gateway auth helpers', () => {
     expect(isMutatingRequest({ method: 'GET', url: '/api/config' } as never)).toBe(false);
     expect(isMutatingRequest({ method: 'POST', url: '/api/document' } as never)).toBe(true);
     expect(isMutatingRequest({ method: 'GET', url: '/collab' } as never)).toBe(true);
+  });
+
+  test('loads and serializes first-run web gateway settings', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ok-web-'));
+    const path = join(dir, 'web.env');
+    try {
+      writeFileSync(
+        path,
+        'GOOGLE_CLIENT_ID=id\nGOOGLE_CLIENT_SECRET="secret"\nOK_WEB_SESSION_SECRET=session\nGOOGLE_WORKSPACE_DOMAIN=example.org\n',
+      );
+      expect(loadEnvFile(path)).toMatchObject({
+        GOOGLE_CLIENT_ID: 'id',
+        GOOGLE_CLIENT_SECRET: 'secret',
+        OK_WEB_SESSION_SECRET: 'session',
+        GOOGLE_WORKSPACE_DOMAIN: 'example.org',
+      });
+      expect(serializeWebSettings({ clientId: 'id', clientSecret: 'secret', sessionSecret: 'session' })).toContain(
+        'GOOGLE_CLIENT_ID=id',
+      );
+      expect(defaultWorkspaceDomain('https://wiki.example.org')).toBe('example.org');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

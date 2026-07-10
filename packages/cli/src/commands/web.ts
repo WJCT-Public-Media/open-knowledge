@@ -1,8 +1,12 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { request as httpRequest, createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { connect as netConnect } from 'node:net';
+import { dirname, join } from 'node:path';
+import { createInterface } from 'node:readline/promises';
 import type { Duplex } from 'node:stream';
 import { URL } from 'node:url';
+import passwordPrompt from '@inquirer/password';
 import type { Config } from '@inkeep/open-knowledge-server';
 import { Command, InvalidArgumentError } from 'commander';
 import { bootStartServer } from './start.ts';
@@ -14,6 +18,7 @@ const DEFAULT_HOST = '0.0.0.0';
 const DEFAULT_PORT = 39849;
 const LOOPBACK_HOST = '127.0.0.1';
 const SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
+const WEB_ENV_FILE = join('.ok', 'web.env');
 
 interface UserSession {
   email: string;
@@ -40,6 +45,24 @@ interface WebGatewayOptions {
   publicUrl: string;
   auth: WebAuthConfig;
   uiPort: number;
+}
+
+interface WebSettings {
+  clientId?: string;
+  clientSecret?: string;
+  sessionSecret?: string;
+  workspaceDomain?: string;
+  redirectUri?: string;
+  viewers?: string;
+  editors?: string;
+}
+
+interface WebCommandOptions {
+  port?: string;
+  host?: string;
+  publicUrl?: string;
+  configFile?: string;
+  interactive?: boolean;
 }
 
 interface TokenResponse {
@@ -77,23 +100,139 @@ function parseCsvSet(value: string | undefined): Set<string> {
   );
 }
 
-function requireEnv(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) throw new Error(`${name} is required for Google Workspace web credentialing.`);
+function requireSetting(settings: WebSettings, key: keyof WebSettings, envName: string): string {
+  const value = settings[key]?.trim();
+  if (!value) throw new Error(`${envName} is required for Google Workspace web credentialing.`);
   return value;
 }
 
-function loadAuthConfig(publicUrl: string): WebAuthConfig {
+function loadAuthConfig(publicUrl: string, settings: WebSettings = loadWebSettings()): WebAuthConfig {
   const normalizedPublicUrl = publicUrl.replace(/\/$/, '');
   return {
-    clientId: requireEnv('GOOGLE_CLIENT_ID'),
-    clientSecret: requireEnv('GOOGLE_CLIENT_SECRET'),
-    redirectUri: process.env.GOOGLE_REDIRECT_URI?.trim() || `${normalizedPublicUrl}/auth/callback`,
-    sessionSecret: requireEnv('OK_WEB_SESSION_SECRET'),
-    workspaceDomain: process.env.GOOGLE_WORKSPACE_DOMAIN?.trim().toLowerCase(),
-    viewers: parseCsvSet(process.env.OK_WEB_VIEWERS),
-    editors: parseCsvSet(process.env.OK_WEB_EDITORS),
+    clientId: requireSetting(settings, 'clientId', 'GOOGLE_CLIENT_ID'),
+    clientSecret: requireSetting(settings, 'clientSecret', 'GOOGLE_CLIENT_SECRET'),
+    redirectUri: settings.redirectUri?.trim() || `${normalizedPublicUrl}/auth/callback`,
+    sessionSecret: requireSetting(settings, 'sessionSecret', 'OK_WEB_SESSION_SECRET'),
+    workspaceDomain: settings.workspaceDomain?.trim().toLowerCase(),
+    viewers: parseCsvSet(settings.viewers),
+    editors: parseCsvSet(settings.editors),
   };
+}
+
+function loadEnvFile(path = WEB_ENV_FILE): Record<string, string> {
+  if (!existsSync(path)) return {};
+  const values: Record<string, string> = {};
+  for (const rawLine of readFileSync(path, 'utf8').split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+    const equals = line.indexOf('=');
+    if (equals === -1) continue;
+    const key = line.slice(0, equals).trim();
+    let value = line.slice(equals + 1).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    values[key] = value;
+  }
+  return values;
+}
+
+function loadWebSettings(path = WEB_ENV_FILE): WebSettings {
+  const file = loadEnvFile(path);
+  return {
+    clientId: process.env.GOOGLE_CLIENT_ID?.trim() || file.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET?.trim() || file.GOOGLE_CLIENT_SECRET,
+    sessionSecret: process.env.OK_WEB_SESSION_SECRET?.trim() || file.OK_WEB_SESSION_SECRET,
+    workspaceDomain: process.env.GOOGLE_WORKSPACE_DOMAIN?.trim() || file.GOOGLE_WORKSPACE_DOMAIN,
+    redirectUri: process.env.GOOGLE_REDIRECT_URI?.trim() || file.GOOGLE_REDIRECT_URI,
+    viewers: process.env.OK_WEB_VIEWERS?.trim() || file.OK_WEB_VIEWERS,
+    editors: process.env.OK_WEB_EDITORS?.trim() || file.OK_WEB_EDITORS,
+  };
+}
+
+function serializeWebSettings(settings: WebSettings): string {
+  const entries = [
+    ['GOOGLE_CLIENT_ID', settings.clientId],
+    ['GOOGLE_CLIENT_SECRET', settings.clientSecret],
+    ['OK_WEB_SESSION_SECRET', settings.sessionSecret],
+    ['GOOGLE_WORKSPACE_DOMAIN', settings.workspaceDomain],
+    ['GOOGLE_REDIRECT_URI', settings.redirectUri],
+    ['OK_WEB_VIEWERS', settings.viewers],
+    ['OK_WEB_EDITORS', settings.editors],
+  ] as const;
+  return `${[
+    '# OpenKnowledge web gateway settings.',
+    '# Created by `ok web`. Keep this file private; it contains OAuth secrets.',
+    ...entries.map(([key, value]) => `${key}=${value ?? ''}`),
+  ].join('\n')}\n`;
+}
+function saveWebSettings(settings: WebSettings, path = WEB_ENV_FILE): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, serializeWebSettings(settings), { mode: 0o600 });
+  chmodSync(path, 0o600);
+}
+
+function defaultWorkspaceDomain(publicUrl: string): string | undefined {
+  try {
+    const parts = new URL(publicUrl).hostname.split('.').filter(Boolean);
+    if (parts.length >= 2) return parts.slice(-2).join('.');
+  } catch {
+    return undefined;
+  }
+}
+
+function printFirstRunHelp(publicUrl: string): void {
+  const callback = `${publicUrl.replace(/\/$/, '')}/auth/callback`;
+  console.log(`
+[web] First-time Google Workspace setup
+[web] 1. Open Google Cloud Console: https://console.cloud.google.com/apis/credentials
+[web] 2. Create or select a project, then configure the OAuth consent screen.
+[web] 3. Create an OAuth Client ID with application type "Web application".
+[web] 4. Add this authorized redirect URI:
+[web]    ${callback}
+[web] 5. Copy the Client ID and Client Secret here when prompted.
+[web]
+[web] Tip: set GOOGLE_WORKSPACE_DOMAIN to your Workspace domain, such as example.org,
+[web] so only users from that domain can sign in.
+`);
+}
+
+async function askLine(message: string, defaultValue?: string): Promise<string> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const suffix = defaultValue ? ` (${defaultValue})` : '';
+    const answer = (await rl.question(`${message}${suffix}: `)).trim();
+    return answer || defaultValue || '';
+  } finally {
+    rl.close();
+  }
+}
+
+async function ensureWebSettings(publicUrl: string, opts: WebCommandOptions): Promise<WebSettings> {
+  const configFile = opts.configFile ?? WEB_ENV_FILE;
+  const settings = loadWebSettings(configFile);
+  if (!settings.sessionSecret) settings.sessionSecret = randomBytes(48).toString('base64url');
+
+  const missingRequired = !settings.clientId || !settings.clientSecret;
+  if (!missingRequired) return settings;
+
+  if (opts.interactive === false || !process.stdin.isTTY || !process.stdout.isTTY) {
+    throw new Error(
+      `Google Workspace web credentialing is not configured. Run \`ok web\` interactively once, ` +
+        `or set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and OK_WEB_SESSION_SECRET in the environment ` +
+        `or in ${configFile}.`,
+    );
+  }
+
+  printFirstRunHelp(publicUrl);
+  settings.clientId ||= await askLine('Google OAuth Client ID');
+  settings.clientSecret ||= await passwordPrompt({ message: 'Google OAuth Client Secret' });
+  settings.workspaceDomain ||= await askLine('Google Workspace domain', defaultWorkspaceDomain(publicUrl));
+  settings.viewers ||= await askLine('Viewer allowlist emails, comma-separated (blank allows all domain users)');
+  settings.editors ||= await askLine('Editor allowlist emails, comma-separated (blank lets all viewers edit)');
+  saveWebSettings(settings, configFile);
+  console.log(`[web] Saved web gateway settings to ${configFile}`);
+  return settings;
 }
 
 function base64url(input: Buffer | string): string {
@@ -353,12 +492,15 @@ export function webCommand(getConfig: () => Config): Command {
     .option('-p, --port <port>', `Public web gateway port (default: ${DEFAULT_PORT})`)
     .option('-H, --host <host>', `Public web gateway host (default: ${DEFAULT_HOST})`)
     .option('--public-url <url>', 'Externally reachable base URL used for Google OAuth redirects')
-    .action(async (opts: { port?: string; host?: string; publicUrl?: string }) => {
+    .option('--config-file <path>', `Web gateway env file (default: ${WEB_ENV_FILE})`)
+    .option('--no-interactive', 'Do not prompt for missing Google Workspace settings')
+    .action(async (opts: WebCommandOptions) => {
       const config = getConfig();
       const host = opts.host ?? process.env.HOST ?? DEFAULT_HOST;
       const port = parsePort(opts.port ?? process.env.PORT, DEFAULT_PORT);
       const publicUrl = opts.publicUrl ?? process.env.OK_WEB_PUBLIC_URL ?? `http://localhost:${port}`;
-      const auth = loadAuthConfig(publicUrl);
+      const settings = await ensureWebSettings(publicUrl, opts);
+      const auth = loadAuthConfig(publicUrl, settings);
 
       const collab = await bootStartServer({
         config,
@@ -402,4 +544,8 @@ export const __webAuthForTests = {
   isWorkspaceMember,
   canEdit,
   isMutatingRequest,
+  loadEnvFile,
+  loadWebSettings,
+  serializeWebSettings,
+  defaultWorkspaceDomain,
 };
