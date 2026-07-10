@@ -17,6 +17,8 @@ const {
   serializeWebSettings,
   sameOriginCollabUrl,
   upstreamProxyHeaders,
+  toEditableWebSettings,
+  mergeEditableWebSettings,
 } = __webAuthForTests;
 
 describe('web gateway auth helpers', () => {
@@ -103,6 +105,55 @@ describe('web gateway auth helpers', () => {
     expect(headers.origin).toBeUndefined();
     expect(headers.referer).toBeUndefined();
     expect(headers.cookie).toBe('ok_web_session=test');
+  });
+
+  test('serializes editable web environment settings without exposing secrets', () => {
+    const editable = toEditableWebSettings({
+      clientId: 'client-id',
+      clientSecret: 'client-secret',
+      sessionSecret: 'session-secret',
+      workspaceDomain: 'wjct.org',
+      publicUrl: 'http://wiki.wjct.org',
+      redirectUri: 'http://wiki.wjct.org/auth/callback',
+      viewers: 'viewer@wjct.org',
+      editors: 'editor@wjct.org',
+    });
+    expect(editable).toEqual({
+      clientId: 'client-id',
+      workspaceDomain: 'wjct.org',
+      publicUrl: 'http://wiki.wjct.org',
+      redirectUri: 'http://wiki.wjct.org/auth/callback',
+      viewers: 'viewer@wjct.org',
+      editors: 'editor@wjct.org',
+      hasClientSecret: true,
+      hasSessionSecret: true,
+    });
+    expect('clientSecret' in editable).toBe(false);
+    expect('sessionSecret' in editable).toBe(false);
+  });
+
+  test('merges editable web environment updates while preserving omitted secrets', () => {
+    expect(
+      mergeEditableWebSettings(
+        {
+          clientId: 'old-id',
+          clientSecret: 'old-secret',
+          sessionSecret: 'old-session',
+          publicUrl: 'http://wiki.wjct.org',
+        },
+        {
+          clientId: 'new-id',
+          clientSecret: '',
+          sessionSecret: undefined,
+          publicUrl: 'http://wiki-new.wjct.org',
+        },
+      ),
+    ).toMatchObject({
+      clientId: 'new-id',
+      clientSecret: 'old-secret',
+      sessionSecret: 'old-session',
+      publicUrl: 'http://wiki-new.wjct.org',
+    });
   });
 
   test('loads and serializes first-run web gateway settings', () => {

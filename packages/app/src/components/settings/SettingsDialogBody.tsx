@@ -220,6 +220,9 @@ export function SettingsDialogBody({
     // more general.)
     return <SyncSection />;
   }
+  if (activeId === 'web-environment') {
+    return <WebEnvironmentSection />;
+  }
   if (activeId === 'search') {
     // Project-local semantic-search opt-in. Reads its own project-local
     // binding from ConfigContext (like SyncSection) — no prop threading.
@@ -300,6 +303,145 @@ function ShortcutBindingChips({ binding }: { binding: ShortcutBinding }) {
         </span>
       ),
     );
+}
+
+interface WebEnvironmentSettings {
+  clientId?: string;
+  clientSecret?: string;
+  sessionSecret?: string;
+  workspaceDomain?: string;
+  publicUrl?: string;
+  redirectUri?: string;
+  viewers?: string;
+  editors?: string;
+  hasClientSecret?: boolean;
+  hasSessionSecret?: boolean;
+}
+
+const WEB_ENV_FIELDS = [
+  ['clientId', 'GOOGLE_CLIENT_ID', 'OAuth client ID.'] as const,
+  ['clientSecret', 'GOOGLE_CLIENT_SECRET', 'Leave blank to keep the current secret.'] as const,
+  ['sessionSecret', 'OK_WEB_SESSION_SECRET', 'Leave blank to keep the current session secret.'] as const,
+  ['workspaceDomain', 'GOOGLE_WORKSPACE_DOMAIN', 'Restrict sign-in to this Google Workspace domain.'] as const,
+  ['publicUrl', 'OK_WEB_PUBLIC_URL', 'Externally reachable base URL for this gateway.'] as const,
+  ['redirectUri', 'GOOGLE_REDIRECT_URI', 'Optional explicit OAuth callback URL.'] as const,
+  ['viewers', 'OK_WEB_VIEWERS', 'Comma-separated viewer email allowlist.'] as const,
+  ['editors', 'OK_WEB_EDITORS', 'Comma-separated editor email allowlist.'] as const,
+];
+
+function WebEnvironmentSection() {
+  const [settings, setSettings] = useState<WebEnvironmentSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetch('/api/web-settings')
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return (await res.json()) as { settings: WebEnvironmentSettings };
+      })
+      .then((body) => {
+        if (cancelled) return;
+        setSettings({ ...body.settings, clientSecret: '', sessionSecret: '' });
+        setError(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const updateField = (key: keyof WebEnvironmentSettings, value: string) => {
+    setSettings((current) => ({ ...(current ?? {}), [key]: value }));
+    setMessage(null);
+    setError(null);
+  };
+
+  const save = () => {
+    if (!settings) return;
+    setSaving(true);
+    setMessage(null);
+    setError(null);
+    void fetch('/api/web-settings', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(settings),
+    })
+      .then(async (res) => {
+        const body = (await res.json().catch(() => ({}))) as {
+          settings?: WebEnvironmentSettings;
+          error?: string;
+        };
+        if (!res.ok) {
+          setError(body.error ?? `HTTP ${res.status}`);
+          return;
+        }
+        setSettings({ ...(body.settings ?? settings), clientSecret: '', sessionSecret: '' });
+        setMessage('Saved. Restart the web gateway for runtime changes to take effect.');
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : String(err));
+      })
+      .then(() => {
+        setSaving(false);
+      });
+  };
+
+  if (loading) return <SectionSkeleton />;
+
+  const titleId = 'settings-web-environment-title';
+  return (
+    <section aria-labelledby={titleId} className="space-y-5" data-testid="settings-web-environment">
+      <div className="space-y-1">
+        <h3 id={titleId} className="text-base font-semibold">
+          Web environment
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Edit the environment variables used by the OpenKnowledge web gateway. Secret values are never shown; leave secret fields blank to keep the current value.
+        </p>
+      </div>
+      {error ? <p className="text-destructive text-sm">{error}</p> : null}
+      {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+      <div className="space-y-4">
+        {WEB_ENV_FIELDS.map(([key, label, help]) => (
+          <div key={key} className="space-y-1.5">
+            <label className="font-medium text-sm" htmlFor={`web-env-${key}`}>
+              {label}
+            </label>
+            <Input
+              id={`web-env-${key}`}
+              aria-label={label}
+              data-testid={`settings-web-env-${key}`}
+              type={key.toLowerCase().includes('secret') ? 'password' : 'text'}
+              value={String(settings?.[key] ?? '')}
+              placeholder={
+                key === 'clientSecret' && settings?.hasClientSecret
+                  ? 'Current secret is set; leave blank to keep it'
+                  : key === 'sessionSecret' && settings?.hasSessionSecret
+                    ? 'Current secret is set; leave blank to keep it'
+                    : undefined
+              }
+              onChange={(event) => updateField(key, event.currentTarget.value)}
+            />
+            <p className="text-muted-foreground text-xs">{help}</p>
+          </div>
+        ))}
+      </div>
+      <Button type="button" onClick={save} disabled={saving || !settings}>
+        {saving ? 'Saving…' : 'Save environment variables'}
+      </Button>
+    </section>
+  );
 }
 
 function HotkeysSection() {

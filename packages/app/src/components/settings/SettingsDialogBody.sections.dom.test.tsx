@@ -699,4 +699,49 @@ describe('SettingsDialogBody section runtime dispatch', () => {
     expect(screen.getByTestId('settings-install-claude-desktop').textContent).toBe('Reinstall');
     expect(screen.getByTestId('install-claude-dialog').getAttribute('data-reinstall')).toBe('true');
   });
+
+  test('web environment section loads and saves gateway environment variables', async () => {
+    const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      fetchCalls.push({ url, init });
+      if (url === '/api/web-settings' && (init?.method ?? 'GET') === 'GET') {
+        return Response.json({
+          settings: {
+            publicUrl: 'http://wiki.wjct.org',
+            workspaceDomain: 'wjct.org',
+            redirectUri: 'http://wiki.wjct.org/auth/callback',
+            viewers: 'viewer@wjct.org',
+            editors: 'editor@wjct.org',
+          },
+        });
+      }
+      if (url === '/api/web-settings' && init?.method === 'PUT') {
+        return Response.json({ ok: true });
+      }
+      return Response.json({ error: 'unexpected' }, { status: 500 });
+    }) as typeof fetch;
+    try {
+      await renderBody({ activeId: 'web-environment' });
+
+      expect(await screen.findByText('Web environment')).toBeTruthy();
+      const publicUrl = (await screen.findByLabelText('OK_WEB_PUBLIC_URL')) as HTMLInputElement;
+      expect(publicUrl.value).toBe('http://wiki.wjct.org');
+
+      fireEvent.change(publicUrl, { target: { value: 'http://wiki-new.wjct.org' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save environment variables' }));
+
+      await waitFor(() => {
+        expect(fetchCalls.some((call) => call.url === '/api/web-settings' && call.init?.method === 'PUT')).toBe(true);
+      });
+      const saveCall = fetchCalls.find((call) => call.url === '/api/web-settings' && call.init?.method === 'PUT');
+      expect(JSON.parse(String(saveCall?.init?.body))).toMatchObject({
+        publicUrl: 'http://wiki-new.wjct.org',
+        workspaceDomain: 'wjct.org',
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

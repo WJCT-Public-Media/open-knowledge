@@ -118,6 +118,7 @@ export function SettingsDialogShell({ open, onOpenChange }: SettingsDialogShellP
       enabled: hasProject,
       items: [
         { id: 'sync', label: t`Sync` },
+        { id: 'web-environment', label: 'Web environment' },
         { id: 'search', label: t`Search` },
         ...(isOkDesktopHost ? [{ id: 'terminal', label: t`Terminal` }] : []),
         // Per-project MCP wiring + runtime skill — desktop-only because the

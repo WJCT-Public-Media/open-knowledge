@@ -46,6 +46,7 @@ interface WebGatewayOptions {
   auth: WebAuthConfig;
   uiPort: number;
   collabPort: number;
+  configFile: string;
 }
 
 interface WebSettings {
@@ -57,6 +58,28 @@ interface WebSettings {
   redirectUri?: string;
   viewers?: string;
   editors?: string;
+}
+
+interface EditableWebSettings {
+  clientId?: string;
+  clientSecret?: string;
+  sessionSecret?: string;
+  workspaceDomain?: string;
+  publicUrl?: string;
+  redirectUri?: string;
+  viewers?: string;
+  editors?: string;
+}
+
+interface PublicEditableWebSettings {
+  clientId?: string;
+  workspaceDomain?: string;
+  publicUrl?: string;
+  redirectUri?: string;
+  viewers?: string;
+  editors?: string;
+  hasClientSecret: boolean;
+  hasSessionSecret: boolean;
 }
 
 interface WebCommandOptions {
@@ -174,6 +197,38 @@ function saveWebSettings(settings: WebSettings, path = WEB_ENV_FILE): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, serializeWebSettings(settings), { mode: 0o600 });
   chmodSync(path, 0o600);
+}
+
+function toEditableWebSettings(settings: WebSettings): PublicEditableWebSettings {
+  return {
+    clientId: settings.clientId,
+    workspaceDomain: settings.workspaceDomain,
+    publicUrl: settings.publicUrl,
+    redirectUri: settings.redirectUri,
+    viewers: settings.viewers,
+    editors: settings.editors,
+    hasClientSecret: Boolean(settings.clientSecret?.trim()),
+    hasSessionSecret: Boolean(settings.sessionSecret?.trim()),
+  };
+}
+
+function stringOrUndefined(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed === '' ? undefined : trimmed;
+}
+
+function mergeEditableWebSettings(current: WebSettings, updates: EditableWebSettings): WebSettings {
+  const next: WebSettings = { ...current };
+  for (const key of ['clientId', 'workspaceDomain', 'publicUrl', 'redirectUri', 'viewers', 'editors'] as const) {
+    const value = stringOrUndefined(updates[key]);
+    next[key] = value;
+  }
+  const clientSecret = stringOrUndefined(updates.clientSecret);
+  if (clientSecret !== undefined) next.clientSecret = clientSecret;
+  const sessionSecret = stringOrUndefined(updates.sessionSecret);
+  if (sessionSecret !== undefined) next.sessionSecret = sessionSecret;
+  return next;
 }
 
 function defaultWorkspaceDomain(publicUrl: string): string | undefined {
@@ -377,6 +432,60 @@ function handleGatewayConfig(req: IncomingMessage, res: ServerResponse, publicUr
   return true;
 }
 
+function readJsonBody(req: IncomingMessage, limitBytes = 64 * 1024): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.setEncoding('utf8');
+    req.on('data', (chunk: string) => {
+      body += chunk;
+      if (body.length > limitBytes) reject(new Error('request_body_too_large'));
+    });
+    req.on('end', () => {
+      if (!body.trim()) return resolve({});
+      try {
+        resolve(JSON.parse(body));
+      } catch {
+        reject(new Error('invalid_json'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+async function handleWebSettingsRoute(
+  req: IncomingMessage,
+  res: ServerResponse,
+  publicUrl: string,
+  configFile: string,
+): Promise<boolean> {
+  const url = new URL(req.url ?? '/', publicUrl);
+  if (url.pathname !== '/api/web-settings') return false;
+  const method = (req.method ?? 'GET').toUpperCase();
+  if (method === 'GET' || method === 'HEAD') {
+    if (method === 'HEAD') {
+      res.statusCode = 204;
+      res.end();
+      return true;
+    }
+    sendJson(res, 200, { settings: toEditableWebSettings(loadWebSettings(configFile)) });
+    return true;
+  }
+  if (method !== 'PUT') {
+    res.setHeader('allow', 'GET, HEAD, PUT');
+    sendJson(res, 405, { error: 'method_not_allowed' });
+    return true;
+  }
+  try {
+    const updates = (await readJsonBody(req)) as EditableWebSettings;
+    const merged = mergeEditableWebSettings(loadWebSettings(configFile), updates);
+    saveWebSettings(merged, configFile);
+    sendJson(res, 200, { ok: true, settings: toEditableWebSettings(merged), restartRequired: true });
+  } catch (err) {
+    sendJson(res, 400, { error: err instanceof Error ? err.message : 'invalid_web_settings' });
+  }
+  return true;
+}
+
 async function exchangeCodeForUser(code: string, auth: WebAuthConfig): Promise<GoogleUserInfo> {
   const body = new URLSearchParams({
     code,
@@ -523,6 +632,7 @@ async function startWebGateway(opts: WebGatewayOptions): Promise<{ close: () => 
     if (isMutatingRequest(req) && !canEdit(session, opts.auth)) {
       return sendJson(res, 403, { error: 'edit_access_required' });
     }
+    if (await handleWebSettingsRoute(req, res, opts.publicUrl, opts.configFile)) return;
     if (handleGatewayConfig(req, res, opts.publicUrl)) return;
     proxyHttp(req, res, url.pathname.startsWith('/api/') ? opts.collabPort : opts.uiPort);
   });
@@ -580,7 +690,15 @@ export function webCommand(getConfig: () => Config): Command {
         port: 0,
         host: LOOPBACK_HOST,
       });
-      const gateway = await startWebGateway({ host, port, publicUrl, auth, uiPort: ui.port, collabPort: collab.port });
+      const gateway = await startWebGateway({
+        host,
+        port,
+        publicUrl,
+        auth,
+        uiPort: ui.port,
+        collabPort: collab.port,
+        configFile: opts.configFile ?? WEB_ENV_FILE,
+      });
       console.log(`[web] OpenKnowledge gateway listening on ${publicUrl}`);
       console.log(`[web] Google Workspace domain: ${auth.workspaceDomain ?? '(not restricted by domain)'}`);
 
@@ -615,4 +733,6 @@ export const __webAuthForTests = {
   defaultWorkspaceDomain,
   sameOriginCollabUrl,
   upstreamProxyHeaders,
+  toEditableWebSettings,
+  mergeEditableWebSettings,
 };
