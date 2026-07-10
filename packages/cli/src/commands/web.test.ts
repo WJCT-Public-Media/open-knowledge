@@ -88,17 +88,23 @@ describe('web gateway auth helpers', () => {
     try {
       writeFileSync(
         path,
-        'GOOGLE_CLIENT_ID=id\nGOOGLE_CLIENT_SECRET="secret"\nOK_WEB_SESSION_SECRET=session\nGOOGLE_WORKSPACE_DOMAIN=example.org\n',
+        'GOOGLE_CLIENT_ID=id\nGOOGLE_CLIENT_SECRET="secret"\nOK_WEB_SESSION_SECRET=session\nGOOGLE_WORKSPACE_DOMAIN=example.org\nOK_WEB_PUBLIC_URL=https://wiki.example.org\n',
       );
       expect(loadEnvFile(path)).toMatchObject({
         GOOGLE_CLIENT_ID: 'id',
         GOOGLE_CLIENT_SECRET: 'secret',
         OK_WEB_SESSION_SECRET: 'session',
         GOOGLE_WORKSPACE_DOMAIN: 'example.org',
+        OK_WEB_PUBLIC_URL: 'https://wiki.example.org',
       });
-      expect(serializeWebSettings({ clientId: 'id', clientSecret: 'secret', sessionSecret: 'session' })).toContain(
-        'GOOGLE_CLIENT_ID=id',
-      );
+      const serialized = serializeWebSettings({
+        clientId: 'id',
+        clientSecret: 'secret',
+        sessionSecret: 'session',
+        publicUrl: 'https://wiki.example.org',
+      });
+      expect(serialized).toContain('GOOGLE_CLIENT_ID=id');
+      expect(serialized).toContain('OK_WEB_PUBLIC_URL=https://wiki.example.org');
       expect(defaultWorkspaceDomain('https://wiki.example.org')).toBe('example.org');
     } finally {
       rmSync(dir, { recursive: true, force: true });

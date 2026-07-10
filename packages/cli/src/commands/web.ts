@@ -52,6 +52,7 @@ interface WebSettings {
   clientSecret?: string;
   sessionSecret?: string;
   workspaceDomain?: string;
+  publicUrl?: string;
   redirectUri?: string;
   viewers?: string;
   editors?: string;
@@ -144,6 +145,7 @@ function loadWebSettings(path = WEB_ENV_FILE): WebSettings {
     clientSecret: process.env.GOOGLE_CLIENT_SECRET?.trim() || file.GOOGLE_CLIENT_SECRET,
     sessionSecret: process.env.OK_WEB_SESSION_SECRET?.trim() || file.OK_WEB_SESSION_SECRET,
     workspaceDomain: process.env.GOOGLE_WORKSPACE_DOMAIN?.trim() || file.GOOGLE_WORKSPACE_DOMAIN,
+    publicUrl: process.env.OK_WEB_PUBLIC_URL?.trim() || file.OK_WEB_PUBLIC_URL,
     redirectUri: process.env.GOOGLE_REDIRECT_URI?.trim() || file.GOOGLE_REDIRECT_URI,
     viewers: process.env.OK_WEB_VIEWERS?.trim() || file.OK_WEB_VIEWERS,
     editors: process.env.OK_WEB_EDITORS?.trim() || file.OK_WEB_EDITORS,
@@ -156,6 +158,7 @@ function serializeWebSettings(settings: WebSettings): string {
     ['GOOGLE_CLIENT_SECRET', settings.clientSecret],
     ['OK_WEB_SESSION_SECRET', settings.sessionSecret],
     ['GOOGLE_WORKSPACE_DOMAIN', settings.workspaceDomain],
+    ['OK_WEB_PUBLIC_URL', settings.publicUrl],
     ['GOOGLE_REDIRECT_URI', settings.redirectUri],
     ['OK_WEB_VIEWERS', settings.viewers],
     ['OK_WEB_EDITORS', settings.editors],
@@ -512,8 +515,13 @@ export function webCommand(getConfig: () => Config): Command {
       const config = getConfig();
       const host = opts.host ?? process.env.HOST ?? DEFAULT_HOST;
       const port = parsePort(opts.port ?? process.env.PORT, DEFAULT_PORT);
-      const publicUrl = opts.publicUrl ?? process.env.OK_WEB_PUBLIC_URL ?? `http://localhost:${port}`;
+      const configuredSettings = loadWebSettings(opts.configFile ?? WEB_ENV_FILE);
+      const publicUrl = opts.publicUrl ?? configuredSettings.publicUrl ?? `http://localhost:${port}`;
       const settings = await ensureWebSettings(publicUrl, opts);
+      if (!settings.publicUrl) {
+        settings.publicUrl = publicUrl;
+        saveWebSettings(settings, opts.configFile ?? WEB_ENV_FILE);
+      }
       const auth = loadAuthConfig(publicUrl, settings);
 
       const collab = await bootStartServer({
