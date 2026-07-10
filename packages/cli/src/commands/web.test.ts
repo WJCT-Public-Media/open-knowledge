@@ -6,6 +6,7 @@ import { __webAuthForTests } from './web.ts';
 
 const {
   decodeSession,
+  buildFirstRunHelp,
   defaultWorkspaceDomain,
   encodeSession,
   isMutatingRequest,
@@ -65,6 +66,15 @@ describe('web gateway auth helpers', () => {
     expect(isMutatingRequest({ method: 'GET', url: '/api/config' } as never)).toBe(false);
     expect(isMutatingRequest({ method: 'POST', url: '/api/document' } as never)).toBe(true);
     expect(isMutatingRequest({ method: 'GET', url: '/collab' } as never)).toBe(true);
+  });
+
+  test('formats first-run setup help as a welcoming clickable guide', () => {
+    const help = buildFirstRunHelp('http://localhost:39849');
+    expect(help).toStartWith('Welcome to OpenKnowledge web setup.');
+    expect(help).toContain('First-time Google Workspace setup');
+    expect(help).toContain('\u001b]8;;https://console.cloud.google.com/apis/credentials\u001b\\Google Cloud Console\u001b]8;;\u001b\\');
+    expect(help).toContain('http://localhost:39849/auth/callback');
+    expect(help).not.toContain('[web]');
   });
 
   test('loads and serializes first-run web gateway settings', () => {

@@ -181,20 +181,32 @@ function defaultWorkspaceDomain(publicUrl: string): string | undefined {
   }
 }
 
-function printFirstRunHelp(publicUrl: string): void {
+function terminalLink(text: string, href: string): string {
+  return `\u001b]8;;${href}\u001b\\${text}\u001b]8;;\u001b\\`;
+}
+
+function buildFirstRunHelp(publicUrl: string): string {
   const callback = `${publicUrl.replace(/\/$/, '')}/auth/callback`;
-  console.log(`
-[web] First-time Google Workspace setup
-[web] 1. Open Google Cloud Console: https://console.cloud.google.com/apis/credentials
-[web] 2. Create or select a project, then configure the OAuth consent screen.
-[web] 3. Create an OAuth Client ID with application type "Web application".
-[web] 4. Add this authorized redirect URI:
-[web]    ${callback}
-[web] 5. Copy the Client ID and Client Secret here when prompted.
-[web]
-[web] Tip: set GOOGLE_WORKSPACE_DOMAIN to your Workspace domain, such as example.org,
-[web] so only users from that domain can sign in.
-`);
+  const credentialsUrl = 'https://console.cloud.google.com/apis/credentials';
+  return [
+    'Welcome to OpenKnowledge web setup.',
+    '',
+    'First-time Google Workspace setup',
+    `1. Open ${terminalLink('Google Cloud Console', credentialsUrl)}: ${credentialsUrl}`,
+    '2. Create or select a project, then configure the OAuth consent screen.',
+    '3. Create an OAuth Client ID with application type "Web application".',
+    '4. Add this authorized redirect URI:',
+    `   ${callback}`,
+    '5. Copy the Client ID and Client Secret here when prompted.',
+    '',
+    'Tip: set GOOGLE_WORKSPACE_DOMAIN to your Workspace domain, such as example.org,',
+    'so only users from that domain can sign in.',
+    '',
+  ].join('\n');
+}
+
+function printFirstRunHelp(publicUrl: string): void {
+  console.log(buildFirstRunHelp(publicUrl));
 }
 
 async function askLine(message: string, defaultValue?: string): Promise<string> {
@@ -539,6 +551,7 @@ export function webCommand(getConfig: () => Config): Command {
 
 export const __webAuthForTests = {
   parseCsvSet,
+  buildFirstRunHelp,
   encodeSession,
   decodeSession,
   isWorkspaceMember,
