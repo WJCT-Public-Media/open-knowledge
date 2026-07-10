@@ -8,10 +8,10 @@ describe('web gateway auth helpers', () => {
   test('round-trips signed sessions and rejects tampering', () => {
     const secret = 'test-secret-that-is-long-enough';
     const cookie = encodeSession(
-      { email: 'editor@wjct.org', iat: 100, exp: Math.floor(Date.now() / 1000) + 60 },
+      { email: 'editor@example.org', iat: 100, exp: Math.floor(Date.now() / 1000) + 60 },
       secret,
     );
-    expect(decodeSession(cookie, secret)?.email).toBe('editor@wjct.org');
+    expect(decodeSession(cookie, secret)?.email).toBe('editor@example.org');
     const [payload, signature] = cookie.split('.');
     expect(decodeSession(`${payload}.${signature?.replace(/.$/, 'x')}`, secret)).toBeNull();
     expect(decodeSession(cookie, 'wrong-secret')).toBeNull();
@@ -23,15 +23,15 @@ describe('web gateway auth helpers', () => {
       clientSecret: 'secret',
       redirectUri: 'http://localhost/auth/callback',
       sessionSecret: 'session',
-      workspaceDomain: 'wjct.org',
-      viewers: parseCsvSet('viewer@wjct.org'),
-      editors: parseCsvSet('editor@wjct.org'),
+      workspaceDomain: 'example.org',
+      viewers: parseCsvSet('viewer@example.org'),
+      editors: parseCsvSet('editor@example.org'),
     };
-    expect(isWorkspaceMember({ email: 'viewer@wjct.org', email_verified: true, hd: 'wjct.org' }, auth)).toBe(
+    expect(isWorkspaceMember({ email: 'viewer@example.org', email_verified: true, hd: 'example.org' }, auth)).toBe(
       true,
     );
     expect(isWorkspaceMember({ email: 'other@example.org', email_verified: true }, auth)).toBe(false);
-    expect(isWorkspaceMember({ email: 'viewer@wjct.org', email_verified: false, hd: 'wjct.org' }, auth)).toBe(
+    expect(isWorkspaceMember({ email: 'viewer@example.org', email_verified: false, hd: 'example.org' }, auth)).toBe(
       false,
     );
   });
@@ -42,11 +42,11 @@ describe('web gateway auth helpers', () => {
       clientSecret: 'secret',
       redirectUri: 'http://localhost/auth/callback',
       sessionSecret: 'session',
-      viewers: parseCsvSet('viewer@wjct.org'),
-      editors: parseCsvSet('editor@wjct.org'),
+      viewers: parseCsvSet('viewer@example.org'),
+      editors: parseCsvSet('editor@example.org'),
     };
-    expect(canEdit({ email: 'editor@wjct.org', iat: 1, exp: 2 }, auth)).toBe(true);
-    expect(canEdit({ email: 'viewer@wjct.org', iat: 1, exp: 2 }, auth)).toBe(false);
+    expect(canEdit({ email: 'editor@example.org', iat: 1, exp: 2 }, auth)).toBe(true);
+    expect(canEdit({ email: 'viewer@example.org', iat: 1, exp: 2 }, auth)).toBe(false);
   });
 
   test('classifies mutating HTTP and collaboration requests', () => {

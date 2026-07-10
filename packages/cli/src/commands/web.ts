@@ -8,8 +8,8 @@ import { Command, InvalidArgumentError } from 'commander';
 import { bootStartServer } from './start.ts';
 import { startUiServer, closeHttpServers } from './ui.ts';
 
-const SESSION_COOKIE = 'ok_wjct_session';
-const OAUTH_STATE_COOKIE = 'ok_wjct_oauth_state';
+const SESSION_COOKIE = 'ok_web_session';
+const OAUTH_STATE_COOKIE = 'ok_web_oauth_state';
 const DEFAULT_HOST = '0.0.0.0';
 const DEFAULT_PORT = 39849;
 const LOOPBACK_HOST = '127.0.0.1';

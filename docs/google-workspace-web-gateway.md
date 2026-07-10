@@ -1,6 +1,6 @@
-# WJCT Google Workspace Web Gateway
+# Google Workspace Web Gateway
 
-This fork adds a public/intranet-ready web gateway for OpenKnowledge. The gateway lets WJCT run OpenKnowledge as a browser-accessible service while requiring Google Workspace sign-in before users can view or edit content.
+This fork adds a public/intranet-ready web gateway for OpenKnowledge. The gateway lets an organization run OpenKnowledge as a browser-accessible service while requiring Google Workspace sign-in before users can view or edit content.
 
 ## What changed
 
@@ -20,24 +20,24 @@ This fork adds a public/intranet-ready web gateway for OpenKnowledge. The gatewa
 
 ## Intranet or internet serving
 
-The gateway is intended to be run behind WJCT infrastructure such as an intranet DNS name, reverse proxy, TLS terminator, firewall, or internet-facing load balancer.
+The gateway is intended to be run behind standard infrastructure such as an intranet DNS name, reverse proxy, TLS terminator, firewall, or internet-facing load balancer.
 
 By default, `ok web` listens on all network interfaces:
 
 ```bash
-ok web --host 0.0.0.0 --port 39849 --public-url https://openknowledge.intranet.wjct.org
+ok web --host 0.0.0.0 --port 39849 --public-url https://wiki.example.org
 ```
 
 Use an intranet hostname for an internal-only deployment, for example:
 
 ```bash
-OK_WEB_PUBLIC_URL=https://openknowledge.intranet.wjct.org
+OK_WEB_PUBLIC_URL=https://wiki.example.org
 ```
 
 Use an internet hostname for a public deployment, for example:
 
 ```bash
-OK_WEB_PUBLIC_URL=https://openknowledge.wjct.org
+OK_WEB_PUBLIC_URL=https://knowledge.example.org
 ```
 
 The `--public-url` value must match the externally reachable URL users open in the browser. It is also used to build the Google OAuth callback URL.
@@ -50,8 +50,8 @@ Set these before starting the gateway:
 export GOOGLE_CLIENT_ID="<google-oauth-client-id>"
 export GOOGLE_CLIENT_SECRET="<google-oauth-client-secret>"
 export OK_WEB_SESSION_SECRET="<long-random-session-secret>"
-export GOOGLE_WORKSPACE_DOMAIN="wjct.org"
-export OK_WEB_PUBLIC_URL="https://openknowledge.intranet.wjct.org"
+export GOOGLE_WORKSPACE_DOMAIN="example.org"
+export OK_WEB_PUBLIC_URL="https://wiki.example.org"
 ```
 
 Do not commit real secret values to the repository.
@@ -63,8 +63,8 @@ If neither allowlist is set, any signed-in user from the configured Google Works
 To separate viewers from editors, set one or both allowlists as comma-separated email addresses:
 
 ```bash
-export OK_WEB_VIEWERS="viewer1@wjct.org,viewer2@wjct.org"
-export OK_WEB_EDITORS="editor1@wjct.org,editor2@wjct.org"
+export OK_WEB_VIEWERS="viewer1@example.org,viewer2@example.org"
+export OK_WEB_EDITORS="editor1@example.org,editor2@example.org"
 ```
 
 Behavior:
@@ -80,7 +80,7 @@ In Google Cloud, configure an OAuth client for the hostname where the gateway wi
 For the default callback path, add this authorized redirect URI:
 
 ```text
-https://openknowledge.intranet.wjct.org/auth/callback
+https://wiki.example.org/auth/callback
 ```
 
 If the deployment uses a different hostname, port, or scheme, update the redirect URI accordingly.
@@ -88,12 +88,12 @@ If the deployment uses a different hostname, port, or scheme, update the redirec
 If needed, the callback can be overridden with:
 
 ```bash
-export GOOGLE_REDIRECT_URI="https://openknowledge.intranet.wjct.org/auth/callback"
+export GOOGLE_REDIRECT_URI="https://wiki.example.org/auth/callback"
 ```
 
 ## Running the gateway
 
-Example intranet launch:
+Example launch:
 
 ```bash
 cd /path/to/open-knowledge
@@ -101,8 +101,8 @@ cd /path/to/open-knowledge
 export GOOGLE_CLIENT_ID="<google-oauth-client-id>"
 export GOOGLE_CLIENT_SECRET="<google-oauth-client-secret>"
 export OK_WEB_SESSION_SECRET="<long-random-session-secret>"
-export GOOGLE_WORKSPACE_DOMAIN="wjct.org"
-export OK_WEB_PUBLIC_URL="https://openknowledge.intranet.wjct.org"
+export GOOGLE_WORKSPACE_DOMAIN="example.org"
+export OK_WEB_PUBLIC_URL="https://wiki.example.org"
 
 ok web \
   --host 0.0.0.0 \
