@@ -10,19 +10,17 @@
 
 </p>
 
-<p>
-  <a href="https://openknowledge.ai">website</a>
-  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-  <a href="https://openknowledge.ai/download/stable">macOS app</a>
-  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-  <a href="https://openknowledge.ai/docs/get-started/quickstart#ok-install-web-app-linux-windows-intel-mac">web view + cli</a>
-  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-  <a href="./src/branch/main/docs/google-workspace-web-gateway.md">Google Workspace web gateway</a>
-  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-  <a href="https://x.com/OpenKnowledge">𝕏</a>
-  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-  <a href="https://discord.com/invite/YujKpFN49">Discord</a>
-</p>
+[website](https://openknowledge.ai)
+&nbsp;&nbsp;•&nbsp;&nbsp;
+[macOS app](https://openknowledge.ai/download/stable)
+&nbsp;&nbsp;•&nbsp;&nbsp;
+[web view + cli](https://openknowledge.ai/docs/get-started/quickstart#ok-install-web-app-linux-windows-intel-mac)
+&nbsp;&nbsp;•&nbsp;&nbsp;
+[Google Workspace web gateway](docs/google-workspace-web-gateway.md)
+&nbsp;&nbsp;•&nbsp;&nbsp;
+[𝕏](https://x.com/OpenKnowledge)
+&nbsp;&nbsp;•&nbsp;&nbsp;
+[Discord](https://discord.com/invite/YujKpFN49)
 
 <br/>
 
