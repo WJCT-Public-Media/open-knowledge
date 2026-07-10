@@ -10,19 +10,19 @@
 
 </p>
 
-<div >
+<p>
   <a href="https://openknowledge.ai">website</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="https://openknowledge.ai/download/stable">macOS app</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="https://openknowledge.ai/docs/get-started/quickstart#ok-install-web-app-linux-windows-intel-mac">web view + cli</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-  <a href="docs/google-workspace-web-gateway.md">Google Workspace web gateway</a>
+  <a href="./src/branch/main/docs/google-workspace-web-gateway.md">Google Workspace web gateway</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="https://x.com/OpenKnowledge">𝕏</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="https://discord.com/invite/YujKpFN49">Discord</a>
-</div>
+</p>
 
 <br/>
 
